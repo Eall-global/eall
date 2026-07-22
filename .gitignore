@@ -31,3 +31,10 @@ public/products/hmd/hmd-watch-x1.mp4
 public/products/hmd/hmd-dub-p50.mp4
 public/products/hmd/hmd-dub-p60.mp4
 public/products/hmd/hmd-watch-p1-16x9.mp4
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
