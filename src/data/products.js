@@ -84,10 +84,10 @@ export const products = [
 
     brandSlug: "apple",
 
-    image: "/products/apple/iphone-17-Pro-Max.png",
+    image: "/products/apple/iPhone-17-Pro-Max.png",
 
     gallery: [
-      "/products/apple/iphone-17-Pro-Max.png",
+      "/products/apple/iPhone-17-Pro-Max.png",
       "/products/apple/iphone-17-pro-backSide.webp",
       "/products/apple/iphone-17-pro-side.webp",
     ],
