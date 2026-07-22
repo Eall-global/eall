@@ -5,7 +5,7 @@ export const heroSlides = [
     subtitle: "Discover the latest smartphones from trusted global brands.",
     buttonText: "Shop Now",
     buttonLink: "/products",
-    image: "/banner/banner-2.png",
+    image: "/banner/banner-2.PNG",
   },
   {
     id: 2,
@@ -14,7 +14,7 @@ export const heroSlides = [
       "Supplying retailers and distributors across Africa and the Middle East.",
     buttonText: "Learn More",
     buttonLink: "/solutions",
-    image: "/banner/banner-1.png",
+    image: "/banner/banner-1.PNG",
   },
   {
     id: 3,
@@ -22,7 +22,7 @@ export const heroSlides = [
     subtitle: "100% authentic devices backed by official warranty.",
     buttonText: "View Products",
     buttonLink: "/brands",
-    image: "/banner/banner-3.png",
+    image: "/banner/banner-3.PNG",
   },
   {
     id: 4,
