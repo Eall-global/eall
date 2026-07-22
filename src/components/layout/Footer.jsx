@@ -3,7 +3,7 @@ import Container from "../common/Container";
 import FooterTopCTA from "../footer/FooterTopCTA";
 import FooterCompany from "../footer/FooterCompany";
 
-import FooterProducts from "../footer/FooterProducts";
+import FooterProducts from "../footer/Footerproducts";
 import FooterSolutions from "../footer/FooterSolutions";
 import FooterSupport from "../footer/FooterSupport";
 import FooterTrustBar from "../footer/FooterTrustBar";
