@@ -114,7 +114,7 @@ export const brands = [
     slug: "hmd",
     name: "HMD",
     tagline: "Human Mobile Devices",
-    logo: "/brands/HMD.png",
+    logo: "/brands/hmd.png",
     banners: ["/products/hmd/homepage.avif", "/banner/nigerian-banner-4.png"],
     country: "Finland",
     founded: "2016",
