@@ -5,6 +5,7 @@ const SpecificationRow = ({ label, value }) => {
         flex
         justify-between
         items-start
+        px-3
         py-2
         border-b
         border-slate-200

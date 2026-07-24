@@ -34,7 +34,7 @@ const ProductDetailPage = () => {
       </div> */}
 
       {/* MAIN PRODUCT SECTION */}
-      <div className="grid lg:grid-cols-2 gap-12 py-10 pt-40 text-left">
+      <div className="grid lg:grid-cols-2 gap-12 py-10 pt-24 lg:pt-32 text-left">
         {/* LEFT: GALLERY */}
 
         <ProductGallery gallery={product.gallery} name={product.name} />
@@ -43,8 +43,8 @@ const ProductDetailPage = () => {
 
         <ProductInfo product={product} />
       </div>
-      <div className="grid lg:grid-cols-2 gap-12 py-10 text-left">
-        <div className=" grid md:grid-cols-2 gap-10">
+      <div className="grid lg:grid-cols-2 gap-12 py-6 lg:py-10 text-left">
+        <div className=" space-y-10">
           {/* FEATURES */}
 
           <ProductFeatures features={product.features} />

@@ -9,7 +9,7 @@ const ProductGrid = ({ products }) => {
         grid-cols-2
         lg:grid-cols-3
         xl:grid-cols-4
-        gap-8
+        gap-4 lg:gap-8
         p-6
         lg:p-10
       "

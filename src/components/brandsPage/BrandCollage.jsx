@@ -2,16 +2,16 @@ import { motion } from "framer-motion";
 import { brands } from "../../data/brandsData";
 
 const positions = [
-  "top-8 left-10",
-  "top-20 left-40",
-  "top-12 right-10",
-  "top-6 right-48",
-  "top-36 left-4",
+  "top-0 left-0",
+  "top-20 left-28 lg:left-48",
+  "top-0 right-0",
+  "top-6 right-32 lg:right-56",
+  "top-36 left-12",
   "top-32 right-24",
-  "bottom-28 left-28",
-  "bottom-20 right-24",
-  "bottom-4 right-6",
-  "bottom-4 left-6",
+  "bottom-32 left-0",
+  "bottom-20 right-20",
+  "bottom-0 right-0",
+  "bottom-0 left-0",
   "bottom-8 left-1/2 -translate-x-1/2",
   "top-52 left-1/2 -translate-x-1/2",
 ];

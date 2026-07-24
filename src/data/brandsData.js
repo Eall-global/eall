@@ -114,7 +114,7 @@ export const brands = [
     slug: "hmd",
     name: "HMD",
     tagline: "Human Mobile Devices",
-    logo: "/brands/HMD.png",
+    logo: "/brands/hmd.png",
     banners: ["/products/hmd/homepage.avif", "/banner/nigerian-banner-4.png"],
     country: "Finland",
     founded: "2016",
@@ -169,13 +169,27 @@ export const brands = [
       },
       {
         id: 2,
+        title: "HMD WATCH X1",
+        thumbnail:
+          "/GALLERY/HMD ACCESSORIES GALLERY/WATCH/WATCH X1/Gray Green/HMD_Watch_X1-GreyGreen-Angled.avif",
+        video: "/products/hmd/hmd-watch-x1.mp4",
+      },
+      {
+        id: 3,
         title: "HMD DUB P60",
         thumbnail:
           "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB P60/Black/HMD_Dub_P60-Black-Buds.avif",
         video: "/products/hmd/hmd-dub-p60.mp4",
       },
       {
-        id: 3,
+        id: 4,
+        title: "HMD WATCH P1",
+        thumbnail:
+          "/GALLERY/HMD ACCESSORIES GALLERY/WATCH/WATCH P1/SILVER/HMD_Watch_P1-Silver-Angled.avif",
+        video: "/products/hmd/hmd-watch-p1-16x9.mp4",
+      },
+      {
+        id: 5,
         title: "HMD DUB P70",
         thumbnail:
           "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB P70/White/HMD_Dub_P70-White-Buds.avif",

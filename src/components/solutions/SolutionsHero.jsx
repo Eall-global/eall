@@ -16,10 +16,10 @@ const SolutionsHero = () => {
 
       <SlideUp>
         <div className="relative z-10 flex h-162.5 items-center p-6 lg:p-10 text-left">
-          <div className="max-w-3xl text-white">
-            <span className=" inline-block text-sm font-semibol">
+          <div className="max-w-3xl mt-20 text-white">
+            {/* <span className=" inline-block text-sm font-semibol">
               BUSINESS SOLUTIONS
-            </span>
+            </span> */}
 
             <h1 className="mt-8 text-5xl lg:text-7xl font-black leading-tight">
               Technology Solutions Designed For Growth
@@ -30,17 +30,17 @@ const SolutionsHero = () => {
               distribution, and business technology solutions.
             </p>
 
-            <div className="mt-10 flex gap-5">
+            <div className="mt-10 flex flex-wrap gap-5">
               <Link
                 to="/contact"
-                className="bg-sky-700 hover:bg-sky-800 text-white px-8 py-4 rounded-xl font-semibold"
+                className="bg-sky-700 w-fit hover:bg-sky-800 text-white px-8 py-4 rounded-2xl font-semibold"
               >
                 Request Consultation
               </Link>
 
               <Link
                 to="/products"
-                className="  border border-white px-8 py-4 rounded-xl hover:bg-white hover:text-slate-900 transition  "
+                className="  border w-fit border-white px-8 py-4 rounded-2xl hover:bg-white hover:text-slate-900 transition  "
               >
                 View Products
               </Link>

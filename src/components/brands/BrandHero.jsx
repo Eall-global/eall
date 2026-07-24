@@ -28,7 +28,7 @@ const BrandHero = ({ brand }) => {
   }, [banners]);
 
   return (
-    <section className="relative  h-180 overflow-hidden">
+    <section className="relative h-[90vh] w-full">
       {/* BACKGROUND IMAGES */}
 
       {banners.map((image, index) => (
@@ -52,17 +52,15 @@ const BrandHero = ({ brand }) => {
       <div className="absolute inset-0 bg-slate-900/60 " />
       <SlideUp>
         <div className="relative z-10 items-center h-162.5 p-6 lg:p-10 text-left">
-          <div className="max-w-4xl pt-44 text-white">
+          <div className="max-w-4xl pt-32 text-white">
             {/* Partnership */}
 
             {brand.partnership && (
               <div
                 className="
                 relative
-                -top-20
-                
+                -top-12
                   inline-flex
-                  
                   items-center
                   gap-2
                   rounded-full
@@ -70,10 +68,12 @@ const BrandHero = ({ brand }) => {
                   border-sky-400/40
                   bg-sky-500/15
                   backdrop-blur-md
-                  px-5
-                  py-2
-                  text-sm
+                  px-3 lg:px-5
+                  py-1 lg:py-2
+                  lg:text-sm
+                  text-[10px]
                   font-medium
+                  tracking-wider
                   text-sky-200
                 "
               >
@@ -148,27 +148,22 @@ const BrandHero = ({ brand }) => {
               </div>
             </div>
 
-            <div className="flex gap-4 mt-10">
-              <Link
-                to="/contact"
-                className="px-8 py-4 font-semibold rounded-2xl bg-sky-700 hover:bg-sky-800 text-white items-center"
-              >
-                Request Quote
-              </Link>
-
+            <div className="mt-10">
               <Link
                 to="#products"
-                className="px-8 py-4 rounded-2xl flex items-center gap-2 border border-white hover:bg-white hover:text-slate-900 transition"
+                className="px-8 py-4 rounded-2xl inline-flex items-center gap-2 border border-white hover:bg-white hover:text-slate-900 transition"
               >
                 View Products
-                <FiArrowRight />
+                <FiArrowRight className="transition-transform group-hover:translate-x-1" />
               </Link>
             </div>
             <div
               className="
             absolute
+            hidden
+            lg:block
             bottom-8
-            right-0
+            right-2
             text-white/70
             text-sm
           "

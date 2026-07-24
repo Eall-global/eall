@@ -10,7 +10,7 @@ const BrandPageHero = ({ totalBrands, totalProducts, onSearch, search }) => {
       className="
        bg-white
         py-20
-        px-10
+        px-6  lg:px-10
     
       "
     >

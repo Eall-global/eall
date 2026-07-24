@@ -17,13 +17,16 @@ const RelatedProducts = ({ currentProduct }) => {
   if (!related.length) return null;
 
   return (
-    <SectionCard title="Related Products">
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+    <section className=" bg-white">
+      <h2 className="text-3xl text-slate-900! text-left font-bold mb-6!">
+        Related Products
+      </h2>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 lg:gap-8">
         {related.map((product) => (
           <ProductCard key={product.id} product={product} />
         ))}
       </div>
-    </SectionCard>
+    </section>
   );
 };
 

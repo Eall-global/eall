@@ -137,21 +137,37 @@ const BrandPage = () => {
 
       {brand.videos?.length > 0 && <BrandVideoGallery videos={brand.videos} />}
 
-      <BrandToolbar
-        search={search}
-        onSearch={setSearch}
-        sort={sort}
-        onSort={setSort}
+      <div className="text-left bg-white py-4 px-6 lg:px-10 lg:py-6">
+        <h2 className="text-3xl font-bold text-slate-900!">Explore Products</h2>
+
+        <p className="text-slate-500 mt-2!">
+          Browse the complete range of {brand.name} products available through
+          E-ALL.
+        </p>
+      </div>
+      <div className=" bg-white flex flex-col-reverse lg:flex-row lg:items-center lg:justify-between ">
+        <div className="w-full lg:flex-1 min-w-0">
+          <BrandCategories
+            categories={brand.categories}
+            selectedCategory={category}
+            onSelect={setCategory}
+          />
+        </div>
+
+        <div className="w-full lg:w-auto shrink-0">
+          <BrandToolbar
+            search={search}
+            onSearch={setSearch}
+            sort={sort}
+            onSort={setSort}
+          />
+        </div>
+      </div>
+
+      <BrandProducts
         total={filteredProducts.length}
+        products={sortedProducts.slice(0, visibleCount)}
       />
-
-      <BrandCategories
-        categories={brand.categories}
-        selectedCategory={category}
-        onSelect={setCategory}
-      />
-
-      <BrandProducts products={sortedProducts.slice(0, visibleCount)} />
 
       {visibleCount < sortedProducts.length && (
         <div className="text-center bg-white py-10">

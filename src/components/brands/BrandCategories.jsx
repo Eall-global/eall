@@ -1,3 +1,4 @@
+import StaggerContainer from "../animations/StaggerContainer";
 import Container from "../common/Container";
 
 const BrandCategories = ({ categories, selectedCategory, onSelect }) => {
@@ -10,18 +11,18 @@ const BrandCategories = ({ categories, selectedCategory, onSelect }) => {
   ];
 
   return (
-    <section className=" py-4 bg-white">
-      <Container>
-        <div className="flex flex-wrap gap-3">
+    <section className="py-2 px-6 lg:px-10 lg:py-4">
+      <div className=" overflow-x-auto whitespace-nowrap scrollbar-hide">
+        <StaggerContainer className="flex lg:flex-wrap gap-3 w-max lg:w-auto">
           {allCategories.map((category) => (
             <button
               key={category.slug}
               onClick={() => onSelect(category.slug)}
               className={`
                 px-5
-                py-2.5
+                py-2
                 rounded-full
-                text-sm
+                lg:text-sm text-xs
                 font-medium
                 transition
 
@@ -35,8 +36,8 @@ const BrandCategories = ({ categories, selectedCategory, onSelect }) => {
               {category.name}
             </button>
           ))}
-        </div>
-      </Container>
+        </StaggerContainer>
+      </div>
     </section>
   );
 };

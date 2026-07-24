@@ -103,7 +103,7 @@ Thank you.
   )}`;
 
   return (
-    <SectionCard>
+    <SectionCard className=" p-6!">
       <div className=" space-y-4">
         <div>
           <h3 className="text-xl font-bold text-slate-900">

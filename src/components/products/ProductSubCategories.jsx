@@ -5,12 +5,12 @@ const ProductSubCategories = ({ subCategories = [], selected, onChange }) => {
   if (!subCategories.length) return null;
 
   return (
-    <section className="bg-white px-6 lg:px-10 py-6">
-      <StaggerContainer className="flex flex-wrap gap-3">
+    <section className="bg-white py-2 px-6 lg:px-10 lg:py-4">
+      <StaggerContainer className="flex lg:flex-wrap gap-3 overflow-x-auto whitespace-nowrap scrollbar-hide">
         <StaggerItem key="all">
           <button
             onClick={() => onChange("All")}
-            className={`rounded-full px-5 py-2 text-sm font-medium transition
+            className={`shrink-0 rounded-full px-5 py-2 text-xs lg:text-sm font-medium transition
               ${
                 selected === "All"
                   ? "bg-sky-100 border-2 border-sky-700"
@@ -25,7 +25,7 @@ const ProductSubCategories = ({ subCategories = [], selected, onChange }) => {
           <button
             key={item.slug}
             onClick={() => onChange(item.slug)}
-            className={`rounded-full px-5 py-2 text-sm font-medium transition
+            className={`shrink-0 rounded-full px-5 py-2 text-xs lg:text-sm font-medium transition
                 ${
                   selected === item.slug
                     ? "bg-sky-100 border-2 border-sky-700"

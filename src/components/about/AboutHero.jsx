@@ -5,7 +5,7 @@ import { aboutData } from "./aboutData";
 const AboutHero = () => {
   return (
     <section
-      className="relative h-162.5 bg-cover bg-center"
+      className="relative min-h-[85vh] bg-cover bg-center"
       style={{
         backgroundImage: `url(${aboutData.hero.image})`,
       }}

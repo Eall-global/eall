@@ -15,10 +15,10 @@ const ServicesHero = () => {
 
       <SlideUp>
         <div className="relative z-10 flex h-162.5 items-center p-6 lg:p-10 text-left">
-          <div className=" max-w-4xl">
-            <span className=" inline-block  text-sm font-semibol">
+          <div className=" max-w-4xl mt-20">
+            {/* <span className=" inline-block text-sm font-semibol">
               BUSINESS SOLUTIONS
-            </span>
+            </span> */}
 
             <h1 className=" mt-4! text-5xl lg:text-7xl font-black leading-tight ">
               Technology Distribution

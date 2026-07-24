@@ -1,5 +1,4 @@
 import ProductSubCategories from "../../components/products/ProductSubCategories";
-import ProductToolbar from "../../components/products/ProductToolbar";
 import ProductGrid from "../../components/products/ProductGrid";
 import ProductEmptyState from "../../components/products/ProductEmptyState";
 
@@ -8,6 +7,7 @@ import { products } from "../../data/products/index";
 import { useEffect, useMemo, useState } from "react";
 import { brands } from "../../data/brandsData";
 import { useSearchParams } from "react-router-dom";
+import ProductToolbar from "../../components/products/toolbar/ProductToolbar";
 
 const shuffleArray = (array) => {
   const shuffled = [...array];
@@ -145,7 +145,7 @@ const AllProductsPage = () => {
   ]);
 
   return (
-    <div className=" bg-white pt-30">
+    <div className=" bg-white lg:pt-32 pt-24">
       <ProductToolbar
         search={search}
         onSearch={setSearch}
@@ -166,7 +166,7 @@ const AllProductsPage = () => {
         />
       )}
 
-      <div className="py-6 text-sm text-slate-500 bg-white">
+      <div className="py-4 text-sm text-slate-500 bg-white">
         Showing
         <span className="font-semibold text-sky-700 mx-1">
           {filteredProducts.length}

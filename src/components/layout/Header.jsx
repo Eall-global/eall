@@ -37,7 +37,7 @@ const Header = () => {
   }, [activeMenu]);
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia("(min-width:768px)");
+    const mediaQuery = window.matchMedia("(min-width:1280px)");
 
     const handleResize = () => {
       setActiveMenu(null);
@@ -68,7 +68,7 @@ const Header = () => {
          ${headerSolid ? "bg-white shadow-md py-3" : "bg-transparent py-4"}
         `}
         >
-          <div className="mx-auto w-full flex items-center justify-between px-6 xl:px-10">
+          <div className="mx-auto w-full flex items-center justify-between px-6 md:px-8 lg:px-10">
             {/* LEFT: LOGO */}
             <div className="flex flex-col leading-tight">
               <div className="flex items-center">
@@ -87,12 +87,17 @@ const Header = () => {
             </div>
 
             {/* CENTER: DESKTOP NAV */}
-            <Navigation activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
+            <div className="hidden xl:flex">
+              <Navigation
+                activeMenu={activeMenu}
+                setActiveMenu={setActiveMenu}
+              />
+            </div>
 
             {/* RIGHT: ACTIONS */}
             <div className="flex items-center gap-3">
               {/* Quote Button */}
-              <div className="hidden md:block">
+              <div className="hidden xl:block">
                 <QuoteButton
                   onClick={() => {
                     setActiveMenu(null);
@@ -102,7 +107,7 @@ const Header = () => {
               </div>
 
               {/* Search Button */}
-              <div className="hidden md:block">
+              <div className="hidden xl:block">
                 <SearchButton
                   onClick={() => {
                     setActiveMenu(null);
@@ -113,7 +118,7 @@ const Header = () => {
 
               {/* Mobile Menu Toggle */}
               <button
-                className="md:hidden text-2xl text-slate-700 cursor-pointer"
+                className="xl:hidden text-2xl text-slate-700 cursor-pointer"
                 onClick={() => setIsMobileOpen(true)}
               >
                 <FiMenu />
