@@ -8,7 +8,7 @@ const HeroSlide = ({ title, subtitle, buttonText, buttonLink, image }) => {
       <img
         src={image}
         alt={title}
-        className="absolute inset-0 bg-center h-full object-cover"
+        className="absolute inset-0 w-full h-full object-cover"
       />
 
       {/* Overlay */}
