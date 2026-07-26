@@ -1,5 +1,7 @@
 import { useParams } from "react-router-dom";
+import { useState, useEffect } from "react";
 
+import ProductVariants from "../../components/products/ProductVariants";
 import Container from "../../components/common/Container";
 import ProductGallery from "../../components/products/ProductGallery";
 import ProductInfo from "../../components/products/ProductInfo";
@@ -10,11 +12,22 @@ import RelatedProducts from "../../components/products/RelatedProducts";
 
 import { products } from "../../data/products/index";
 import { brands } from "../../data/brandsData";
+import { getDefaultVariant } from "../../utils/productVariant";
 
 const ProductDetailPage = () => {
   const { slug } = useParams();
 
   const product = products.find((p) => p.slug === slug);
+
+  const [selectedVariant, setSelectedVariant] = useState(
+    getDefaultVariant(product),
+  );
+
+  useEffect(() => {
+    if (product) {
+      setSelectedVariant(getDefaultVariant(product));
+    }
+  }, [slug, product]);
 
   if (!product) {
     return (
@@ -37,11 +50,19 @@ const ProductDetailPage = () => {
       <div className="grid lg:grid-cols-2 gap-12 py-10 pt-24 lg:pt-32 text-left">
         {/* LEFT: GALLERY */}
 
-        <ProductGallery gallery={product.gallery} name={product.name} />
+        <ProductGallery
+          gallery={selectedVariant?.gallery || product.gallery}
+          image={selectedVariant?.image || product.image}
+          name={product.name}
+        />
 
         {/* RIGHT: INFO + CTA (sticky on desktop) */}
 
-        <ProductInfo product={product} />
+        <ProductInfo
+          product={product}
+          selectedVariant={selectedVariant || getDefaultVariant(product)}
+          onVariantChange={setSelectedVariant}
+        />
       </div>
       <div className="grid lg:grid-cols-2 gap-12 py-6 lg:py-10 text-left">
         <div className=" space-y-10">

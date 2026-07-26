@@ -2,7 +2,7 @@ import ProductCard from "../products/ProductCard";
 
 const BrandProducts = ({ products, total }) => {
   return (
-    <section id="products" className=" p-6 lg:p-10 bg-white">
+    <section id="products" className=" py-2 px-6 lg:px-10 lg:py-4 bg-white">
       <p className="text-slate-500 text-xs lg:text-sm pb-4">
         Showing {total} products
       </p>

@@ -93,37 +93,6 @@ space-y-6
           ))}
         </StaggerContainer>
       </div>
-
-      {/* MOBILE IMAGE */}
-
-      <div
-        className="
-lg:hidden
-mt-12
-flex
-justify-center
-"
-      >
-        <div
-          className="
-w-64
-h-64
-rounded-full
-overflow-hidden
-shadow-xl
-"
-        >
-          <img
-            src="/images/about/solution-center.webp"
-            alt="E-ALL"
-            className="
-w-full
-h-full
-object-cover
-"
-          />
-        </div>
-      </div>
     </section>
   );
 };

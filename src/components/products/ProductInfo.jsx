@@ -28,7 +28,7 @@ const availabilityStyles = {
   },
 };
 
-const ProductInfo = ({ product }) => {
+const ProductInfo = ({ product, selectedVariant, onVariantChange }) => {
   const availability =
     availabilityStyles[product.availability] ||
     availabilityStyles["Available on Request"];
@@ -110,11 +110,55 @@ const ProductInfo = ({ product }) => {
         )}
       </div>
 
+      {/* Colour Selection */}
+
+      {product.variants?.length > 0 && (
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900">
+            Available Colours
+          </h3>
+
+          <div className="flex flex-wrap gap-3 mt-4">
+            {product.variants.map((variant) => (
+              <button
+                key={variant.colorSlug}
+                onClick={() => onVariantChange(variant)}
+                className={`
+                        flex
+                        items-center
+                        gap-3
+                        px-3
+                        py-2
+                        rounded-xl
+                        border-2
+                        transition
+
+                        ${
+                          selectedVariant.colorSlug === variant.colorSlug
+                            ? "border-sky-700 bg-sky-50"
+                            : "border-slate-200 hover:border-slate-300"
+                        }
+                    `}
+              >
+                <img
+                  src={variant.image}
+                  alt={variant.color}
+                  className="w-10 h-10 object-contain"
+                />
+
+                <span className="font-medium">{variant.color}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Information Grid */}
       <div
         className="
           grid
           grid-cols-2
+          
           gap-5
           border
           rounded-2xl
@@ -122,7 +166,11 @@ const ProductInfo = ({ product }) => {
           p-6
         "
       >
-        <InfoItem icon={<FiPackage />} label="SKU" value={product.sku} />
+        <InfoItem
+          icon={<FiPackage />}
+          label="SKU"
+          value={selectedVariant?.sku || product.sku}
+        />
 
         <InfoItem
           icon={<FiGrid />}

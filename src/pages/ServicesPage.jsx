@@ -9,7 +9,7 @@ import FAQAccordion from "../components/common/FAQAccordion";
 
 const ServicesPage = () => {
   return (
-    <>
+    <div className="min-h-screen overflow-x-hidden">
       <ServicesHero />
 
       <ServicesGrid />
@@ -25,7 +25,7 @@ const ServicesPage = () => {
       <GlobalCoverage />
 
       <CTASection />
-    </>
+    </div>
   );
 };
 

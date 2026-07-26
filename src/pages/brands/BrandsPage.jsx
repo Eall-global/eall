@@ -76,7 +76,7 @@ Sorting
   };
 
   return (
-    <section className="min-h-fit bg-white">
+    <section className="min-h-fit bg-white overflow-x-hidden">
       <div className=" py-10">
         <BrandPageHero
           totalBrands={brands.length}

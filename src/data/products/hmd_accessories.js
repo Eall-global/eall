@@ -55,6 +55,7 @@ const hmdAccessories = [
       {
         color: "Black",
         colorSlug: "black",
+        isDefault: true,
         sku: "7000000357",
         image:
           "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB P50/Black/HMD_Dub_P50-Black-Buds.avif",
@@ -162,6 +163,7 @@ const hmdAccessories = [
       {
         color: "Black",
         colorSlug: "black",
+        isDefault: true,
         sku: "7000000360",
         image:
           "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB P60/Black/HMD_Dub_P60-Black-Buds.avif",
@@ -264,6 +266,7 @@ const hmdAccessories = [
       {
         color: "Black",
         colorSlug: "black",
+        isDefault: true,
         sku: "7000000362",
 
         image:
@@ -343,13 +346,13 @@ const hmdAccessories = [
     brandSlug: "hmd",
 
     image:
-      "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB S60/Gray/HMD_Dub_S60-Gray-Case_OpenFront.avif",
+      "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB S60/Purple/HMD_Dub_S60-Purple-Case_OpenFront.avif",
 
     gallery: [
-      "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB S60/Gray/HMD_Dub_S60-Gray-Buds2.avif",
-      "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB S60/Gray/HMD_Dub_S60-Gray-Case_OpenFront.avif",
-      "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB S60/Gray/HMD_Dub_S60-Gray-Case_Open.avif",
-      "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB S60/Gray/HMD_Dub_S60-Gray-Case.avif",
+      "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB S60/Purple/HMD_Dub_S60-Purple-Buds2.avif",
+      "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB S60/Purple/HMD_Dub_S60-Purple-Case_OpenFront.avif",
+      "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB S60/Purple/HMD_Dub_S60-Purple-Case_Open.avif",
+      "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB S60/Purple/HMD_Dub_S60-Purple-Case.avif",
     ],
 
     category: "consumer-electronics",
@@ -385,10 +388,11 @@ const hmdAccessories = [
       {
         color: "Purple",
         colorSlug: "purple",
+        isDefault: true,
         sku: "7000000367",
 
         image:
-          "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB S60/Purple/HMD_Dub_S60-Purple-Buds2.avif",
+          "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB S60/Purple/HMD_Dub_S60-Purple-Case_OpenFront.avif",
 
         gallery: [
           "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB S60/Purple/HMD_Dub_S60-Purple-Buds2.avif",
@@ -478,6 +482,7 @@ const hmdAccessories = [
       {
         color: "Black",
         colorSlug: "black",
+        isDefault: true,
         sku: "7000000368",
 
         image:
@@ -576,16 +581,17 @@ const hmdAccessories = [
       {
         color: "Silver",
         colorSlug: "silver",
+        isDefault: true,
         sku: "7000000370",
 
         image:
-          "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB PRO X50/Silver/HMD_Dub_X50Pro-Silver-Buds.avif",
+          "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB PRO X50/Silver/HMD_Dub_X50_Pro-Silver-Buds.avif",
 
         gallery: [
-          "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB PRO X50/Silver/HMD_Dub_X50Pro-Silver-Buds.avif",
-          "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB PRO X50/Silver/HMD_Dub_X50Pro-Silver-Case.avif",
-          "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB PRO X50/Silver/HMD_Dub_X50Pro-Silver-Case_Open.avif",
-          "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB PRO X50/Silver/HMD_Dub_X50Pro-Silver-Lifestyle.avif",
+          "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB PRO X50/Silver/HMD_Dub_X50_Pro-Silver-Buds.avif",
+          "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB PRO X50/Silver/HMD_Dub_X50_Pro-Silver-Case.avif",
+          "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB PRO X50/Silver/HMD_Dub_X50_Pro-Silver-Case_Open.avif",
+          "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB PRO X50/Silver/HMD_Dub_X50_Pro-Silver-Lifestyle.avif",
         ],
       },
       {
@@ -594,13 +600,13 @@ const hmdAccessories = [
         sku: "7000000371",
 
         image:
-          "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB PRO X50/Blue/HMD_Dub_X50Pro-Blue-Buds.avif",
+          "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB PRO X50/Blue/HMD_Dub_X50_Pro-Blue-Buds.avif",
 
         gallery: [
-          "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB PRO X50/Blue/HMD_Dub_X50Pro-Blue-Buds.avif",
-          "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB PRO X50/Blue/HMD_Dub_X50Pro-Blue-Case.avif",
-          "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB PRO X50/Blue/HMD_Dub_X50Pro-Blue-Case_Open.avif",
-          "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB PRO X50/Blue/HMD_Dub_X50Pro-Blue-Lifestyle.avif",
+          "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB PRO X50/Blue/HMD_Dub_X50_Pro-Blue-Buds.avif",
+          "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB PRO X50/Blue/HMD_Dub_X50_Pro-Blue-Case.avif",
+          "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB PRO X50/Blue/HMD_Dub_X50_Pro-Blue-Case_Open.avif",
+          "/GALLERY/HMD ACCESSORIES GALLERY/DUB/DUB PRO X50/Blue/HMD_Dub_X50_Pro-Blue-Lifestyle.avif",
         ],
       },
     ],
@@ -696,6 +702,7 @@ const hmdAccessories = [
       {
         color: "Black",
         colorSlug: "black",
+        isDefault: true,
         sku: "7000000374",
 
         image:
@@ -756,13 +763,13 @@ const hmdAccessories = [
     brandSlug: "hmd",
 
     image:
-      "/GALLERY/HMD ACCESSORIES GALLERY/WATCH/WATCH X1/Black/HMD_Watch_X1-Black-Angled.avif",
+      "/GALLERY/HMD ACCESSORIES GALLERY/WATCH/WATCH X1/Silver Leather/HMD_Watch_X1-SilverLeather-Angled.avif",
 
     gallery: [
-      "/GALLERY/HMD ACCESSORIES GALLERY/WATCH/WATCH X1/Black/HMD_Watch_X1-Black-Angled.avif",
-      "/GALLERY/HMD ACCESSORIES GALLERY/WATCH/WATCH X1/Black/HMD_Watch_X1-Black-Front.avif",
-      "/GALLERY/HMD ACCESSORIES GALLERY/WATCH/WATCH X1/Black/HMD_Watch_X1-Black-Side.avif",
-      "/GALLERY/HMD ACCESSORIES GALLERY/WATCH/WATCH X1/Black/HMD_Watch_X1-Black-Top.avif",
+      "/GALLERY/HMD ACCESSORIES GALLERY/WATCH/WATCH X1/Silver Leather/HMD_Watch_X1-SilverLeather-Angled.avif",
+      "/GALLERY/HMD ACCESSORIES GALLERY/WATCH/WATCH X1/Silver Leather/HMD_Watch_X1-SilverLeather-Front.avif",
+      "/GALLERY/HMD ACCESSORIES GALLERY/WATCH/WATCH X1/Silver Leather/HMD_Watch_X1-SilverLeather-Side.avif",
+      "/GALLERY/HMD ACCESSORIES GALLERY/WATCH/WATCH X1/Silver Leather/HMD_Watch_X1-SilverLeather-Top.avif",
     ],
 
     category: "consumer-electronics",
@@ -798,6 +805,7 @@ const hmdAccessories = [
       {
         color: "Silver Leather",
         colorSlug: "silver-leather",
+        isDefault: true,
         sku: "7000000377",
 
         image:

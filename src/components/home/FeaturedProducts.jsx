@@ -38,7 +38,7 @@ const FeaturedProducts = () => {
         </Link>
 
         {/* Grid */}
-        <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 mt-10">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-8 mt-10">
           {featuredProducts.length > 0 ? (
             featuredProducts.map((product) => (
               <ProductCard key={product.id} product={product} />

@@ -149,13 +149,18 @@ const BrandHero = ({ brand }) => {
             </div>
 
             <div className="mt-10">
-              <Link
-                to="#products"
+              <button
+                onClick={() => {
+                  document.getElementById("products")?.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start",
+                  });
+                }}
                 className="px-8 py-4 rounded-2xl inline-flex items-center gap-2 border border-white hover:bg-white hover:text-slate-900 transition"
               >
                 View Products
                 <FiArrowRight className="transition-transform group-hover:translate-x-1" />
-              </Link>
+              </button>
             </div>
             <div
               className="

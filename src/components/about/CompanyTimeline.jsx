@@ -28,7 +28,6 @@ const CompanyTimeline = () => {
         <StaggerContainer
           className="
       relative
-      max-w-7xl
       mx-auto
       h-105
       flex
@@ -53,7 +52,7 @@ const CompanyTimeline = () => {
         relative
         w-full
         flex
-        justify-between
+        justify-evenly
       "
           >
             {timeline.map((item, index) => (

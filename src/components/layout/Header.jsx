@@ -9,6 +9,7 @@ import SearchButton from "../buttons/SearchButton";
 import QuoteButton from "../buttons/QuoteButton";
 import SearchDrawer from "../search/SearchDrawer";
 import ProductMegaMenu from "../navigation/megaMenu/ProductMegaMenu";
+import { brands } from "../../data/brandsData";
 
 const Header = () => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -57,6 +58,8 @@ const Header = () => {
     setIsMobileOpen(false);
   }, [location.pathname]);
 
+  const brand = brands.find((b) => location.pathname === `/brands/${b.slug}`);
+
   return (
     <>
       <div ref={headerRef}>
@@ -71,7 +74,7 @@ const Header = () => {
           <div className="mx-auto w-full flex items-center justify-between px-6 md:px-8 lg:px-10">
             {/* LEFT: LOGO */}
             <div className="flex flex-col leading-tight">
-              <div className="flex items-center">
+              <div className="flex items-center gap-3">
                 <Link
                   to="/"
                   onClick={() => setActiveMenu(null)}
@@ -83,6 +86,17 @@ const Header = () => {
                     className="h-12 md:h-16 lg:h-20 w-auto object-contain"
                   />
                 </Link>
+                {brand && (
+                  <>
+                    <div className="h-8 w-px bg-slate-500" />
+
+                    <img
+                      src={brand.logo}
+                      alt={brand.name}
+                      className="h-8 lg:h-10 object-contain"
+                    />
+                  </>
+                )}
               </div>
             </div>
 
@@ -118,7 +132,7 @@ const Header = () => {
 
               {/* Mobile Menu Toggle */}
               <button
-                className="xl:hidden text-2xl text-slate-700 cursor-pointer"
+                className={`  xl:hidden text-2xl cursor-pointer transition-colors duration-300 ${headerSolid ? "text-slate-900" : "text-slate-300"} `}
                 onClick={() => setIsMobileOpen(true)}
               >
                 <FiMenu />

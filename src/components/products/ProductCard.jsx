@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
 import { FiArrowRight, FiCheckCircle } from "react-icons/fi";
 import { FaStar } from "react-icons/fa";
+import { useState } from "react";
+import { getColorSwatch } from "../../utils/getColorSwatch";
 
 const ProductCard = ({ product }) => {
   const availabilityConfig = {
@@ -29,14 +31,19 @@ const ProductCard = ({ product }) => {
     availabilityConfig[product.availability] ||
     availabilityConfig["Available on Request"];
 
+  const defaultVariant =
+    product.variants?.find((v) => v.isDefault) ?? product.variants?.[0];
+
+  const [previewVariant, setPreviewVariant] = useState(defaultVariant);
+
   return (
     <Link to={`/products/${product.slug}`} className=" block group h-full ">
-      <article className="group bg-white rounded-2xl border-8 border-slate-100 overflow-hidden hover:shadow-lg transition-all duration-300 h-full cursor-pointer">
+      <article className="group bg-white rounded-2xl border-8 border-slate-100 overflow-hidden hover:shadow-lg transition-all duration-300 h-full flex flex-col cursor-pointer">
         {/* IMAGE */}
 
         <div className="relative bg-white-50 h-48 lg:h-64 flex items-center justify-center overflow-hidden">
           <img
-            src={product.image}
+            src={previewVariant?.image || product.image}
             alt={product.name}
             className="h-full w-full object-contain p-6 transition-transform duration-500 group-hover:scale-105"
           />
@@ -64,7 +71,7 @@ const ProductCard = ({ product }) => {
 
         {/* CONTENT */}
 
-        <div className=" lg:p-6 p-4 bg-slate-100 h-full">
+        <div className="lg:p-6 p-4 bg-slate-100 flex flex-col flex-1">
           <p className=" text-xs uppercase tracking-wide text-sky-700 font-semibold">
             {product.brand}
           </p>
@@ -98,11 +105,45 @@ const ProductCard = ({ product }) => {
             )}
           </div>
 
-          {/* CTA */}
+          {product.variants?.length > 0 && (
+            <div className="mt-5 flex items-center gap-2">
+              {product.variants.map((variant) => (
+                <button
+                  key={variant.colorSlug}
+                  type="button"
+                  onMouseEnter={() => setPreviewVariant(variant)}
+                  onMouseLeave={() => setPreviewVariant(defaultVariant)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setPreviewVariant(variant);
+                  }}
+                  title={variant.color}
+                  className={`
+          h-5
+          w-5
+          rounded-full
+          border-2
+          transition-all
+          ${
+            previewVariant?.colorSlug === variant.colorSlug
+              ? "border-sky-600 scale-110"
+              : "border-slate-300 hover:border-sky-400"
+          }
+        `}
+                  style={{
+                    backgroundColor: getColorSwatch(variant.color),
+                  }}
+                />
+              ))}
+            </div>
+          )}
 
-          <div className="mt-6 flex items-center justify-between text-sky-700 font-semibold text-sm group-hover:text-sky-800">
-            View Details
-            <FiArrowRight className="transition-transform group-hover:translate-x-1" />
+          {/* CTA */}
+          <div className="mt-auto">
+            <div className="mt-6 flex items-center justify-between text-sky-700 font-semibold text-sm group-hover:text-sky-800">
+              View Details
+              <FiArrowRight className="transition-transform group-hover:translate-x-1" />
+            </div>
           </div>
         </div>
       </article>

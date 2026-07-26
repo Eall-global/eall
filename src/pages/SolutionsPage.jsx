@@ -11,7 +11,7 @@ import IndustrySolutions from "../components/solutions/IndustrySolutions";
 
 const SolutionsPage = () => {
   return (
-    <>
+    <div className="min-h-screen overflow-x-hidden">
       <SolutionsHero />
 
       <SolutionsGrid />
@@ -29,7 +29,7 @@ const SolutionsPage = () => {
       <FAQAccordion />
 
       <BusinessCTA />
-    </>
+    </div>
   );
 };
 

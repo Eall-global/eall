@@ -53,7 +53,7 @@ export const companyStats = [
 export const timeline = [
   {
     year: "2008",
-    title: "Fast Track Global Established",
+    title: "FTG Established",
     description: "Started trading and logistics operations.",
   },
 

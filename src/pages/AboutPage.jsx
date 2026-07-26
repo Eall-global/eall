@@ -11,7 +11,7 @@ import GlobalCoverage from "../components/services/GlobalCoverage";
 
 const AboutPage = () => {
   return (
-    <>
+    <div className="min-h-screen overflow-x-hidden">
       <AboutHero />
 
       <CompanyStory />
@@ -29,7 +29,7 @@ const AboutPage = () => {
       <BusinessSolutions />
 
       <GlobalCoverage />
-    </>
+    </div>
   );
 };
 

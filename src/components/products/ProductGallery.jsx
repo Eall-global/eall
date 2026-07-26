@@ -1,8 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { FiImage } from "react-icons/fi";
 
-const ProductGallery = ({ gallery = [], name }) => {
-  const images = gallery.length ? gallery : ["/placeholder-product.png"];
+const ProductGallery = ({ gallery = [], image, name }) => {
+  const images = gallery?.length
+    ? gallery
+    : image
+      ? [image]
+      : ["/placeholder-product.png"];
   const touchStart = useRef(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const activeImage = images[currentIndex];

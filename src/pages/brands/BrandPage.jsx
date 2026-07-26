@@ -117,7 +117,7 @@ const BrandPage = () => {
   ];
 
   return (
-    <>
+    <div className="min-h-screen overflow-x-hidden">
       <BrandSEO brand={brand} />
 
       <BrandHero brand={brand} />
@@ -145,7 +145,10 @@ const BrandPage = () => {
           E-ALL.
         </p>
       </div>
-      <div className=" bg-white flex flex-col-reverse lg:flex-row lg:items-center lg:justify-between ">
+      <div
+        id="products"
+        className=" scroll-mt-36 bg-white flex flex-col-reverse lg:flex-row lg:items-center lg:justify-between "
+      >
         <div className="w-full lg:flex-1 min-w-0">
           <BrandCategories
             categories={brand.categories}
@@ -193,7 +196,7 @@ const BrandPage = () => {
       <RecentlyViewedProducts products={recentlyViewed} />
 
       <BrandCTA brand={brand} />
-    </>
+    </div>
   );
 };
 
