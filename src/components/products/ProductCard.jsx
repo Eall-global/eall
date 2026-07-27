@@ -95,7 +95,7 @@ const ProductCard = ({ product }) => {
 
           {/* STATUS */}
 
-          <div className="mt-5 flex items-center justify-between">
+          {/* <div className="mt-5 flex items-center justify-between">
             {product.warranty && (
               <span className="flex items-center gap-1 text-xs text-slate-500">
                 <FiCheckCircle className="text-green-600" />
@@ -103,10 +103,10 @@ const ProductCard = ({ product }) => {
                 {product.warranty}
               </span>
             )}
-          </div>
+          </div> */}
 
           {product.variants?.length > 0 && (
-            <div className="mt-5 flex items-center gap-2">
+            <div className="mt-5 flex items-center flex-wrap gap-2">
               {product.variants.map((variant) => (
                 <button
                   key={variant.colorSlug}
