@@ -36,6 +36,7 @@ const AppRoutes = () => {
         <Route path="/contact" element={<Contact />} />
         {/* AUTHENTICITY CHECKER */}
         <Route path="/verify" element={<VerifyPage />} />
+        <Route path="/verify/:imei" element={<VerifyPage />} />
       </Route>
     </Routes>
   );

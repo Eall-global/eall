@@ -239,11 +239,10 @@ const VerifyPage = () => {
                     setMode("manual");
                     setScannerActive(false);
                   }}
-                  className={`py-3 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer ${
-                    mode === "manual"
-                      ? "bg-white text-sky-700 shadow-sm"
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
+                  className={`py-3 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer ${mode === "manual"
+                    ? "bg-white text-sky-700 shadow-sm"
+                    : "text-slate-500 hover:text-slate-800"
+                    }`}
                 >
                   <FiSmartphone className="text-base" />
                   Enter IMEI
@@ -258,11 +257,10 @@ const VerifyPage = () => {
                     setMode("scan");
                     setScannerActive(true);
                   }}
-                  className={`py-3 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer ${
-                    mode === "scan"
-                      ? "bg-white text-sky-700 shadow-sm"
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
+                  className={`py-3 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer ${mode === "scan"
+                    ? "bg-white text-sky-700 shadow-sm"
+                    : "text-slate-500 hover:text-slate-800"
+                    }`}
                 >
                   <FiCamera className="text-base" />
                   Scan Code
@@ -293,19 +291,17 @@ const VerifyPage = () => {
                         maxLength={19} // 15 digits + 3 spaces
                         autoComplete="off"
                         spellCheck="false"
-                        className={`w-full pl-11 pr-16 py-3.5 sm:py-4 bg-slate-50 border-2 rounded-2xl text-slate-900 text-base sm:text-lg font-mono font-bold tracking-widest outline-none transition-all placeholder:text-slate-400 placeholder:font-sans placeholder:font-normal placeholder:tracking-normal placeholder:text-sm ${
-                          inputError
-                            ? "border-rose-400 bg-rose-50/30 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10"
-                            : "border-slate-200 focus:bg-white focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10"
-                        }`}
+                        className={`w-full pl-11 pr-16 py-3.5 sm:py-4 bg-slate-50 border-2 rounded-2xl text-slate-900 text-base sm:text-lg font-mono font-bold tracking-widest outline-none transition-all placeholder:text-slate-400 placeholder:font-sans placeholder:font-normal placeholder:tracking-normal placeholder:text-sm ${inputError
+                          ? "border-rose-400 bg-rose-50/30 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10"
+                          : "border-slate-200 focus:bg-white focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10"
+                          }`}
                       />
                       {imeiInput.length > 0 && (
                         <span
-                          className={`absolute right-4 text-xs font-semibold px-2 py-0.5 rounded-md font-mono ${
-                            imeiInput.length === 15
-                              ? "bg-emerald-100 text-emerald-700"
-                              : "bg-slate-200/70 text-slate-600"
-                          }`}
+                          className={`absolute right-4 text-xs font-semibold px-2 py-0.5 rounded-md font-mono ${imeiInput.length === 15
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-slate-200/70 text-slate-600"
+                            }`}
                         >
                           {imeiInput.length}/15
                         </span>
@@ -323,7 +319,7 @@ const VerifyPage = () => {
                       id="verify-submit-btn"
                       type="submit"
                       disabled={imeiInput.length !== 15}
-                      className="w-full mt-5 py-3.5 sm:py-4 px-6 rounded-2xl bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white font-bold text-sm sm:text-base shadow-lg shadow-sky-600/25 active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none cursor-pointer"
+                      className="w-full mt-5 py-3.5 sm:py-4 px-6 rounded-2xl bg-linear-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white font-bold text-sm sm:text-base shadow-lg shadow-sky-600/25 active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none cursor-pointer"
                     >
                       <FiShield className="text-lg" />
                       Verify Authenticity
