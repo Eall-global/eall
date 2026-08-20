@@ -37,8 +37,8 @@ const VerifyResult = ({ result, onReset }) => {
   const borderColor = isAuthentic
     ? "border-t-emerald-500"
     : isNotFound
-    ? "border-t-amber-500"
-    : "border-t-rose-500";
+      ? "border-t-amber-500"
+      : "border-t-rose-500";
 
   return (
     <motion.div
@@ -51,13 +51,12 @@ const VerifyResult = ({ result, onReset }) => {
       <div className="p-6 sm:p-8 pb-6 flex flex-col sm:flex-row items-start gap-4 sm:gap-5">
         {/* Status Icon */}
         <div
-          className={`w-13 h-13 rounded-2xl flex items-center justify-center shrink-0 ${
-            isAuthentic
+          className={`w-13 h-13 rounded-2xl flex items-center justify-center shrink-0 ${isAuthentic
               ? "bg-emerald-50 text-emerald-600 border border-emerald-200/80"
               : isNotFound
-              ? "bg-amber-50 text-amber-600 border border-amber-200/80"
-              : "bg-rose-50 text-rose-600 border border-rose-200/80"
-          }`}
+                ? "bg-amber-50 text-amber-600 border border-amber-200/80"
+                : "bg-rose-50 text-rose-600 border border-rose-200/80"
+            }`}
         >
           {isAuthentic && <FiCheckCircle className="text-2xl" />}
           {isNotFound && <FiAlertTriangle className="text-2xl" />}
@@ -68,13 +67,12 @@ const VerifyResult = ({ result, onReset }) => {
         <div className="flex-1 text-left">
           <div className="flex flex-wrap items-center gap-2 mb-2">
             <span
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider ${
-                isAuthentic
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider ${isAuthentic
                   ? "bg-emerald-100/80 text-emerald-800"
                   : isNotFound
-                  ? "bg-amber-100/80 text-amber-800"
-                  : "bg-rose-100/80 text-rose-800"
-              }`}
+                    ? "bg-amber-100/80 text-amber-800"
+                    : "bg-rose-100/80 text-rose-800"
+                }`}
             >
               {isAuthentic && "✓ Authentic Product"}
               {isNotFound && "⚠ Not In Registry"}
@@ -98,11 +96,10 @@ const VerifyResult = ({ result, onReset }) => {
             {/* Dual-SIM Badge */}
             {isAuthentic && product?.sim && (
               <span
-                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold ${
-                  product.sim === 1
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold ${product.sim === 1
                     ? "bg-sky-100 text-sky-800"
                     : "bg-indigo-100 text-indigo-800"
-                }`}
+                  }`}
               >
                 SIM {product.sim}
               </span>
