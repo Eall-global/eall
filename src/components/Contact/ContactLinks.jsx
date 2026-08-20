@@ -11,7 +11,7 @@ const ContactLinks = () => {
       <div className="mx-auto text-left">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <a
-            href="https://wa.me/+971526073266?text=Hi%20E-ALL%2C%20I%20would%20like%20to%20request%20a%20quote."
+            href="https://wa.me/+971526073267?text=Hi%20E-ALL%2C%20I%20would%20like%20to%20request%20a%20quote."
             target="_blank"
             rel="noopener noreferrer"
             style={{ opacity: 1, transform: "none" }}

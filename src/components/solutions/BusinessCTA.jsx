@@ -37,7 +37,7 @@ const BusinessCTA = () => {
             <FaArrowRight />
           </a>
           <a
-            href="https://wa.me/+971526073266?text=Hi%20E-ALL%2C%20I%20would%20like%20to%20request%20a%20quote."
+            href="https://wa.me/+971526073267?text=Hi%20E-ALL%2C%20I%20would%20like%20to%20request%20a%20quote."
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 px-7 py-3.5 rounded-full bg-white/10 text-white font-semibold text-sm hover:bg-white/20 transition-all duration-300 backdrop-blur-sm"

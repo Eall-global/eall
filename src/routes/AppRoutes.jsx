@@ -9,6 +9,7 @@ import AllProductsPage from "../pages/products/AllProductsPage";
 import AboutPage from "../pages/AboutPage";
 import ServicesPage from "../pages/ServicesPage";
 import SolutionsPage from "../pages/SolutionsPage";
+import VerifyPage from "../pages/verify/VerifyPage";
 
 // Placeholder pages (can be expanded later)
 const Placeholder = ({ title }) => (
@@ -33,6 +34,8 @@ const AppRoutes = () => {
         <Route path="/services" element={<ServicesPage />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/contact" element={<Contact />} />
+        {/* AUTHENTICITY CHECKER */}
+        <Route path="/verify" element={<VerifyPage />} />
       </Route>
     </Routes>
   );

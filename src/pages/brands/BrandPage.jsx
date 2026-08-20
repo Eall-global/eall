@@ -1,4 +1,4 @@
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { brands } from "../../data/brandsData";
 import { products } from "../../data/products/index";
 import { useEffect, useState } from "react";
@@ -134,6 +134,94 @@ const BrandPage = () => {
       <FeaturedProducts products={featured} />
 
       <NewArrivals products={latest} />
+
+      {/* VERIFY DEVICE BANNER — Nokia & HMD only */}
+      {(slug === "nokia" || slug === "hmd") && (
+        <div
+          style={{
+            background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
+            margin: "0",
+            padding: "24px 32px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "20px",
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+            <div
+              style={{
+                width: "44px",
+                height: "44px",
+                borderRadius: "50%",
+                background: "rgba(14, 165, 233, 0.15)",
+                border: "1.5px solid rgba(14, 165, 233, 0.3)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M12 2L3.5 6.5v5c0 4.9 3.6 9.5 8.5 10.5 4.9-1 8.5-5.6 8.5-10.5v-5L12 2z"
+                  stroke="#0ea5e9"
+                  strokeWidth="2"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M9 12l2 2 4-4"
+                  stroke="#0ea5e9"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+            <div style={{ textAlign: "left" }}>
+              <div
+                style={{
+                  color: "#fff",
+                  fontWeight: "700",
+                  fontSize: "15px",
+                  marginBottom: "3px",
+                }}
+              >
+                Verify Your {brand.name} Device
+              </div>
+              <div style={{ color: "rgba(255,255,255,0.55)", fontSize: "13px" }}>
+                Enter or scan your IMEI to confirm authenticity through E-ALL's official registry
+              </div>
+            </div>
+          </div>
+          <Link
+            id={`verify-cta-${slug}`}
+            to="/verify"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "10px 22px",
+              background: "linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%)",
+              color: "#fff",
+              textDecoration: "none",
+              borderRadius: "10px",
+              fontSize: "13.5px",
+              fontWeight: "600",
+              whiteSpace: "nowrap",
+              boxShadow: "0 4px 14px rgba(14, 165, 233, 0.35)",
+              flexShrink: 0,
+            }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2L3.5 6.5v5c0 4.9 3.6 9.5 8.5 10.5 4.9-1 8.5-5.6 8.5-10.5v-5L12 2z" stroke="currentColor" strokeWidth="2" />
+              <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+            Verify Authenticity
+          </Link>
+        </div>
+      )}
 
       {brand.videos?.length > 0 && <BrandVideoGallery videos={brand.videos} />}
 
