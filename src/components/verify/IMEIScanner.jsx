@@ -46,7 +46,7 @@ const IMEIScanner = ({ onScan, onClose }) => {
       try {
         scannerRef.current
           .stop()
-          .catch(() => {})
+          .catch(() => { })
           .finally(() => {
             onScan(decodedText);
           });
@@ -122,7 +122,7 @@ const IMEIScanner = ({ onScan, onClose }) => {
                 { facingMode: "environment" },
                 config,
                 handleDetected,
-                () => {}
+                () => { }
               );
               if (isMountedRef.current) setIsStarting(false);
               return;
@@ -175,7 +175,7 @@ const IMEIScanner = ({ onScan, onClose }) => {
       if (scannerRef.current) {
         try {
           if (scannerRef.current.isScanning) {
-            scannerRef.current.stop().catch(() => {});
+            scannerRef.current.stop().catch(() => { });
           }
           scannerRef.current.clear();
         } catch {

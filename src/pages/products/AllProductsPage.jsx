@@ -30,13 +30,22 @@ const AllProductsPage = () => {
 
   const [selectedFamily, setSelectedFamily] = useState("All");
 
-  const [search, setSearch] = useState("");
+  const urlSearch = searchParams.get("search") || searchParams.get("q") || "";
+  const [search, setSearch] = useState(urlSearch);
 
   const [brand, setBrand] = useState("All");
 
   const [availability, setAvailability] = useState("All");
 
   const [sort, setSort] = useState("latest");
+
+  /*
+    Sync search state with URL query param
+  */
+  useEffect(() => {
+    const q = searchParams.get("search") || searchParams.get("q") || "";
+    setSearch(q);
+  }, [searchParams]);
 
   /*
     Reset family when category or subcategory changes
@@ -98,12 +107,17 @@ const AllProductsPage = () => {
       }
 
       // SEARCH
+      if (search) {
+        const q = search.toLowerCase();
+        const matchesName = product.name?.toLowerCase().includes(q);
+        const matchesBrand = product.brand?.toLowerCase().includes(q);
+        const matchesCategory = product.categoryName?.toLowerCase().includes(q) || product.category?.toLowerCase().includes(q);
+        const matchesSubCategory = product.subCategory?.toLowerCase().includes(q);
+        const matchesTag = product.tags?.some((t) => t.toLowerCase().includes(q));
 
-      if (
-        search &&
-        !product.name.toLowerCase().includes(search.toLowerCase())
-      ) {
-        return false;
+        if (!matchesName && !matchesBrand && !matchesCategory && !matchesSubCategory && !matchesTag) {
+          return false;
+        }
       }
 
       return true;

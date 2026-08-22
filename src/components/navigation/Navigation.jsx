@@ -1,7 +1,7 @@
 import NavItem from "./NavItem";
 import { navigationLinks } from "../../constants/navigation";
 
-const Navigation = ({ activeMenu, setActiveMenu }) => {
+const Navigation = ({ activeMenu, setActiveMenu, isTransparent }) => {
   return (
     <nav className="hidden md:flex items-center gap-8">
       {navigationLinks.map((item) => (
@@ -11,6 +11,7 @@ const Navigation = ({ activeMenu, setActiveMenu }) => {
           activeMenu={activeMenu}
           setActiveMenu={setActiveMenu}
           onClick={() => setActiveMenu(null)}
+          isTransparent={isTransparent}
         />
       ))}
     </nav>

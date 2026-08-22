@@ -21,7 +21,7 @@ const shuffleArray = (array) => {
 const FeaturedProducts = () => {
   // You can later replace this with API-driven "featured" flag
   const featuredProducts = shuffleArray(
-    products.filter((p) => p.isFeatured).slice(0, 8),
+    (products || []).filter((p) => p?.isFeatured).slice(0, 8),
   );
 
   return (

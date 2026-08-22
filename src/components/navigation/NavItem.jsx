@@ -1,7 +1,13 @@
 import { NavLink } from "react-router-dom";
 import { FiChevronDown } from "react-icons/fi";
 
-const NavItem = ({ item, activeMenu, setActiveMenu, onClick }) => {
+const NavItem = ({
+  item,
+  activeMenu,
+  setActiveMenu,
+  onClick,
+  isTransparent,
+}) => {
   const hasMegaMenu = !!item.megaMenu;
 
   if (hasMegaMenu) {
@@ -18,10 +24,14 @@ const NavItem = ({ item, activeMenu, setActiveMenu, onClick }) => {
           items-center
           gap-1
           font-medium
+          text-sm
           transition-colors
+          cursor-pointer
           ${
             activeMenu === "products"
-              ? "text-sky-700"
+              ? "text-sky-600 font-semibold"
+              : isTransparent
+              ? "text-white/90 hover:text-white drop-shadow-xs"
               : "text-slate-700 hover:text-sky-700"
           }
         `}
@@ -46,8 +56,17 @@ const NavItem = ({ item, activeMenu, setActiveMenu, onClick }) => {
       className={({ isActive }) =>
         `
           font-medium
+          text-sm
           transition-colors
-          ${isActive ? "text-sky-700" : "text-slate-700 hover:text-sky-700"}
+          ${
+            isActive
+              ? isTransparent
+                ? "text-sky-400 font-semibold drop-shadow-xs"
+                : "text-sky-700 font-semibold"
+              : isTransparent
+              ? "text-white/90 hover:text-white drop-shadow-xs"
+              : "text-slate-700 hover:text-sky-700"
+          }
         `
       }
     >

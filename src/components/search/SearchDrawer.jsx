@@ -54,7 +54,7 @@ const SearchDrawer = ({ isOpen, onClose }) => {
           {results.categories.map((c) => (
             <Link
               key={c.slug}
-              to={`/categories/${c.slug}`}
+              to={`/products?category=${c.slug}`}
               onClick={onClose}
               className="block py-2 hover:text-blue-600"
             >
@@ -91,7 +91,7 @@ const SearchDrawer = ({ isOpen, onClose }) => {
       {query && (
         <div className="px-6 py-4 border-t bg-slate-50">
           <Link
-            to="/products"
+            to={`/products?search=${encodeURIComponent(query)}`}
             onClick={onClose}
             className="text-blue-600 font-semibold"
           >

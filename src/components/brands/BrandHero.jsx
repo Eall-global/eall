@@ -1,14 +1,11 @@
-import { Link } from "react-router-dom";
 import {
   FiArrowRight,
   FiCalendar,
   FiCheckCircle,
   FiMapPin,
-  FiMessageCircle,
   FiPackage,
   FiShield,
 } from "react-icons/fi";
-import Container from "../common/Container";
 import SlideUp from "../animations/SlideUp";
 import { useEffect, useState } from "react";
 
@@ -28,9 +25,8 @@ const BrandHero = ({ brand }) => {
   }, [banners]);
 
   return (
-    <section className="relative h-[90vh] w-full">
+    <section className="relative min-h-[85vh] sm:min-h-[90vh] w-full flex flex-col justify-center overflow-hidden">
       {/* BACKGROUND IMAGES */}
-
       {banners.map((image, index) => (
         <div
           key={image}
@@ -48,107 +44,107 @@ const BrandHero = ({ brand }) => {
           }}
         />
       ))}
+
       {/* Overlay */}
-      <div className="absolute inset-0 bg-slate-900/60 " />
-      <SlideUp>
-        <div className="relative z-10 items-center h-162.5 p-6 lg:p-10 text-left">
-          <div className="max-w-4xl pt-32 text-white">
-            {/* Partnership */}
+      <div className="absolute inset-0 bg-slate-950/65" />
 
+      {/* CONTENT */}
+      <div className="relative z-10 w-full px-6 sm:px-8 lg:px-12 pt-28 pb-16 sm:pt-32 sm:pb-20 lg:pt-36 lg:pb-24 text-left">
+        <div className="max-w-4xl text-white">
+          <SlideUp>
+            {/* Partnership Badge */}
             {brand.partnership && (
-              <div
-                className="
-                relative
-                -top-12
-                  inline-flex
-                  items-center
-                  gap-2
-                  rounded-full
-                  border
-                  border-sky-400/40
-                  bg-sky-500/15
-                  backdrop-blur-md
-                  px-3 lg:px-5
-                  py-1 lg:py-2
-                  lg:text-sm
-                  text-[10px]
-                  font-medium
-                  tracking-wider
-                  text-sky-200
-                "
-              >
-                <FiCheckCircle />
-
-                {brand.partnership.type}
-
-                {brand.partnership.region && <>• {brand.partnership.region}</>}
+              <div className="mb-4 sm:mb-6">
+                <div
+                  className="
+                    inline-flex
+                    items-center
+                    gap-2
+                    rounded-full
+                    border
+                    border-sky-400/40
+                    bg-sky-500/15
+                    backdrop-blur-md
+                    px-3.5 sm:px-5
+                    py-1.5 sm:py-2
+                    text-xs sm:text-sm
+                    font-medium
+                    tracking-wide
+                    text-sky-200
+                  "
+                >
+                  <FiCheckCircle className="text-sky-400 text-sm sm:text-base shrink-0" />
+                  <span>{brand.partnership.type}</span>
+                  {brand.partnership.region && (
+                    <span className="text-sky-300/80">
+                      • {brand.partnership.region}
+                    </span>
+                  )}
+                </div>
               </div>
             )}
 
-            {/* <img
-              src={brand.logo}
-              alt={brand.name}
-              className="h-16 object-contain bg-white rounded-xl p-2"
-            /> */}
-
-            {/* <h1 className="mt-8 text-5xl! font-black">{brand.name}</h1> */}
-
-            <p
-              className="
-    mt-4
-    font-bold
-    tracking-wider
-    text-white
-    leading-tight
-  "
+            {/* Tagline */}
+            <h1
+              className="font-bold tracking-tight text-white leading-tight"
               style={{
-                fontSize: "clamp(1.5rem, 4vw, 2.5rem)",
+                fontSize: "clamp(1.75rem, 3.5vw, 2.75rem)",
               }}
             >
               {brand.tagline}
-            </p>
+            </h1>
 
+            {/* Description */}
             <p
-              className="
-    mt-6
-    text-slate-200
-    leading-8
-    max-w-4xl
-  "
+              className="mt-4 sm:mt-5 text-slate-200 leading-relaxed max-w-3xl"
               style={{
-                fontSize: "clamp(1rem, 1.4vw, 1.25rem)",
+                fontSize: "clamp(0.95rem, 1.3vw, 1.15rem)",
               }}
             >
               {brand.description}
             </p>
 
-            <div className="mt-10 grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="rounded-2xl bg-white/10 backdrop-blur-xl border border-white/10 p-4">
-                <FiMapPin className="mb-2 text-lg" />
-                <p className="text-xs text-slate-300">Country</p>
-                <p className="font-semibold">{brand.country}</p>
+            {/* Stats Grid */}
+            <div className="mt-8 sm:mt-10 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+              <div className="rounded-2xl bg-white/10 backdrop-blur-xl border border-white/10 p-3.5 sm:p-4">
+                <FiMapPin className="mb-1.5 text-base sm:text-lg text-sky-400" />
+                <p className="text-[11px] sm:text-xs text-slate-300">Country</p>
+                <p className="font-semibold text-sm sm:text-base truncate">
+                  {brand.country}
+                </p>
               </div>
 
-              <div className="rounded-2xl bg-white/10 backdrop-blur-xl border border-white/10 p-4">
-                <FiCalendar className="mb-2 text-lg" />
-                <p className="text-xs text-slate-300">Founded</p>
-                <p className="font-semibold">{brand.founded}</p>
+              <div className="rounded-2xl bg-white/10 backdrop-blur-xl border border-white/10 p-3.5 sm:p-4">
+                <FiCalendar className="mb-1.5 text-base sm:text-lg text-sky-400" />
+                <p className="text-[11px] sm:text-xs text-slate-300">Founded</p>
+                <p className="font-semibold text-sm sm:text-base">
+                  {brand.founded}
+                </p>
               </div>
 
-              <div className="rounded-2xl bg-white/10 backdrop-blur-xl border border-white/10 p-4">
-                <FiShield className="mb-2 text-lg" />
-                <p className="text-xs text-slate-300">Warranty</p>
-                <p className="font-semibold">{brand.stats.warranty}</p>
+              <div className="rounded-2xl bg-white/10 backdrop-blur-xl border border-white/10 p-3.5 sm:p-4">
+                <FiShield className="mb-1.5 text-base sm:text-lg text-sky-400" />
+                <p className="text-[11px] sm:text-xs text-slate-300">
+                  Warranty
+                </p>
+                <p className="font-semibold text-sm sm:text-base">
+                  {brand.stats.warranty}
+                </p>
               </div>
 
-              <div className="rounded-2xl bg-white/10 backdrop-blur-xl border border-white/10 p-4">
-                <FiPackage className="mb-2 text-lg" />
-                <p className="text-xs text-slate-300">Products</p>
-                <p className="font-semibold">{brand.stats.products}</p>
+              <div className="rounded-2xl bg-white/10 backdrop-blur-xl border border-white/10 p-3.5 sm:p-4">
+                <FiPackage className="mb-1.5 text-base sm:text-lg text-sky-400" />
+                <p className="text-[11px] sm:text-xs text-slate-300">
+                  Products
+                </p>
+                <p className="font-semibold text-sm sm:text-base">
+                  {brand.stats.products}
+                </p>
               </div>
             </div>
 
-            <div className="mt-10">
+            {/* CTA Button */}
+            <div className="mt-8 sm:mt-10">
               <button
                 onClick={() => {
                   document.getElementById("products")?.scrollIntoView({
@@ -156,28 +152,40 @@ const BrandHero = ({ brand }) => {
                     block: "start",
                   });
                 }}
-                className="px-8 py-4 rounded-2xl inline-flex items-center gap-2 border border-white hover:bg-white hover:text-slate-900 transition"
+                className="
+                  px-6 sm:px-8
+                  py-3 sm:py-3.5
+                  rounded-xl
+                  inline-flex
+                  items-center
+                  gap-2
+                  border
+                  border-white/80
+                  bg-white/10
+                  hover:bg-white
+                  text-white
+                  hover:text-slate-900
+                  font-semibold
+                  text-sm sm:text-base
+                  backdrop-blur-md
+                  transition-all
+                  duration-200
+                  cursor-pointer
+                  shadow-lg
+                "
               >
-                View Products
+                <span>View Products</span>
                 <FiArrowRight className="transition-transform group-hover:translate-x-1" />
               </button>
             </div>
-            <div
-              className="
-            absolute
-            hidden
-            lg:block
-            bottom-8
-            right-2
-            text-white/70
-            text-sm
-          "
-            >
-              E-ALL • Electronics All
-            </div>
-          </div>
+          </SlideUp>
         </div>
-      </SlideUp>
+      </div>
+
+      {/* Brand Sub-Watermark */}
+      <div className="absolute hidden lg:block bottom-6 right-8 text-white/40 text-xs tracking-wider">
+        E-ALL • Electronics All
+      </div>
     </section>
   );
 };

@@ -17,7 +17,6 @@ const Header = () => {
   const [activeMenu, setActiveMenu] = useState(null);
   const headerRef = useRef(null);
   const isScrolled = useScrollPosition(80);
-  const headerSolid = isScrolled || activeMenu === "products";
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -60,6 +59,18 @@ const Header = () => {
 
   const brand = brands.find((b) => location.pathname === `/brands/${b.slug}`);
 
+  // Pages with a dark hero banner behind the transparent header at the top
+  const isDarkHeroPage =
+    location.pathname === "/" ||
+    location.pathname.startsWith("/brands/") ||
+    location.pathname === "/about" ||
+    location.pathname === "/services" ||
+    location.pathname === "/solutions";
+
+  const isTransparent =
+    !isScrolled && activeMenu !== "products" && isDarkHeroPage;
+  const headerSolid = !isTransparent;
+
   return (
     <>
       <div ref={headerRef}>
@@ -68,36 +79,51 @@ const Header = () => {
           className={`
           fixed top-0 left-0 w-full z-50
           transition-all duration-300
-         ${headerSolid ? "bg-white shadow-md py-3" : "bg-transparent py-4"}
+         ${headerSolid
+              ? "bg-white/95 backdrop-blur-md shadow-md py-2.5 sm:py-3"
+              : "bg-linear-to-b from-black/50 via-black/20 to-transparent py-3 sm:py-4"
+            }
         `}
         >
-          <div className="mx-auto w-full flex items-center justify-between px-6 md:px-8 lg:px-10">
-            {/* LEFT: LOGO */}
-            <div className="flex flex-col leading-tight">
-              <div className="flex items-center gap-3">
-                <Link
-                  to="/"
-                  onClick={() => setActiveMenu(null)}
-                  className="flex items-center"
-                >
-                  <img
-                    src="/logo.png"
-                    alt="E-ALL Logo"
-                    className="h-12 md:h-16 lg:h-20 w-auto object-contain"
-                  />
-                </Link>
-                {brand && (
-                  <>
-                    <div className="h-8 w-px bg-slate-500" />
+          <div className="mx-auto w-full flex items-center justify-between px-4 sm:px-6 md:px-8 lg:px-10">
+            {/* LEFT: LOGO / CO-BRANDING */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              <Link
+                to="/"
+                onClick={() => setActiveMenu(null)}
+                className="flex items-center shrink-0"
+              >
+                <img
+                  src="/logo.png"
+                  alt="E-ALL Logo"
+                  className="h-8 sm:h-10 lg:h-11 w-auto object-contain transition-all duration-300"
+                />
+              </Link>
 
+              {brand && (
+                <div className="flex items-center gap-2 sm:gap-2.5">
+                  <span
+                    className={`font-semibold text-xs sm:text-sm select-none transition-colors duration-300 ${isTransparent ? "text-white/60" : "text-slate-400"
+                      }`}
+                  >
+                    ✕
+                  </span>
+
+                  <Link
+                    to={`/brands/${brand.slug}`}
+                    className={`flex items-center transition-all duration-300 ${isTransparent
+                        ? "bg-white/90 px-2 py-0.5 rounded-md shadow-xs backdrop-blur-xs"
+                        : ""
+                      }`}
+                  >
                     <img
                       src={brand.logo}
                       alt={brand.name}
-                      className="h-8 lg:h-10 object-contain"
+                      className="h-5 sm:h-6 lg:h-7 max-w-18 sm:max-w-24 lg:max-w-28 object-contain"
                     />
-                  </>
-                )}
-              </div>
+                  </Link>
+                </div>
+              )}
             </div>
 
             {/* CENTER: DESKTOP NAV */}
@@ -105,11 +131,12 @@ const Header = () => {
               <Navigation
                 activeMenu={activeMenu}
                 setActiveMenu={setActiveMenu}
+                isTransparent={isTransparent}
               />
             </div>
 
             {/* RIGHT: ACTIONS */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               {/* Quote Button */}
               <div className="hidden xl:block">
                 <QuoteButton
@@ -123,6 +150,7 @@ const Header = () => {
               {/* Search Button */}
               <div className="hidden xl:block">
                 <SearchButton
+                  isTransparent={isTransparent}
                   onClick={() => {
                     setActiveMenu(null);
                     setIsSearchOpen(true);
@@ -132,33 +160,50 @@ const Header = () => {
 
               {/* Mobile Menu Toggle */}
               <button
-                className={`  xl:hidden text-2xl cursor-pointer transition-colors duration-300 ${headerSolid ? "text-slate-900" : "text-slate-300"} `}
+                className={`xl:hidden text-2xl p-1.5 rounded-lg cursor-pointer transition-colors duration-300 ${
+                  isTransparent
+                    ? "text-white hover:bg-white/10"
+                    : "text-slate-900 hover:bg-slate-100"
+                }`}
                 onClick={() => setIsMobileOpen(true)}
+                aria-label="Toggle mobile menu"
               >
                 <FiMenu />
               </button>
             </div>
           </div>
+
+          {/* MEGA MENU (Seamlessly attached to header bottom) */}
+          {activeMenu === "products" && (
+            <ProductMegaMenu
+              onClose={() => {
+                setActiveMenu(null);
+              }}
+            />
+          )}
         </header>
+
+        {/* Backdrop for Mega Menu */}
         {activeMenu === "products" && (
-          <ProductMegaMenu
-            onClose={() => {
-              setActiveMenu(null);
-            }}
+          <div
+            className="fixed inset-0 bg-black/25 z-40 backdrop-blur-xs"
+            onClick={() => setActiveMenu(null)}
           />
         )}
       </div>
+
       <SearchDrawer
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
       />
 
       {/* MOBILE MENU */}
-
       <MobileMenu
         isOpen={isMobileOpen}
         onClose={() => setIsMobileOpen(false)}
-        onSearch={(query) => navigate(`/search?q=${query}`)}
+        onSearch={(query) =>
+          navigate(`/products?search=${encodeURIComponent(query)}`)
+        }
       />
     </>
   );
