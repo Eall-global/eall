@@ -30,8 +30,13 @@ const BrandToolbar = ({ search, onSearch, sort, onSort }) => {
                   py-2
                   rounded-xl
                   border
+                  border-slate-200
+                  text-base
+                  sm:text-sm
                   w-full
                   lg:w-80
+                  outline-none
+                  focus:border-sky-700
                 "
           />
         </div>

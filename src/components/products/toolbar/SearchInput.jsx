@@ -18,6 +18,7 @@ const SearchInput = ({ value, onChange, className = "" }) => {
           py-3
           pl-11
           pr-4
+          text-base sm:text-sm
           outline-none
           transition
           focus:border-sky-700

@@ -21,9 +21,20 @@ const MobileMenu = ({ isOpen, onClose, onSearch }) => {
   }, [isOpen]);
 
   const handleSearch = (e) => {
-    e.preventDefault();
+    e?.preventDefault();
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
     if (!query.trim()) return;
     onSearch(query.trim());
+    setQuery("");
+    onClose();
+  };
+
+  const handleResultClick = () => {
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
     setQuery("");
     onClose();
   };
@@ -88,7 +99,7 @@ const MobileMenu = ({ isOpen, onClose, onSearch }) => {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search products, brands..."
-                className="w-full outline-none text-sm bg-transparent text-slate-800"
+                className="w-full outline-none text-base bg-transparent text-slate-800"
               />
 
               {query && (
@@ -118,10 +129,7 @@ const MobileMenu = ({ isOpen, onClose, onSearch }) => {
                             <Link
                               key={b.slug}
                               to={`/brands/${b.slug}`}
-                              onClick={() => {
-                                setQuery("");
-                                onClose();
-                              }}
+                              onClick={handleResultClick}
                               className="px-3 py-1.5 rounded-lg bg-sky-50 text-sky-700 text-xs font-semibold hover:bg-sky-100 transition"
                             >
                               {b.name}
@@ -142,10 +150,7 @@ const MobileMenu = ({ isOpen, onClose, onSearch }) => {
                             <Link
                               key={c.slug}
                               to={`/products?category=${c.slug}`}
-                              onClick={() => {
-                                setQuery("");
-                                onClose();
-                              }}
+                              onClick={handleResultClick}
                               className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 text-xs font-medium hover:bg-slate-200 transition"
                             >
                               {c.name}
@@ -166,10 +171,7 @@ const MobileMenu = ({ isOpen, onClose, onSearch }) => {
                             <Link
                               key={p.id}
                               to={`/products/${p.slug}`}
-                              onClick={() => {
-                                setQuery("");
-                                onClose();
-                              }}
+                              onClick={handleResultClick}
                               className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 transition border border-slate-100"
                             >
                               {p.image && (

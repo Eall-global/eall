@@ -8,6 +8,13 @@ const SearchDrawer = ({ isOpen, onClose }) => {
   const [query, setQuery] = useState("");
   const results = useSearchEngine(query);
 
+  const handleClose = () => {
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+    onClose();
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -21,11 +28,11 @@ const SearchDrawer = ({ isOpen, onClose }) => {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search products, brands, categories..."
-          className="w-full outline-none text-lg"
+          className="w-full outline-none text-base sm:text-lg"
         />
 
-        <button onClick={onClose}>
-          <FiX className="text-2xl text-slate-600" />
+        <button onClick={handleClose} aria-label="Close search">
+          <FiX className="text-2xl text-slate-600 cursor-pointer" />
         </button>
       </div>
 
@@ -39,7 +46,7 @@ const SearchDrawer = ({ isOpen, onClose }) => {
             <Link
               key={b.slug}
               to={`/brands/${b.slug}`}
-              onClick={onClose}
+              onClick={handleClose}
               className="block py-2 hover:text-blue-600"
             >
               {b.name}
@@ -55,7 +62,7 @@ const SearchDrawer = ({ isOpen, onClose }) => {
             <Link
               key={c.slug}
               to={`/products?category=${c.slug}`}
-              onClick={onClose}
+              onClick={handleClose}
               className="block py-2 hover:text-blue-600"
             >
               {c.name}
@@ -71,7 +78,7 @@ const SearchDrawer = ({ isOpen, onClose }) => {
             <Link
               key={p.id}
               to={`/products/${p.slug}`}
-              onClick={onClose}
+              onClick={handleClose}
               className="
                 block
                 py-2
@@ -92,7 +99,7 @@ const SearchDrawer = ({ isOpen, onClose }) => {
         <div className="px-6 py-4 border-t bg-slate-50">
           <Link
             to={`/products?search=${encodeURIComponent(query)}`}
-            onClick={onClose}
+            onClick={handleClose}
             className="text-blue-600 font-semibold"
           >
             View all results →
