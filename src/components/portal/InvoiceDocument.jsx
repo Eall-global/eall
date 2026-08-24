@@ -1,69 +1,78 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import {
   FiPrinter,
   FiX,
   FiShare2,
   FiDownload,
   FiCheckCircle,
-  FiZoomIn,
-  FiZoomOut,
-  FiRefreshCw,
+  FiFileText,
   FiMapPin,
   FiMail,
   FiGlobe,
-  FiFileText,
 } from "react-icons/fi";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
+import {
+  downloadInvoicePDF,
+  getInvoicePDFBlob,
+} from "../../services/pdfInvoiceGenerator";
 
 const InvoiceDocument = ({ invoice, onClose }) => {
-  const invoiceRef = useRef(null);
   const [downloading, setDownloading] = useState(false);
-  const [zoomLevel, setZoomLevel] = useState(1);
+  const [sharing, setSharing] = useState(false);
 
   if (!invoice) return null;
 
-  // 1. Direct PDF Download using jsPDF + html2canvas (Exact A4 scale)
-  const handleDownloadPDF = async () => {
-    if (!invoiceRef.current) return;
+  // 1. Direct 1-Click Vector PDF Download (No screen capturing, No browser print dialogs)
+  const handleDownload = () => {
     setDownloading(true);
-
     try {
-      const element = invoiceRef.current;
-      const canvas = await html2canvas(element, {
-        scale: 2.5, // Crisp 300dpi-like high resolution
-        useCORS: true,
-        logging: false,
-        backgroundColor: "#ffffff",
-        windowWidth: 850,
-      });
-
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4",
-      });
-
-      const pdfWidth = 210; // Standard A4 width in mm
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, Math.min(pdfHeight, 297));
-      pdf.save(`Invoice_${invoice.invoiceNo}_${invoice.customerName.replace(/[^a-zA-Z0-9]/g, "_")}.pdf`);
+      downloadInvoicePDF(invoice);
     } catch (err) {
-      console.error("PDF download failed:", err);
-      handlePrintSinglePage();
+      console.error("PDF Download error:", err);
     } finally {
-      setDownloading(false);
+      setTimeout(() => setDownloading(false), 500);
     }
   };
 
-  // 2. ISOLATED 1-PAGE PRINT (Prints ONLY the invoice sheet without any background UI)
-  const handlePrintSinglePage = () => {
-    const printArea = document.getElementById("invoice-printable-sheet");
-    if (!printArea) return;
+  // 2. Direct 1-Click PDF Share (Web Share API with actual .pdf file attachment + WhatsApp fallback)
+  const handleShare = async () => {
+    setSharing(true);
+    try {
+      const pdfBlob = getInvoicePDFBlob(invoice);
+      const fileName = `Invoice_${invoice.invoiceNo}.pdf`;
+      const file = new File([pdfBlob], fileName, { type: "application/pdf" });
 
-    // Create a hidden isolated iframe to guarantee ZERO background portal elements are printed
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: `Tax Invoice ${invoice.invoiceNo} - E-ALL`,
+          text: `E-ALL Official Tax Invoice for ${invoice.customerName}. Total: AED ${Number(invoice.totalAmount).toLocaleString("en-AE", { minimumFractionDigits: 2 })}`,
+          files: [file],
+        });
+        return;
+      }
+    } catch (err) {
+      console.warn("Native file share skipped:", err);
+    } finally {
+      setSharing(false);
+    }
+
+    // WhatsApp Fallback
+    const summary =
+      `*E-ALL OFFICIAL TAX INVOICE ${invoice.invoiceNo}*\n` +
+      `*Customer:* ${invoice.customerName}\n` +
+      `*Total Amount:* AED ${Number(invoice.totalAmount).toLocaleString("en-AE", { minimumFractionDigits: 2 })}\n` +
+      `*Date:* ${new Date(invoice.createdAt).toLocaleDateString("en-GB")}\n\n` +
+      `Thank you for doing business with E-ALL Electronics!`;
+
+    const cleanPhone = (invoice.customerPhone || "").replace(/[^0-9]/g, "");
+    window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(summary)}`, "_blank");
+  };
+
+  // 3. Isolated Vector PDF Print (Direct 1-page paper print)
+  const handlePrint = () => {
+    const pdfBlob = getInvoicePDFBlob(invoice);
+    if (!pdfBlob) return;
+
+    const blobUrl = URL.createObjectURL(pdfBlob);
     const iframe = document.createElement("iframe");
     iframe.style.position = "fixed";
     iframe.style.right = "0";
@@ -71,93 +80,19 @@ const InvoiceDocument = ({ invoice, onClose }) => {
     iframe.style.width = "0";
     iframe.style.height = "0";
     iframe.style.border = "0";
+    iframe.src = blobUrl;
     document.body.appendChild(iframe);
 
-    const doc = iframe.contentWindow.document;
-    doc.open();
-    doc.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Tax Invoice - ${invoice.invoiceNo}</title>
-          <meta charset="utf-8" />
-          <style>
-            @page {
-              size: A4 portrait;
-              margin: 0;
-            }
-            * {
-              box-sizing: border-box;
-              margin: 0;
-              padding: 0;
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-            }
-            body {
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-              background: #ffffff;
-              color: #0f172a;
-              width: 210mm;
-              min-height: 297mm;
-              margin: 0 auto;
-              padding: 12mm 14mm;
-            }
-            /* Copy Tailwind helper styles for table & typography */
-            .flex { display: flex; }
-            .flex-col { flex-direction: column; }
-            .justify-between { justify-content: space-between; }
-            .items-center { align-items: center; }
-            .items-start { align-items: flex-start; }
-            .text-left { text-align: left; }
-            .text-right { text-align: right; }
-            .text-center { text-align: center; }
-            .font-mono { font-family: monospace; }
-            .font-bold { font-weight: 700; }
-            .font-black { font-weight: 900; }
-            .w-full { width: 100%; }
-            table { width: 100%; border-collapse: collapse; }
-          </style>
-        </head>
-        <body>
-          ${printArea.innerHTML}
-        </body>
-      </html>
-    `);
-    doc.close();
-
-    setTimeout(() => {
+    iframe.onload = () => {
       iframe.contentWindow.focus();
       iframe.contentWindow.print();
       setTimeout(() => {
         if (document.body.contains(iframe)) {
           document.body.removeChild(iframe);
         }
-      }, 1500);
-    }, 400);
-  };
-
-  // 3. Share Functionality (Native Share / WhatsApp)
-  const handleShare = async () => {
-    const summary = `*E-ALL TAX INVOICE ${invoice.invoiceNo}*\n` +
-      `*Customer:* ${invoice.customerName}\n` +
-      `*Total Amount:* AED ${Number(invoice.totalAmount).toLocaleString("en-AE", { minimumFractionDigits: 2 })}\n` +
-      `*Date:* ${new Date(invoice.createdAt).toLocaleDateString("en-GB")}\n` +
-      `Thank you for doing business with E-ALL Electronics!`;
-
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: `Invoice ${invoice.invoiceNo} - E-ALL`,
-          text: summary,
-        });
-        return;
-      } catch (e) {
-        // Fall through to WhatsApp
-      }
-    }
-
-    const cleanPhone = invoice.customerPhone.replace(/[^0-9]/g, "");
-    window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(summary)}`, "_blank");
+        URL.revokeObjectURL(blobUrl);
+      }, 2000);
+    };
   };
 
   return (
@@ -173,9 +108,9 @@ const InvoiceDocument = ({ invoice, onClose }) => {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-bold text-sm text-white">Invoice Document Viewer</span>
+              <span className="font-bold text-sm text-white">Document Viewer</span>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                A4 Standard
+                A4 Vector Engine
               </span>
             </div>
             <p className="text-xs text-slate-400 font-mono">
@@ -184,71 +119,42 @@ const InvoiceDocument = ({ invoice, onClose }) => {
           </div>
         </div>
 
-        {/* Center: Zoom Controls */}
-        <div className="hidden md:flex items-center gap-1.5 bg-slate-800/80 p-1 rounded-xl border border-slate-700">
-          <button
-            type="button"
-            onClick={() => setZoomLevel((z) => Math.max(0.7, z - 0.1))}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition cursor-pointer"
-            title="Zoom Out"
-          >
-            <FiZoomOut />
-          </button>
-          <span className="text-xs font-mono px-2 text-slate-300">
-            {Math.round(zoomLevel * 100)}%
-          </span>
-          <button
-            type="button"
-            onClick={() => setZoomLevel((z) => Math.min(1.3, z + 0.1))}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition cursor-pointer"
-            title="Zoom In"
-          >
-            <FiZoomIn />
-          </button>
-          <button
-            type="button"
-            onClick={() => setZoomLevel(1)}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition cursor-pointer text-xs"
-            title="Reset Zoom (100%)"
-          >
-            <FiRefreshCw />
-          </button>
-        </div>
-
-        {/* Right: Actions (Share, Download, Print, Close) */}
+        {/* Right: Actions (1-Click Download, Share, Print, Close) */}
         <div className="flex items-center gap-2">
-          {/* Share */}
+          
+          {/* 1-Click Download PDF */}
+          <button
+            type="button"
+            onClick={handleDownload}
+            disabled={downloading}
+            className="flex items-center gap-1.5 px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+            title="Download true A4 Vector PDF on 1 click"
+          >
+            <FiDownload />
+            <span>{downloading ? "Downloading..." : "Download PDF"}</span>
+          </button>
+
+          {/* Share PDF */}
           <button
             type="button"
             onClick={handleShare}
-            className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
-            title="Share via WhatsApp or Device"
+            disabled={sharing}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+            title="Share PDF via WhatsApp or Device"
           >
             <FiShare2 />
             <span className="hidden sm:inline">Share</span>
           </button>
 
-          {/* Download PDF */}
+          {/* Print Isolated 1-Page */}
           <button
             type="button"
-            onClick={handleDownloadPDF}
-            disabled={downloading}
-            className="flex items-center gap-1.5 px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
-            title="Download true A4 PDF document"
-          >
-            <FiDownload />
-            <span>{downloading ? "Saving PDF..." : "Download PDF"}</span>
-          </button>
-
-          {/* Print 1 Page */}
-          <button
-            type="button"
-            onClick={handlePrintSinglePage}
+            onClick={handlePrint}
             className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition border border-slate-700 cursor-pointer"
             title="Print isolated 1-sheet A4 page"
           >
             <FiPrinter />
-            <span className="hidden sm:inline">Print (1 Page)</span>
+            <span className="hidden sm:inline">Print</span>
           </button>
 
           {/* Close */}
@@ -263,14 +169,9 @@ const InvoiceDocument = ({ invoice, onClose }) => {
         </div>
       </div>
 
-      {/* 📄 TRUE A4 SHEET PAPER CONTAINER */}
-      <div
-        className="w-full flex justify-center overflow-x-auto pb-10 transition-transform duration-200"
-        style={{ transform: `scale(${zoomLevel})`, transformOrigin: "top center" }}
-      >
+      {/* 📄 CRISP A4 SHEET PREVIEW */}
+      <div className="w-full flex justify-center pb-10">
         <div
-          ref={invoiceRef}
-          id="invoice-printable-sheet"
           style={{
             width: "100%",
             maxWidth: "794px", // Standard A4 width at 96 DPI
@@ -279,11 +180,10 @@ const InvoiceDocument = ({ invoice, onClose }) => {
           className="
             bg-white text-slate-900 font-sans p-8 sm:p-12
             shadow-2xl rounded-2xl border border-slate-200
-            print:shadow-none print:rounded-none print:border-none print:p-8 print:w-full print:max-w-none
             flex flex-col justify-between text-left
           "
         >
-          {/* TOP HALF OF INVOICE */}
+          {/* TOP HALF */}
           <div>
             
             {/* 1. BRAND HEADER & TAX INVOICE BADGE */}

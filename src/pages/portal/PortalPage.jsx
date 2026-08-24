@@ -22,7 +22,7 @@ import PortalSettings from "../../components/portal/PortalSettings";
 import InvoiceDocument from "../../components/portal/InvoiceDocument";
 import { fetchStock } from "../../services/stockService";
 import { fetchInvoices } from "../../services/billingService";
-import { isSupabaseConfigured } from "../../lib/supabaseClient";
+import { getSupabase, isSupabaseConfigured } from "../../lib/supabaseClient";
 
 const PortalPage = () => {
   const { isAuthenticated, currentUser, role, isAdmin, logout } = useStaffAuth();
@@ -49,9 +49,42 @@ const PortalPage = () => {
     }
   }, []);
 
+  // ⚡ AUTOMATIC REALTIME SUBSCRIPTION (Synchronizes every operation across all devices)
   useEffect(() => {
-    if (isAuthenticated) {
-      loadData();
+    if (!isAuthenticated) return;
+
+    loadData();
+
+    const supabase = getSupabase();
+    if (supabase && isSupabaseConfigured()) {
+      const channel = supabase
+        .channel("portal_realtime_global_sync")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "product_stock" },
+          () => {
+            loadData();
+          }
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "invoices" },
+          () => {
+            loadData();
+          }
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "staff_members" },
+          () => {
+            loadData();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
   }, [isAuthenticated, loadData]);
 
@@ -114,12 +147,13 @@ const PortalPage = () => {
             {/* Sync Badge */}
             <div className="hidden md:flex items-center gap-1.5 text-xs text-slate-400">
               {isConnected ? (
-                <span className="flex items-center gap-1 text-emerald-400 font-medium">
-                  <FiCheckCircle className="text-sm" /> Cloud Synced
+                <span className="flex items-center gap-1.5 text-emerald-400 font-medium bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  Live Cloud Sync Active
                 </span>
               ) : (
                 <span className="flex items-center gap-1 text-amber-400 font-medium">
-                  <FiInfo className="text-sm" /> Local Mode
+                  <FiInfo className="text-sm" /> Local Sandbox Mode
                 </span>
               )}
             </div>
@@ -182,7 +216,7 @@ const PortalPage = () => {
         {loading && stock.length === 0 ? (
           <div className="py-24 text-center">
             <div className="inline-block w-8 h-8 border-4 border-sky-600 border-t-transparent rounded-full animate-spin mb-3" />
-            <p className="text-sm font-semibold text-slate-600">Loading portal inventory & audit...</p>
+            <p className="text-sm font-semibold text-slate-600">Syncing live inventory & audit records...</p>
           </div>
         ) : (
           <>
