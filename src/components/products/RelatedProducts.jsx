@@ -1,8 +1,12 @@
 import SectionCard from "../common/SectionCard";
 import ProductCard from "./ProductCard";
-import { products } from "../../data/products/index";
+import { products as fallbackProducts } from "../../data/products/index";
+import { useCatalog } from "../../context/CatalogContext";
 
 const RelatedProducts = ({ currentProduct }) => {
+  const { products: liveProducts } = useCatalog();
+  const products = liveProducts || fallbackProducts;
+
   if (!currentProduct) return null;
 
   const related = products

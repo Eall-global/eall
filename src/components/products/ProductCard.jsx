@@ -7,28 +7,14 @@ import { useWishlist } from "../../context/WishlistContext";
 const ProductCard = ({ product }) => {
   const { isWishlisted, toggleWishlist } = useWishlist();
 
-  const availabilityConfig = {
-    "In Stock": {
-      label: "In Stock",
-      className: "bg-green-100 text-green-700",
-    },
-    "Limited Stock": {
-      label: "Limited Stock",
-      className: "bg-yellow-100 text-yellow-700",
-    },
-    "Available on Request": {
-      label: "Available on Request",
-      className: "bg-blue-100 text-blue-700",
-    },
-    "Out of Stock": {
-      label: "Out of Stock",
-      className: "bg-red-100 text-red-700",
-    },
-  };
-
-  const availability =
-    availabilityConfig[product.availability] ||
-    availabilityConfig["Available on Request"];
+  const availabilityBadgeText = product.availabilityBadge || product.availability || "Available on Request";
+  const availabilityClass = product.availabilityClass || (
+    product.availability === "In Stock"
+      ? "bg-green-100 text-green-700"
+      : product.availability === "Limited Stock"
+      ? "bg-yellow-100 text-yellow-700"
+      : "bg-blue-100 text-blue-700"
+  );
 
   const defaultVariant =
     product.variants?.find((v) => v.isDefault) ?? product.variants?.[0];
@@ -50,21 +36,23 @@ const ProductCard = ({ product }) => {
   return (
     <Link to={`/products/${product.slug}`} className="block group h-full text-left">
       <article className="group bg-white rounded-2xl border border-slate-200 hover:border-sky-300 hover:shadow-xl transition-all duration-300 h-full flex flex-col overflow-hidden cursor-pointer relative">
-        
-        {/* 📸 PURE WHITE IMAGE CONTAINER (Seamless blending for white background images) */}
-        <div className="relative bg-white h-48 sm:h-56 md:h-64 flex items-center justify-center overflow-hidden">
-          <img
-            src={previewVariant?.image || product.image}
-            alt={product.name}
-            className="h-full w-full object-contain p-4 sm:p-6 transition-transform duration-500 group-hover:scale-105"
-            onError={(e) => {
-              e.target.src = "/logo.png";
-            }}
-          />
+
+        {/* 📸 PURE WHITE IMAGE CONTAINER WITH STRICT BOUNDS (Uniform scale for all products) */}
+        <div className="relative bg-white h-44 sm:h-52 md:h-56 w-full flex items-center justify-center overflow-hidden">
+          <div className="w-full h-full flex items-center justify-center p-3 sm:p-4">
+            <img
+              src={previewVariant?.image || product.image}
+              alt={product.name}
+              className="max-h-28 sm:max-h-36 md:max-h-40 max-w-[80%] sm:max-w-[75%] w-auto h-auto object-contain transition-transform duration-500 group-hover:scale-105"
+              onError={(e) => {
+                e.target.src = "/logo.png";
+              }}
+            />
+          </div>
 
           {/* NEW BADGE (Top-Left) */}
           {product.isNewArrival && (
-            <span className="absolute top-0 left-0 bg-sky-700/15 text-sky-800 text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-br-xl">
+            <span className="absolute top-0 left-0 bg-sky-700/15 text-sky-800 text-xs font-bold px-3 py-1.5 rounded-br-xl z-10">
               NEW
             </span>
           )}
@@ -74,11 +62,10 @@ const ProductCard = ({ product }) => {
             type="button"
             onClick={handleWishlistClick}
             className={`
-              absolute top-2.5 right-2.5 p-1.5 rounded-full transition-all duration-200 cursor-pointer
-              ${
-                wishlisted
-                  ? "bg-rose-50 text-rose-600 scale-110"
-                  : "text-slate-400 hover:text-rose-500 hover:bg-slate-50"
+              absolute top-2.5 right-2.5 p-1.5 rounded-full transition-all duration-200 cursor-pointer z-10
+              ${wishlisted
+                ? "bg-rose-50 text-rose-600 scale-110"
+                : "text-slate-400 hover:text-rose-500 hover:bg-slate-50"
               }
             `}
             title={wishlisted ? "Remove from Wishlist" : "Add to Wishlist"}
@@ -89,11 +76,11 @@ const ProductCard = ({ product }) => {
           {/* 🏷️ FULL-WIDTH AVAILABILITY STRIP (Pinned at bottom of top half) */}
           <div
             className={`
-              absolute bottom-0 left-0 right-0 w-full text-center text-[10px] sm:text-xs font-semibold py-1.5
-              ${availability.className}
+              absolute bottom-0 left-0 right-0 w-full text-center text-[10px] sm:text-xs font-semibold py-1.5 z-10
+              ${availabilityClass}
             `}
           >
-            {availability.label}
+            {availabilityBadgeText}
           </div>
         </div>
 
@@ -127,10 +114,9 @@ const ProductCard = ({ product }) => {
                     title={variant.color}
                     className={`
                       h-3.5 w-3.5 sm:h-4 sm:w-4 rounded-full border transition-all cursor-pointer
-                      ${
-                        previewVariant?.colorSlug === variant.colorSlug
-                          ? "border-sky-600 ring-2 ring-sky-400/30 scale-110"
-                          : "border-slate-300 hover:border-sky-500"
+                      ${previewVariant?.colorSlug === variant.colorSlug
+                        ? "border-sky-600 ring-2 ring-sky-400/30 scale-110"
+                        : "border-slate-300 hover:border-sky-500"
                       }
                     `}
                     style={{

@@ -3,13 +3,16 @@
 import AppRoutes from "./routes/AppRoutes";
 import { StaffAuthProvider } from "./context/StaffAuthContext";
 import { WishlistProvider } from "./context/WishlistContext";
+import { CatalogProvider } from "./context/CatalogContext";
 
 const App = () => {
   return (
     <StaffAuthProvider>
-      <WishlistProvider>
-        <AppRoutes />
-      </WishlistProvider>
+      <CatalogProvider>
+        <WishlistProvider>
+          <AppRoutes />
+        </WishlistProvider>
+      </CatalogProvider>
     </StaffAuthProvider>
   );
 };

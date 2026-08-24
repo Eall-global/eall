@@ -3,11 +3,12 @@ import ProductGrid from "../../components/products/ProductGrid";
 import ProductEmptyState from "../../components/products/ProductEmptyState";
 
 import categories from "../../data/categories";
-import { products } from "../../data/products/index";
+import { products as fallbackProducts } from "../../data/products/index";
 import { useEffect, useMemo, useState } from "react";
 import { brands } from "../../data/brandsData";
 import { useSearchParams } from "react-router-dom";
 import ProductToolbar from "../../components/products/toolbar/ProductToolbar";
+import { useCatalog } from "../../context/CatalogContext";
 
 const shuffleArray = (array) => {
   const shuffled = [...array];
@@ -22,6 +23,8 @@ const shuffleArray = (array) => {
 };
 
 const AllProductsPage = () => {
+  const { products: liveProducts } = useCatalog();
+  const products = liveProducts || fallbackProducts;
   const [searchParams] = useSearchParams();
 
   const category = searchParams.get("category") || "All";

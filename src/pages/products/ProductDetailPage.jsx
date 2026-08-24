@@ -10,14 +10,16 @@ import ProductSpecifications from "../../components/products/ProductSpecificatio
 import InquiryCard from "../../components/products/InquiryCard";
 import RelatedProducts from "../../components/products/RelatedProducts";
 
-import { products } from "../../data/products/index";
+import { products as fallbackProducts } from "../../data/products/index";
 import { brands } from "../../data/brandsData";
 import { getDefaultVariant } from "../../utils/productVariant";
+import { useCatalog } from "../../context/CatalogContext";
 
 const ProductDetailPage = () => {
   const { slug } = useParams();
+  const { getProductBySlug, products } = useCatalog();
 
-  const product = products.find((p) => p.slug === slug);
+  const product = getProductBySlug(slug) || (products || fallbackProducts).find((p) => p.slug === slug);
 
   const [selectedVariant, setSelectedVariant] = useState(
     getDefaultVariant(product),

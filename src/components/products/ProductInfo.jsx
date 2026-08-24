@@ -86,7 +86,7 @@ const ProductInfo = ({ product, selectedVariant, onVariantChange }) => {
             ${availability.text}
           `}
         >
-          ● {product.availability}
+          ● {product.availabilityBadge || product.availability}
         </span>
 
         {product.warranty && (

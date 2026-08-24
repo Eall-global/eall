@@ -395,7 +395,6 @@ const hmdNokiaProducts = [
       `${GALLERY_BASE}/HMD/HMD LUMA DEVICES/Blue/Blue back01.png`,
       `${GALLERY_BASE}/HMD/HMD LUMA DEVICES/Blue/Blue back02.png`,
       `${GALLERY_BASE}/HMD/HMD LUMA DEVICES/Blue/Blue front-back.png`,
-      `${GALLERY_BASE}/HMD/HMD LUMA DEVICES/Blue/Blue heroshot (1).png`,
       `${GALLERY_BASE}/HMD/HMD LUMA DEVICES/Blue/HMD Luma Blue.jpg`
     ],
     "category": "mobile-devices",
@@ -429,7 +428,6 @@ const hmdNokiaProducts = [
           `${GALLERY_BASE}/HMD/HMD LUMA DEVICES/Blue/Blue back01.png`,
           `${GALLERY_BASE}/HMD/HMD LUMA DEVICES/Blue/Blue back02.png`,
           `${GALLERY_BASE}/HMD/HMD LUMA DEVICES/Blue/Blue front-back.png`,
-          `${GALLERY_BASE}/HMD/HMD LUMA DEVICES/Blue/Blue heroshot (1).png`,
           `${GALLERY_BASE}/HMD/HMD LUMA DEVICES/Blue/HMD Luma Blue.jpg`
         ]
       },
@@ -442,7 +440,6 @@ const hmdNokiaProducts = [
           `${GALLERY_BASE}/HMD/HMD LUMA DEVICES/Titanium/HMD Luma Titanium.jpg`,
           `${GALLERY_BASE}/HMD/HMD LUMA DEVICES/Titanium/Titanium back01.png`,
           `${GALLERY_BASE}/HMD/HMD LUMA DEVICES/Titanium/Titanium front-back (1).png`,
-          `${GALLERY_BASE}/HMD/HMD LUMA DEVICES/Titanium/Titanium heroshot.png`,
           `${GALLERY_BASE}/HMD/HMD LUMA DEVICES/Titanium/Titannium back02.png`
         ]
       }

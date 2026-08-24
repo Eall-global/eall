@@ -4,7 +4,8 @@ import Container from "../common/Container";
 import SectionTitle from "../common/SectionTitle";
 import ProductCard from "../products/ProductCard";
 
-import { products } from "../../data/products/index";
+import { products as fallbackProducts } from "../../data/products/index";
+import { useCatalog } from "../../context/CatalogContext";
 
 const shuffleArray = (array) => {
   const shuffled = [...array];
@@ -19,10 +20,12 @@ const shuffleArray = (array) => {
 };
 
 const FeaturedProducts = () => {
-  // You can later replace this with API-driven "featured" flag
-  const featuredProducts = shuffleArray(
-    (products || []).filter((p) => p?.isFeatured).slice(0, 8),
-  );
+  const { products: liveProducts } = useCatalog();
+  const products = liveProducts || fallbackProducts;
+
+  const featuredProducts = (products || [])
+    .filter((p) => p?.isFeatured)
+    .slice(0, 8);
 
   return (
     <section>

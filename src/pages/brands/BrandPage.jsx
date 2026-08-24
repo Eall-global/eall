@@ -1,7 +1,8 @@
 import { useParams, Link } from "react-router-dom";
 import { brands } from "../../data/brandsData";
-import { products } from "../../data/products/index";
+import { products as fallbackProducts } from "../../data/products/index";
 import { useEffect, useState } from "react";
+import { useCatalog } from "../../context/CatalogContext";
 // import ProductListingPage from "../products/ProductListingPage";
 import BrandSEO from "../../components/brands/BrandSEO";
 import BrandHero from "../../components/brands/BrandHero";
@@ -29,6 +30,8 @@ const shuffleArray = (array) => {
 };
 
 const BrandPage = () => {
+  const { products: liveProducts } = useCatalog();
+  const products = liveProducts || fallbackProducts;
   const [category, setCategory] = useState("All");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("latest");
