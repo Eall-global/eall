@@ -35,6 +35,14 @@ const FooterBottom = () => {
         <Link to="/sitemap" className="text-slate-400 hover:text-white">
           Sitemap
         </Link>
+
+        <Link
+          to="/portal"
+          className="text-slate-500 hover:text-sky-400 inline-flex items-center gap-1 transition"
+          title="Staff Portal (Stock & Billing)"
+        >
+          <span>Staff Portal</span>
+        </Link>
       </div>
 
       <FooterSocial />

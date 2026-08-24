@@ -10,6 +10,7 @@ import AboutPage from "../pages/AboutPage";
 import ServicesPage from "../pages/ServicesPage";
 import SolutionsPage from "../pages/SolutionsPage";
 import VerifyPage from "../pages/verify/VerifyPage";
+import PortalPage from "../pages/portal/PortalPage";
 
 // Placeholder pages (can be expanded later)
 const Placeholder = ({ title }) => (
@@ -21,7 +22,10 @@ const Placeholder = ({ title }) => (
 const AppRoutes = () => {
   return (
     <Routes>
-      {/* MAIN LAYOUT */}
+      {/* STAFF PORTAL (Stock Management & Billing POS) */}
+      <Route path="/portal" element={<PortalPage />} />
+
+      {/* PUBLIC STOREFRONT (MAIN LAYOUT) */}
       <Route element={<MainLayout />}>
         {/* HOME */}
         <Route path="/" element={<Home />} />
