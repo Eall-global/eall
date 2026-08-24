@@ -11,16 +11,32 @@ import {
   FiEdit2,
   FiPackage,
 } from "react-icons/fi";
-import { updateStockQuantity, updateProductDetails, syncCatalogToStock } from "../../services/stockService";
+import {
+  updateStockQuantity,
+  updateProductDetails,
+  syncCatalogToStock,
+  addCustomProduct,
+} from "../../services/stockService";
 
 const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
   const [search, setSearch] = useState("");
   const [brandFilter, setBrandFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All"); // All | in-stock | low-stock | out-of-stock
   const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState("");
   const [editingItem, setEditingItem] = useState(null); // For Admin Price / Alert threshold editing
   const [editPrice, setEditPrice] = useState("");
   const [editAlert, setEditAlert] = useState("");
+
+  // New Product Modal State
+  const [showAddProductModal, setShowAddProductModal] = useState(false);
+  const [newSku, setNewSku] = useState("");
+  const [newName, setNewName] = useState("");
+  const [newBrand, setNewBrand] = useState("");
+  const [newCategory, setNewCategory] = useState("Electronics");
+  const [newQty, setNewQty] = useState(10);
+  const [newPrice, setNewPrice] = useState(999);
+  const [newAlert, setNewAlert] = useState(3);
 
   const brands = useMemo(() => {
     const list = Array.from(new Set(stock.map((s) => s.brand).filter(Boolean)));
@@ -85,12 +101,39 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
 
   const handleSync = async () => {
     setSyncing(true);
+    setSyncMessage("");
     try {
-      await syncCatalogToStock();
+      const res = await syncCatalogToStock();
+      setSyncMessage(`Successfully synced ${res.total} products to database!`);
+      setTimeout(() => setSyncMessage(""), 4000);
       onStockChanged();
+    } catch (err) {
+      setSyncMessage(`Sync warning: ${err.message || "Check connection"}`);
+      setTimeout(() => setSyncMessage(""), 4000);
     } finally {
       setSyncing(false);
     }
+  };
+
+  const handleAddProduct = async (e) => {
+    e.preventDefault();
+    if (!newSku.trim() || !newName.trim()) return;
+
+    await addCustomProduct({
+      sku: newSku,
+      name: newName,
+      brand: newBrand,
+      category: newCategory,
+      quantity: newQty,
+      price: newPrice,
+      minAlert: newAlert,
+    });
+
+    setNewSku("");
+    setNewName("");
+    setNewBrand("");
+    setShowAddProductModal(false);
+    onStockChanged();
   };
 
   const handleOpenEdit = (item) => {
@@ -143,7 +186,7 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
             <FiPackage className="text-sky-600" />
           </div>
           <p className="text-2xl font-bold text-slate-900">{metrics.totalSkus}</p>
-          <p className="text-[11px] text-slate-400 mt-0.5">Active catalog items</p>
+          <p className="text-[11px] text-slate-400 mt-0.5">Active database items</p>
         </div>
 
         <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
@@ -176,6 +219,13 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
 
       {/* 🔍 SEARCH & ACTION TOOLBAR */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs space-y-3">
+        {syncMessage && (
+          <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold flex items-center gap-2">
+            <FiCheckCircle className="text-base text-emerald-600" />
+            {syncMessage}
+          </div>
+        )}
+
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
           
           {/* Search bar */}
@@ -200,14 +250,25 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
 
           {/* Action buttons */}
           <div className="flex items-center gap-2">
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => setShowAddProductModal(true)}
+                className="flex items-center gap-1.5 px-3.5 py-2.5 bg-sky-700 hover:bg-sky-800 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+              >
+                <FiPlus />
+                Add Product
+              </button>
+            )}
+
             <button
               onClick={handleSync}
               disabled={syncing}
-              title="Sync any new catalog products into inventory"
+              title="Populate or refresh catalog products into database"
               className="flex items-center gap-1.5 px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer"
             >
               <FiRefreshCw className={syncing ? "animate-spin" : ""} />
-              Sync Catalog
+              {syncing ? "Syncing..." : "Sync Catalog"}
             </button>
 
             <button
@@ -457,6 +518,127 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
                   className="px-5 py-2 bg-sky-700 hover:bg-sky-800 text-white rounded-xl text-xs font-semibold transition"
                 >
                   Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ADMIN ADD PRODUCT MODAL */}
+      {showAddProductModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-lg shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-900 mb-1">
+              Add New Product to Inventory
+            </h3>
+            <p className="text-xs text-slate-500 mb-4">
+              Enter product details to add directly to database stock.
+            </p>
+
+            <form onSubmit={handleAddProduct} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    SKU / Product Code *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. SONY-WH1000XM5"
+                    value={newSku}
+                    onChange={(e) => setNewSku(e.target.value)}
+                    className="w-full py-2.5 px-3 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs outline-none focus:bg-white focus:border-sky-600 uppercase"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Brand *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Sony, Apple, Samsung"
+                    value={newBrand}
+                    onChange={(e) => setNewBrand(e.target.value)}
+                    className="w-full py-2.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:bg-white focus:border-sky-600"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Product Full Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Sony WH-1000XM5 Noise Canceling Headphones"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:bg-white focus:border-sky-600 font-medium"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Initial Stock
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={newQty}
+                    onChange={(e) => setNewQty(e.target.value)}
+                    className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs outline-none focus:bg-white focus:border-sky-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Price (AED)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    required
+                    value={newPrice}
+                    onChange={(e) => setNewPrice(e.target.value)}
+                    className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs outline-none focus:bg-white focus:border-sky-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Min Alert
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={newAlert}
+                    onChange={(e) => setNewAlert(e.target.value)}
+                    className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs outline-none focus:bg-white focus:border-sky-600"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowAddProductModal(false)}
+                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-semibold transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-sky-700 hover:bg-sky-800 text-white rounded-xl text-xs font-semibold transition cursor-pointer"
+                >
+                  Add Product
                 </button>
               </div>
             </form>

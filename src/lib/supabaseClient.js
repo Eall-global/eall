@@ -1,9 +1,22 @@
 import { createClient } from "@supabase/supabase-js";
 
+// Helper to sanitize URL (removes /rest/v1 or trailing slashes)
+const sanitizeUrl = (rawUrl) => {
+  if (!rawUrl) return null;
+  try {
+    const trimmed = rawUrl.trim();
+    if (!trimmed.startsWith("http")) return trimmed;
+    const parsed = new URL(trimmed);
+    return `${parsed.protocol}//${parsed.host}`;
+  } catch {
+    return rawUrl.trim().replace(/\/rest\/v1\/?$/, "").replace(/\/$/, "");
+  }
+};
+
 // Check environment variables first, then fallback to user-saved config in localStorage
 const getSupabaseConfig = () => {
-  const envUrl = import.meta.env.VITE_SUPABASE_URL;
-  const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const envUrl = sanitizeUrl(import.meta.env.VITE_SUPABASE_URL);
+  const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
 
   if (envUrl && envKey) {
     return { url: envUrl, key: envKey, source: "env" };
@@ -13,8 +26,9 @@ const getSupabaseConfig = () => {
     const stored = localStorage.getItem("eall_supabase_config");
     if (stored) {
       const parsed = JSON.parse(stored);
-      if (parsed.url && parsed.key) {
-        return { url: parsed.url, key: parsed.key, source: "stored" };
+      const clean = sanitizeUrl(parsed.url);
+      if (clean && parsed.key) {
+        return { url: clean, key: parsed.key.trim(), source: "stored" };
       }
     }
   } catch (e) {
@@ -23,8 +37,6 @@ const getSupabaseConfig = () => {
 
   return { url: null, key: null, source: "none" };
 };
-
-const config = getSupabaseConfig();
 
 export const isSupabaseConfigured = () => {
   const cfg = getSupabaseConfig();
@@ -38,15 +50,12 @@ export const saveSupabaseConfig = (url, key) => {
     localStorage.removeItem("eall_supabase_config");
     return;
   }
+  const clean = sanitizeUrl(url);
   localStorage.setItem(
     "eall_supabase_config",
-    JSON.stringify({ url: url.trim(), key: key.trim() })
+    JSON.stringify({ url: clean, key: key.trim() })
   );
 };
-
-export const supabase = isSupabaseConfigured()
-  ? createClient(config.url, config.key)
-  : null;
 
 export const getSupabase = () => {
   const cfg = getSupabaseConfig();

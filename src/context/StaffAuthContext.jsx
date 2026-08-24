@@ -1,13 +1,16 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState } from "react";
 
 const StaffAuthContext = createContext(null);
 
-const DEFAULT_PINS = {
-  admin: "8888",
-  sales: "1234",
-};
+const DEFAULT_MEMBERS = [
+  { id: "admin", name: "E-ALL Admin", role: "admin", pin: "8888" },
+  { id: "sales-1", name: "Ahmed - Sales Executive", role: "sales", pin: "1234" },
+  { id: "sales-2", name: "Sara - Account Manager", role: "sales", pin: "2345" },
+  { id: "sales-3", name: "Bilal - Sales Rep", role: "sales", pin: "3456" },
+];
 
 const SESSION_KEY = "eall_staff_auth_session";
+const MEMBERS_KEY = "eall_staff_team_members";
 
 export const StaffAuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(() => {
@@ -19,34 +22,80 @@ export const StaffAuthProvider = ({ children }) => {
     }
   });
 
-  const [pins, setPins] = useState(() => {
+  const [members, setMembers] = useState(() => {
     try {
-      const storedPins = localStorage.getItem("eall_staff_pins");
-      return storedPins ? JSON.parse(storedPins) : DEFAULT_PINS;
+      const stored = localStorage.getItem(MEMBERS_KEY);
+      return stored ? JSON.parse(stored) : DEFAULT_MEMBERS;
     } catch {
-      return DEFAULT_PINS;
+      return DEFAULT_MEMBERS;
     }
   });
 
-  const updatePin = (role, newPin) => {
-    const updated = { ...pins, [role]: newPin };
-    setPins(updated);
-    localStorage.setItem("eall_staff_pins", JSON.stringify(updated));
+  const saveMembers = (newMembers) => {
+    setMembers(newMembers);
+    localStorage.setItem(MEMBERS_KEY, JSON.stringify(newMembers));
   };
 
-  const login = (role, enteredPin) => {
-    const targetPin = pins[role] || DEFAULT_PINS[role];
-    if (enteredPin === targetPin) {
+  const addMember = ({ name, role = "sales", pin }) => {
+    const id = `member-${Date.now()}`;
+    const newMember = { id, name: name.trim(), role, pin: String(pin).trim() };
+    const updated = [...members, newMember];
+    saveMembers(updated);
+    return newMember;
+  };
+
+  const updateMember = (id, updates) => {
+    const updated = members.map((m) =>
+      m.id === id ? { ...m, ...updates, pin: String(updates.pin || m.pin).trim() } : m
+    );
+    saveMembers(updated);
+  };
+
+  const deleteMember = (id) => {
+    if (id === "admin") return; // Cannot delete primary admin
+    const updated = members.filter((m) => m.id !== id);
+    saveMembers(updated);
+  };
+
+  const loginByPin = (enteredPin) => {
+    const cleanPin = String(enteredPin).trim();
+    const match = members.find((m) => m.pin === cleanPin);
+
+    if (match) {
       const user = {
-        role,
-        name: role === "admin" ? "E-ALL Administrator" : "Sales Executive",
+        id: match.id,
+        role: match.role,
+        name: match.name,
         loginAt: new Date().toISOString(),
       };
       setCurrentUser(user);
       localStorage.setItem(SESSION_KEY, JSON.stringify(user));
-      return { success: true };
+      return { success: true, user };
     }
+
     return { success: false, message: "Invalid Access PIN. Please try again." };
+  };
+
+  const loginAsRole = (role, enteredPin) => {
+    const cleanPin = String(enteredPin).trim();
+    const match = members.find((m) => m.role === role && m.pin === cleanPin);
+
+    if (match) {
+      const user = {
+        id: match.id,
+        role: match.role,
+        name: match.name,
+        loginAt: new Date().toISOString(),
+      };
+      setCurrentUser(user);
+      localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+      return { success: true, user };
+    }
+
+    return {
+      success: false,
+      message: `Invalid PIN for ${role === "admin" ? "Admin" : "Salesperson"}. Please try again.`,
+    };
   };
 
   const logout = () => {
@@ -56,13 +105,17 @@ export const StaffAuthProvider = ({ children }) => {
 
   const value = {
     currentUser,
+    members,
     role: currentUser?.role || null,
     isAdmin: currentUser?.role === "admin",
     isSales: currentUser?.role === "sales",
     isAuthenticated: !!currentUser,
-    login,
+    loginByPin,
+    loginAsRole,
     logout,
-    updatePin,
+    addMember,
+    updateMember,
+    deleteMember,
   };
 
   return (

@@ -12,6 +12,8 @@ import {
   FiCreditCard,
   FiDollarSign,
   FiAlertCircle,
+  FiPercent,
+  FiLayers,
 } from "react-icons/fi";
 import { createInvoice } from "../../services/billingService";
 import { useStaffAuth } from "../../context/StaffAuthContext";
@@ -170,9 +172,9 @@ const BillingPOS = ({ stock = [], onInvoiceCreated }) => {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
       
-      {/* 📦 LEFT COLUMN: PRODUCT PICKER & BILL ITEMS (7 COLS) */}
+      {/* 📦 LEFT COLUMN: PRODUCT SEARCH & BILL ITEMS TABLE (7 COLS) */}
       <div className="lg:col-span-7 space-y-6">
         
         {/* Product Search Card */}
@@ -188,7 +190,7 @@ const BillingPOS = ({ stock = [], onInvoiceCreated }) => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="e.g. iPhone 16, APL-IP16, Nokia, Galaxy..."
-              className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:bg-white focus:border-sky-600 outline-none transition"
+              className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:bg-white focus:border-sky-600 outline-none transition text-left"
             />
           </div>
 
@@ -204,7 +206,7 @@ const BillingPOS = ({ stock = [], onInvoiceCreated }) => {
                     type="button"
                     disabled={isOutOfStock}
                     onClick={() => handleAddItem(prod)}
-                    className="w-full flex items-center justify-between p-3 text-left hover:bg-sky-50/70 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+                    className="w-full flex items-center justify-between p-3.5 text-left hover:bg-sky-50/70 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
                   >
                     <div className="min-w-0 flex-1 pr-3">
                       <p className="font-semibold text-slate-900 text-xs sm:text-sm truncate">
@@ -234,17 +236,20 @@ const BillingPOS = ({ stock = [], onInvoiceCreated }) => {
           )}
         </div>
 
-        {/* Selected Items Cart */}
+        {/* Selected Items Cart / Table */}
         <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-900">
-              Bill Items ({selectedItems.length})
-            </h3>
+          <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <FiLayers className="text-sky-700 text-base" />
+              <h3 className="text-sm font-bold uppercase tracking-wider text-slate-900">
+                Bill Items ({selectedItems.length})
+              </h3>
+            </div>
             {selectedItems.length > 0 && (
               <button
                 type="button"
                 onClick={() => setSelectedItems([])}
-                className="text-xs text-rose-600 hover:underline font-semibold"
+                className="text-xs text-rose-600 hover:underline font-semibold cursor-pointer"
               >
                 Clear All
               </button>
@@ -254,81 +259,102 @@ const BillingPOS = ({ stock = [], onInvoiceCreated }) => {
           {selectedItems.length === 0 ? (
             <div className="py-12 text-center text-slate-400 border-2 border-dashed border-slate-100 rounded-2xl">
               <FiFileText className="mx-auto text-3xl mb-2 text-slate-300" />
-              <p className="text-sm font-medium">No items added yet</p>
+              <p className="text-sm font-medium">No items added to invoice yet</p>
               <p className="text-xs text-slate-400 mt-1">
-                Search and select products above to start creating an invoice.
+                Search and select products above to begin building the bill.
               </p>
             </div>
           ) : (
-            <div className="divide-y divide-slate-100">
-              {selectedItems.map((item) => (
-                <div
-                  key={item.sku}
-                  className="py-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-slate-900 text-sm">
-                      {item.name}
-                    </p>
-                    <p className="text-xs font-mono text-slate-400">
-                      {item.sku} • Max available: {item.availableStock}
-                    </p>
-                  </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs sm:text-sm border-collapse">
+                <thead>
+                  <tr className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 bg-slate-50/50">
+                    <th className="py-2.5 px-3">Item Description</th>
+                    <th className="py-2.5 px-3 text-center w-28">Unit Price (AED)</th>
+                    <th className="py-2.5 px-3 text-center w-28">Quantity</th>
+                    <th className="py-2.5 px-3 text-right w-28">Total (AED)</th>
+                    <th className="py-2.5 px-2 text-center w-10"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                  {selectedItems.map((item) => (
+                    <tr key={item.sku} className="hover:bg-slate-50/60 transition-colors">
+                      
+                      {/* Product Name & SKU */}
+                      <td className="py-3 px-3">
+                        <p className="font-semibold text-slate-900 text-xs sm:text-sm">
+                          {item.name}
+                        </p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[11px] font-mono text-slate-400">
+                            {item.sku}
+                          </span>
+                          <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-sky-50 text-sky-700 font-semibold">
+                            Max: {item.availableStock}
+                          </span>
+                        </div>
+                      </td>
 
-                  <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
-                    {/* Price Input */}
-                    <div className="w-24">
-                      <span className="text-[10px] text-slate-400 block">Unit AED</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={item.unitPrice}
-                        onChange={(e) => handleUpdatePrice(item.sku, e.target.value)}
-                        className="w-full text-right font-mono font-bold text-xs py-1 px-2 bg-slate-50 border border-slate-200 rounded-lg outline-none"
-                      />
-                    </div>
+                      {/* Unit Price Input */}
+                      <td className="py-3 px-3 text-center">
+                        <div className="relative inline-block w-24">
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={item.unitPrice}
+                            onChange={(e) => handleUpdatePrice(item.sku, e.target.value)}
+                            className="w-full text-right font-mono font-bold text-xs py-1.5 px-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:bg-white focus:border-sky-600"
+                          />
+                        </div>
+                      </td>
 
-                    {/* Quantity Stepper */}
-                    <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-xl border border-slate-200">
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateQty(item.sku, -1)}
-                        className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-slate-200 text-slate-700 text-xs cursor-pointer"
-                      >
-                        <FiMinus />
-                      </button>
-                      <span className="w-6 text-center font-mono font-bold text-xs">
-                        {item.quantity}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateQty(item.sku, 1)}
-                        disabled={item.quantity >= item.availableStock}
-                        className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-slate-200 text-slate-700 text-xs disabled:opacity-30 cursor-pointer"
-                      >
-                        <FiPlus />
-                      </button>
-                    </div>
+                      {/* Quantity Stepper */}
+                      <td className="py-3 px-3 text-center">
+                        <div className="inline-flex items-center justify-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-200">
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateQty(item.sku, -1)}
+                            className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-slate-200 text-slate-700 text-xs cursor-pointer transition"
+                            title="Decrease Quantity"
+                          >
+                            <FiMinus />
+                          </button>
+                          <span className="w-7 text-center font-mono font-bold text-xs text-slate-900">
+                            {item.quantity}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateQty(item.sku, 1)}
+                            disabled={item.quantity >= item.availableStock}
+                            className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-slate-200 text-slate-700 text-xs disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition"
+                            title="Increase Quantity"
+                          >
+                            <FiPlus />
+                          </button>
+                        </div>
+                      </td>
 
-                    {/* Item Total */}
-                    <div className="w-24 text-right">
-                      <span className="text-[10px] text-slate-400 block">Total</span>
-                      <span className="font-mono font-bold text-slate-900 text-sm">
-                        AED {(item.unitPrice * item.quantity).toLocaleString()}
-                      </span>
-                    </div>
+                      {/* Item Total */}
+                      <td className="py-3 px-3 text-right font-mono font-bold text-slate-900 text-xs sm:text-sm">
+                        AED {(item.unitPrice * item.quantity).toLocaleString("en-AE", { minimumFractionDigits: 2 })}
+                      </td>
 
-                    {/* Remove */}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveItem(item.sku)}
-                      className="text-slate-400 hover:text-rose-600 p-1 text-base cursor-pointer"
-                    >
-                      <FiTrash2 />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                      {/* Remove Button */}
+                      <td className="py-3 px-2 text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveItem(item.sku)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                          title="Remove item"
+                        >
+                          <FiTrash2 className="text-sm" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
@@ -338,70 +364,72 @@ const BillingPOS = ({ stock = [], onInvoiceCreated }) => {
       <div className="lg:col-span-5 space-y-6">
         <form
           onSubmit={handleSubmit}
-          className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-5"
+          className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-5 text-left"
         >
-          <h3 className="text-base font-bold text-slate-900 pb-3 border-b border-slate-100 flex items-center gap-2">
-            <FiUser className="text-sky-700" />
-            Customer & Billing Details
-          </h3>
+          <div className="pb-3 border-b border-slate-100 flex items-center gap-2">
+            <FiUser className="text-sky-700 text-base" />
+            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-900">
+              Customer & Billing Details
+            </h3>
+          </div>
 
           {/* Customer Name */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+          <div className="text-left">
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
               Customer / Client Name <span className="text-rose-500">*</span>
             </label>
             <div className="relative">
-              <FiUser className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm" />
+              <FiUser className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm" />
               <input
                 type="text"
                 required
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
                 placeholder="e.g. Tech Retail FZCO / Ahmed Ali"
-                className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-sky-600 outline-none"
+                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:bg-white focus:border-sky-600 outline-none text-left"
               />
             </div>
           </div>
 
           {/* Phone Number */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+          <div className="text-left">
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
               Phone / WhatsApp Number <span className="text-rose-500">*</span>
             </label>
             <div className="relative">
-              <FiPhone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm" />
+              <FiPhone className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm" />
               <input
                 type="tel"
                 required
                 value={customerPhone}
                 onChange={(e) => setCustomerPhone(e.target.value)}
                 placeholder="e.g. +971 50 123 4567"
-                className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-sky-600 outline-none font-mono"
+                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:bg-white focus:border-sky-600 outline-none font-mono text-left"
               />
             </div>
           </div>
 
           {/* Email (Optional) */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+          <div className="text-left">
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
               Email Address (Optional)
             </label>
             <div className="relative">
-              <FiMail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm" />
+              <FiMail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm" />
               <input
                 type="email"
                 value={customerEmail}
                 onChange={(e) => setCustomerEmail(e.target.value)}
                 placeholder="client@company.com"
-                className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-sky-600 outline-none"
+                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:bg-white focus:border-sky-600 outline-none text-left"
               />
             </div>
           </div>
 
-          {/* TRN / Tax No & Payment Method */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* TRN & Payment Method (Grid 2 cols) */}
+          <div className="grid grid-cols-2 gap-3 text-left">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 TRN / Tax ID (B2B)
               </label>
               <input
@@ -409,18 +437,18 @@ const BillingPOS = ({ stock = [], onInvoiceCreated }) => {
                 value={customerTrn}
                 onChange={(e) => setCustomerTrn(e.target.value)}
                 placeholder="100xxxxxxx"
-                className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:bg-white focus:border-sky-600 outline-none"
+                className="w-full py-2.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:bg-white focus:border-sky-600 outline-none text-left"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 Payment Method
               </label>
               <select
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value)}
-                className="w-full py-2 px-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:border-sky-600 outline-none cursor-pointer"
+                className="w-full py-2.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:border-sky-600 outline-none cursor-pointer"
               >
                 <option value="Cash">Cash</option>
                 <option value="Card">Credit / Debit Card</option>
@@ -431,10 +459,10 @@ const BillingPOS = ({ stock = [], onInvoiceCreated }) => {
           </div>
 
           {/* Calculations Box */}
-          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-2.5 text-xs sm:text-sm">
-            <div className="flex justify-between text-slate-600">
+          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-3 text-xs sm:text-sm">
+            <div className="flex justify-between items-center text-slate-600">
               <span>Subtotal:</span>
-              <span className="font-mono font-semibold">
+              <span className="font-mono font-bold text-slate-800">
                 AED {subtotal.toLocaleString("en-AE", { minimumFractionDigits: 2 })}
               </span>
             </div>
@@ -447,27 +475,28 @@ const BillingPOS = ({ stock = [], onInvoiceCreated }) => {
                 min="0"
                 value={discount}
                 onChange={(e) => setDiscount(e.target.value)}
-                className="w-24 text-right py-1 px-2 bg-white border border-slate-200 rounded-lg text-xs font-mono font-semibold text-rose-600 outline-none"
+                className="w-24 text-right py-1 px-2.5 bg-white border border-slate-200 rounded-lg text-xs font-mono font-bold text-rose-600 outline-none focus:border-sky-600"
               />
             </div>
 
             {/* VAT Toggle */}
             <div className="flex items-center justify-between text-slate-600">
-              <label className="flex items-center gap-1.5 cursor-pointer select-none">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={applyVat}
                   onChange={(e) => setApplyVat(e.target.checked)}
-                  className="rounded text-sky-600"
+                  className="rounded text-sky-600 cursor-pointer"
                 />
                 <span>Apply UAE VAT (5%)</span>
               </label>
-              <span className="font-mono">
+              <span className="font-mono font-semibold text-slate-700">
                 AED {vatAmount.toLocaleString("en-AE", { minimumFractionDigits: 2 })}
               </span>
             </div>
 
-            <div className="pt-2 border-t border-slate-200 flex justify-between items-center text-base font-bold text-slate-900">
+            {/* Grand Total */}
+            <div className="pt-3 border-t border-slate-200 flex justify-between items-center text-base font-extrabold text-slate-900">
               <span>Grand Total:</span>
               <span className="font-mono text-sky-800 text-lg">
                 AED {grandTotal.toLocaleString("en-AE", { minimumFractionDigits: 2 })}
@@ -475,10 +504,10 @@ const BillingPOS = ({ stock = [], onInvoiceCreated }) => {
             </div>
           </div>
 
-          {/* Error notice */}
+          {/* Error Notice */}
           {errorMsg && (
             <div className="flex items-center gap-2 p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs">
-              <FiAlertCircle className="shrink-0" />
+              <FiAlertCircle className="shrink-0 text-base" />
               <span>{errorMsg}</span>
             </div>
           )}
@@ -490,7 +519,7 @@ const BillingPOS = ({ stock = [], onInvoiceCreated }) => {
             className="
               w-full py-3.5 px-4 bg-sky-700 hover:bg-sky-800 disabled:opacity-50 disabled:cursor-not-allowed
               text-white font-bold rounded-2xl shadow-lg shadow-sky-700/25
-              flex items-center justify-center gap-2 transition cursor-pointer
+              flex items-center justify-center gap-2 transition cursor-pointer text-sm
             "
           >
             <FiCheckCircle className="text-lg" />

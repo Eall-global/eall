@@ -59,13 +59,24 @@ export const fetchStock = async () => {
 
       if (error) throw error;
 
-      // If Supabase table is completely empty, seed it with catalog
+      // If Supabase table is completely empty, automatically seed it with catalog
       if (!data || data.length === 0) {
         const seed = getInitialCatalogSeed();
-        const { error: seedError } = await supabase
-          .from("product_stock")
-          .upsert(seed);
-        if (!seedError) return seed;
+        const dbSeed = seed.map((s) => ({
+          sku: s.sku,
+          name: s.name,
+          brand: s.brand,
+          category: s.category,
+          image: s.image,
+          quantity: s.quantity,
+          price: s.price,
+          cost_price: s.costPrice,
+          min_alert: s.minAlert,
+          updated_at: s.updatedAt,
+        }));
+
+        await supabase.from("product_stock").upsert(dbSeed);
+        return seed;
       }
 
       return data.map((item) => ({
@@ -146,8 +157,8 @@ export const updateProductDetails = async (sku, { price, costPrice, minAlert }) 
         .from("product_stock")
         .update({
           price: Number(price),
-          cost_price: Number(costPrice),
-          min_alert: Number(minAlert),
+          cost_price: Number(costPrice || 0),
+          min_alert: Number(minAlert || 3),
           updated_at: new Date().toISOString(),
         })
         .eq("sku", sku);
@@ -175,45 +186,87 @@ export const updateProductDetails = async (sku, { price, costPrice, minAlert }) 
 };
 
 /**
- * Sync catalog to include any new items added to static code
+ * Add a new custom product to inventory
+ */
+export const addCustomProduct = async ({ sku, name, brand, category, quantity, price, minAlert }) => {
+  const newProduct = {
+    sku: sku.trim().toUpperCase(),
+    name: name.trim(),
+    brand: brand.trim() || "General",
+    category: category.trim() || "Electronics",
+    image: "/logo.png",
+    quantity: Number(quantity) || 0,
+    price: Number(price) || 0,
+    costPrice: 0,
+    minAlert: Number(minAlert) || 3,
+    updatedAt: new Date().toISOString(),
+  };
+
+  const supabase = getSupabase();
+  if (supabase && isSupabaseConfigured()) {
+    try {
+      await supabase.from("product_stock").upsert({
+        sku: newProduct.sku,
+        name: newProduct.name,
+        brand: newProduct.brand,
+        category: newProduct.category,
+        image: newProduct.image,
+        quantity: newProduct.quantity,
+        price: newProduct.price,
+        cost_price: 0,
+        min_alert: newProduct.minAlert,
+        updated_at: newProduct.updatedAt,
+      });
+    } catch (e) {
+      console.warn("Error adding custom product to Supabase:", e);
+    }
+  }
+
+  const current = getLocalStock();
+  const updated = [newProduct, ...current.filter((i) => i.sku !== newProduct.sku)];
+  saveLocalStock(updated);
+  return updated;
+};
+
+/**
+ * Sync catalog to include all catalog items into database
  */
 export const syncCatalogToStock = async () => {
+  const seed = getInitialCatalogSeed();
   const currentStock = await fetchStock();
   const existingSkus = new Set(currentStock.map((s) => s.sku));
 
-  const newItems = catalogProducts
-    .filter((p) => {
-      const sku = p.sku || `EALL-${p.brand?.toUpperCase() || "GEN"}-${p.id}`;
-      return !existingSkus.has(sku);
-    })
-    .map((p, idx) => ({
-      sku: p.sku || `EALL-${p.brand?.toUpperCase() || "GEN"}-${p.id || idx + 1}`,
-      name: p.name || p.shortName || "Unnamed Product",
-      brand: p.brand || "General",
-      category: p.categoryName || p.category || "Electronics",
-      image: p.image || "/logo.png",
-      quantity: 10,
-      price: 999,
-      costPrice: 750,
-      minAlert: 3,
-      updatedAt: new Date().toISOString(),
-    }));
+  // Merge seed products with any existing stock updates
+  const combined = seed.map((item) => {
+    const existing = currentStock.find((s) => s.sku === item.sku);
+    return existing || item;
+  });
 
-  if (newItems.length === 0) {
-    return { added: 0, total: currentStock.length };
-  }
-
-  const combined = [...currentStock, ...newItems];
   saveLocalStock(combined);
 
   const supabase = getSupabase();
   if (supabase && isSupabaseConfigured()) {
     try {
-      await supabase.from("product_stock").upsert(newItems);
+      const dbSeed = combined.map((s) => ({
+        sku: s.sku,
+        name: s.name,
+        brand: s.brand,
+        category: s.category,
+        image: s.image,
+        quantity: s.quantity,
+        price: s.price,
+        cost_price: s.costPrice || 0,
+        min_alert: s.minAlert || 3,
+        updated_at: new Date().toISOString(),
+      }));
+
+      const { error } = await supabase.from("product_stock").upsert(dbSeed);
+      if (error) throw error;
     } catch (e) {
       console.warn("Syncing to Supabase warning:", e);
+      throw e;
     }
   }
 
-  return { added: newItems.length, total: combined.length };
+  return { added: combined.length, total: combined.length };
 };

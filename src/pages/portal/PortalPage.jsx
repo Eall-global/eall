@@ -70,11 +70,11 @@ const PortalPage = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans">
-      
+
       {/* 🚀 TOP PORTAL HEADER */}
       <header className="sticky top-0 z-30 bg-slate-900 text-white shadow-md border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between gap-4">
-          
+
           {/* Brand & Mode */}
           <div className="flex items-center gap-3">
             <Link
@@ -90,17 +90,16 @@ const PortalPage = () => {
 
             <div className="flex items-center gap-2">
               <span className="font-extrabold text-sm sm:text-base tracking-tight text-white">
-                E-ALL Portal
+                E-ALL Business
               </span>
-              
+
               {/* Role badge */}
               <span
                 className={`
                   inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold
-                  ${
-                    isAdmin
-                      ? "bg-sky-500/20 text-sky-300 border border-sky-500/30"
-                      : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                  ${isAdmin
+                    ? "bg-sky-500/20 text-sky-300 border border-sky-500/30"
+                    : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
                   }
                 `}
               >
@@ -164,10 +163,9 @@ const PortalPage = () => {
                 onClick={() => setActiveTab(tab.id)}
                 className={`
                   flex items-center gap-2 py-2 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap cursor-pointer
-                  ${
-                    active
-                      ? "bg-sky-700 text-white shadow-md shadow-sky-900/50"
-                      : "text-slate-400 hover:text-white hover:bg-slate-800"
+                  ${active
+                    ? "bg-sky-700 text-white shadow-md shadow-sky-900/50"
+                    : "text-slate-400 hover:text-white hover:bg-slate-800"
                   }
                 `}
               >
