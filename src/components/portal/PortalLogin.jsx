@@ -53,16 +53,23 @@ const PortalLogin = () => {
         className="relative z-10 w-full max-w-md bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-6 sm:p-8"
       >
         {/* Brand Header */}
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-sky-700 text-white shadow-lg shadow-sky-700/30 mb-3">
-            <FiLock className="text-2xl" />
+        <div className="text-center mb-6 space-y-2">
+          <div className="inline-flex items-center justify-center gap-2.5">
+            <img
+              src="/logo.png"
+              alt="E-ALL Logo"
+              className="w-9 h-9 object-contain"
+              onError={(e) => {
+                e.target.style.display = "none";
+              }}
+            />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            E-ALL Staff Portal
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Inventory Management & POS Billing
-          </p>
+          <div className="text-xl font-bold tracking-widest text-slate-900">
+            E-ALL Business
+          </div>
+          <div className="text-xs text-slate-500 font-medium">
+            Staff Portal • Inventory & POS Billing
+          </div>
         </div>
 
         {/* Role Selector */}
@@ -77,10 +84,9 @@ const PortalLogin = () => {
             }}
             className={`
               flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer
-              ${
-                selectedRole === "admin"
-                  ? "bg-white text-sky-800 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
+              ${selectedRole === "admin"
+                ? "bg-white text-sky-800 shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
               }
             `}
           >
@@ -97,10 +103,9 @@ const PortalLogin = () => {
             }}
             className={`
               flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer
-              ${
-                selectedRole === "sales"
-                  ? "bg-white text-sky-800 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
+              ${selectedRole === "sales"
+                ? "bg-white text-sky-800 shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
               }
             `}
           >
@@ -178,40 +183,6 @@ const PortalLogin = () => {
             <FiArrowRight />
           </button>
         </form>
-
-        {/* Demo PIN Hints */}
-        <div className="mt-6 pt-4 border-t border-slate-100 text-center">
-          <p className="text-[11px] text-slate-400">
-            Default Demo PINs (customizable in Settings):
-          </p>
-          <div className="flex flex-wrap justify-center gap-3 mt-1.5 text-[11px]">
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedRole("admin");
-                handleQuickFill("8888");
-              }}
-              className="text-sky-700 hover:underline font-semibold"
-            >
-              Admin: <span className="font-mono">8888</span>
-            </button>
-            <span className="text-slate-300">•</span>
-            {salesMembers.slice(0, 3).map((m, idx) => (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => {
-                  setSelectedRole("sales");
-                  setSelectedMemberId(m.id);
-                  handleQuickFill(m.pin);
-                }}
-                className="text-sky-700 hover:underline font-semibold"
-              >
-                {m.name.split(" ")[0]}: <span className="font-mono">{m.pin}</span>
-              </button>
-            ))}
-          </div>
-        </div>
       </motion.div>
     </div>
   );
