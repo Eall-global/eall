@@ -1,17 +1,13 @@
-// HMD / Nokia new phone catalogue
-// Matches the uploaded "new_phone" gallery directory exactly.
-// Place the "new_phone" folder inside your website's public/GALLERY directory.
+// HMD / Nokia phone catalogue
+// Gallery paths match the included hmd_phones_colors media directory.
 //
-// Expected:
-// public/
-//   GALLERY/
-//     new_phone/
-//       100/
-//       101/
-//       102/
-//       110/
+// Place the media folder in:
+// public/GALLERY/hmd_phones_colors/
+//
+// Then this file can reference images from:
+// /GALLERY/hmd_phones_colors/<model>/<color>/<filename>
 
-const GALLERY_BASE = "/GALLERY/new_phone";
+const GALLERY_BASE = "/GALLERY/hmd_phones_colors";
 
 const newPhoneProducts = [
   {
@@ -24,11 +20,11 @@ const newPhoneProducts = [
     brand: "HMD",
     brandSlug: "hmd",
 
-    image: `${GALLERY_BASE}/100/HMD_100-Red-FrontBack.avif`,
+    image: `${GALLERY_BASE}/100/Red/HMD_100-Red-FrontBack.avif`,
     gallery: [
-      `${GALLERY_BASE}/100/HMD_100-Red-FrontBack.avif`,
-      `${GALLERY_BASE}/100/HMD_100-Red-Front.avif`,
-      `${GALLERY_BASE}/100/HMD_100-Red-Back-IN.avif`,
+      `${GALLERY_BASE}/100/Red/HMD_100-Red-FrontBack.avif`,
+      `${GALLERY_BASE}/100/Red/HMD_100-Red-Front.avif`,
+      `${GALLERY_BASE}/100/Red/HMD_100-Red-Back-IN.avif`,
     ],
 
     category: "mobile-devices",
@@ -48,33 +44,33 @@ const newPhoneProducts = [
         color: "Red",
         colorSlug: "red",
         sku: "HMD-100-RED",
-        image: `${GALLERY_BASE}/100/HMD_100-Red-FrontBack.avif`,
+        image: `${GALLERY_BASE}/100/Red/HMD_100-Red-FrontBack.avif`,
         gallery: [
-          `${GALLERY_BASE}/100/HMD_100-Red-FrontBack.avif`,
-          `${GALLERY_BASE}/100/HMD_100-Red-Front.avif`,
-          `${GALLERY_BASE}/100/HMD_100-Red-Back-IN.avif`,
+          `${GALLERY_BASE}/100/Red/HMD_100-Red-FrontBack.avif`,
+          `${GALLERY_BASE}/100/Red/HMD_100-Red-Front.avif`,
+          `${GALLERY_BASE}/100/Red/HMD_100-Red-Back-IN.avif`,
         ],
       },
       {
         color: "Grey",
         colorSlug: "grey",
         sku: "HMD-100-GREY",
-        image: `${GALLERY_BASE}/100/HMD_100-Grey-FrontBack.avif`,
+        image: `${GALLERY_BASE}/100/Grey/HMD_100-Grey-FrontBack.avif`,
         gallery: [
-          `${GALLERY_BASE}/100/HMD_100-Grey-FrontBack.avif`,
-          `${GALLERY_BASE}/100/HMD_100-Grey-Front.avif`,
-          `${GALLERY_BASE}/100/HMD_100-Grey-Back-IN.avif`,
+          `${GALLERY_BASE}/100/Grey/HMD_100-Grey-FrontBack.avif`,
+          `${GALLERY_BASE}/100/Grey/HMD_100-Grey-Front.avif`,
+          `${GALLERY_BASE}/100/Grey/HMD_100-Grey-Back-IN.avif`,
         ],
       },
       {
         color: "Teal",
         colorSlug: "teal",
         sku: "HMD-100-TEAL",
-        image: `${GALLERY_BASE}/100/HMD_100-Teal-FrontBack.avif`,
+        image: `${GALLERY_BASE}/100/Teal/HMD_100-Teal-FrontBack.avif`,
         gallery: [
-          `${GALLERY_BASE}/100/HMD_100-Teal-FrontBack.avif`,
-          `${GALLERY_BASE}/100/HMD_100-Teal-Front.avif`,
-          `${GALLERY_BASE}/100/HMD_100-Teal-Back-IN.avif`,
+          `${GALLERY_BASE}/100/Teal/HMD_100-Teal-FrontBack.avif`,
+          `${GALLERY_BASE}/100/Teal/HMD_100-Teal-Front.avif`,
+          `${GALLERY_BASE}/100/Teal/HMD_100-Teal-Back-IN.avif`,
         ],
       },
     ],
@@ -99,14 +95,11 @@ const newPhoneProducts = [
     },
 
     specificationSource: "Internal HMD/Nokia portfolio document",
-
     availability: "Available on Request",
     warranty: "Official",
-
     isFeatured: true,
     isNewArrival: true,
     isTrending: true,
-
     createdAt: "2026-07-19",
   },
 
@@ -120,11 +113,11 @@ const newPhoneProducts = [
     brand: "HMD",
     brandSlug: "hmd",
 
-    image: `${GALLERY_BASE}/101/HMD_101-Grey-FrontBack-Int.avif`,
+    image: `${GALLERY_BASE}/101/Grey/HMD_101-Grey-FrontBack-Int.avif`,
     gallery: [
-      `${GALLERY_BASE}/101/HMD_101-Grey-FrontBack-Int.avif`,
-      `${GALLERY_BASE}/101/HMD_101-Grey-Front-Int.avif`,
-      `${GALLERY_BASE}/101/HMD_101-Grey-Back-Int.avif`,
+      `${GALLERY_BASE}/101/Grey/HMD_101-Grey-FrontBack-Int.avif`,
+      `${GALLERY_BASE}/101/Grey/HMD_101-Grey-Front-Int.avif`,
+      `${GALLERY_BASE}/101/Grey/HMD_101-Grey-Back-Int.avif`,
     ],
 
     category: "mobile-devices",
@@ -144,22 +137,22 @@ const newPhoneProducts = [
         color: "Grey",
         colorSlug: "grey",
         sku: "HMD-101-GREY",
-        image: `${GALLERY_BASE}/101/HMD_101-Grey-FrontBack-Int.avif`,
+        image: `${GALLERY_BASE}/101/Grey/HMD_101-Grey-FrontBack-Int.avif`,
         gallery: [
-          `${GALLERY_BASE}/101/HMD_101-Grey-FrontBack-Int.avif`,
-          `${GALLERY_BASE}/101/HMD_101-Grey-Front-Int.avif`,
-          `${GALLERY_BASE}/101/HMD_101-Grey-Back-Int.avif`,
+          `${GALLERY_BASE}/101/Grey/HMD_101-Grey-FrontBack-Int.avif`,
+          `${GALLERY_BASE}/101/Grey/HMD_101-Grey-Front-Int.avif`,
+          `${GALLERY_BASE}/101/Grey/HMD_101-Grey-Back-Int.avif`,
         ],
       },
       {
         color: "Teal",
         colorSlug: "teal",
         sku: "HMD-101-TEAL",
-        image: `${GALLERY_BASE}/101/HMD_101-Teal-FrontBack-Int.avif`,
+        image: `${GALLERY_BASE}/101/Teal/HMD_101-Teal-FrontBack-Int.avif`,
         gallery: [
-          `${GALLERY_BASE}/101/HMD_101-Teal-FrontBack-Int.avif`,
-          `${GALLERY_BASE}/101/HMD_101-Teal-Front-Int.avif`,
-          `${GALLERY_BASE}/101/HMD_101-Teal-Back-Int.avif`,
+          `${GALLERY_BASE}/101/Teal/HMD_101-Teal-FrontBack-Int.avif`,
+          `${GALLERY_BASE}/101/Teal/HMD_101-Teal-Front-Int.avif`,
+          `${GALLERY_BASE}/101/Teal/HMD_101-Teal-Back-Int.avif`,
         ],
       },
     ],
@@ -185,14 +178,11 @@ const newPhoneProducts = [
     },
 
     specificationSource: "Internal HMD/Nokia portfolio document",
-
     availability: "Available on Request",
     warranty: "Official",
-
     isFeatured: true,
     isNewArrival: true,
     isTrending: true,
-
     createdAt: "2026-07-19",
   },
 
@@ -206,11 +196,11 @@ const newPhoneProducts = [
     brand: "HMD",
     brandSlug: "hmd",
 
-    image: `${GALLERY_BASE}/102/HMD_102-Blue-FrontBack.avif`,
+    image: `${GALLERY_BASE}/102/Blue/HMD_102-Blue-FrontBack.avif`,
     gallery: [
-      `${GALLERY_BASE}/102/HMD_102-Blue-FrontBack.avif`,
-      `${GALLERY_BASE}/102/HMD_102-Blue-Front.avif`,
-      `${GALLERY_BASE}/102/HMD_102-Blue-Back.avif`,
+      `${GALLERY_BASE}/102/Blue/HMD_102-Blue-FrontBack.avif`,
+      `${GALLERY_BASE}/102/Blue/HMD_102-Blue-Front.avif`,
+      `${GALLERY_BASE}/102/Blue/HMD_102-Blue-Back.avif`,
     ],
 
     category: "mobile-devices",
@@ -230,33 +220,33 @@ const newPhoneProducts = [
         color: "Blue",
         colorSlug: "blue",
         sku: "HMD-102-BLUE",
-        image: `${GALLERY_BASE}/102/HMD_102-Blue-FrontBack.avif`,
+        image: `${GALLERY_BASE}/102/Blue/HMD_102-Blue-FrontBack.avif`,
         gallery: [
-          `${GALLERY_BASE}/102/HMD_102-Blue-FrontBack.avif`,
-          `${GALLERY_BASE}/102/HMD_102-Blue-Front.avif`,
-          `${GALLERY_BASE}/102/HMD_102-Blue-Back.avif`,
+          `${GALLERY_BASE}/102/Blue/HMD_102-Blue-FrontBack.avif`,
+          `${GALLERY_BASE}/102/Blue/HMD_102-Blue-Front.avif`,
+          `${GALLERY_BASE}/102/Blue/HMD_102-Blue-Back.avif`,
         ],
       },
       {
         color: "Grey",
         colorSlug: "grey",
         sku: "HMD-102-GREY",
-        image: `${GALLERY_BASE}/102/HMD_102-Grey-FrontBack.avif`,
+        image: `${GALLERY_BASE}/102/Grey/HMD_102-Grey-FrontBack.avif`,
         gallery: [
-          `${GALLERY_BASE}/102/HMD_102-Grey-FrontBack.avif`,
-          `${GALLERY_BASE}/102/HMD_102-Grey-Front.avif`,
-          `${GALLERY_BASE}/102/HMD_102-Grey-Back.avif`,
+          `${GALLERY_BASE}/102/Grey/HMD_102-Grey-FrontBack.avif`,
+          `${GALLERY_BASE}/102/Grey/HMD_102-Grey-Front.avif`,
+          `${GALLERY_BASE}/102/Grey/HMD_102-Grey-Back.avif`,
         ],
       },
       {
         color: "Red",
         colorSlug: "red",
         sku: "HMD-102-RED",
-        image: `${GALLERY_BASE}/102/HMD_102-Red-FrontBack.avif`,
+        image: `${GALLERY_BASE}/102/Red/HMD_102-Red-FrontBack.avif`,
         gallery: [
-          `${GALLERY_BASE}/102/HMD_102-Red-FrontBack.avif`,
-          `${GALLERY_BASE}/102/HMD_102-Red-Front.avif`,
-          `${GALLERY_BASE}/102/HMD_102-Red-Back.avif`,
+          `${GALLERY_BASE}/102/Red/HMD_102-Red-FrontBack.avif`,
+          `${GALLERY_BASE}/102/Red/HMD_102-Red-Front.avif`,
+          `${GALLERY_BASE}/102/Red/HMD_102-Red-Back.avif`,
         ],
       },
     ],
@@ -283,14 +273,11 @@ const newPhoneProducts = [
     },
 
     specificationSource: "Internal HMD/Nokia portfolio document",
-
     availability: "Available on Request",
     warranty: "Official",
-
     isFeatured: true,
     isNewArrival: true,
     isTrending: true,
-
     createdAt: "2026-07-19",
   },
 
@@ -304,11 +291,11 @@ const newPhoneProducts = [
     brand: "Nokia",
     brandSlug: "nokia",
 
-    image: `${GALLERY_BASE}/110/Nokia_110_Power-Blue-FrontBack.avif`,
+    image: `${GALLERY_BASE}/110/Blue/Nokia_110_Power-Blue-FrontBack.avif`,
     gallery: [
-      `${GALLERY_BASE}/110/Nokia_110_Power-Blue-FrontBack.avif`,
-      `${GALLERY_BASE}/110/Nokia_110_Power-Blue-Front.avif`,
-      `${GALLERY_BASE}/110/Nokia_110_Power-Blue-Back.avif`,
+      `${GALLERY_BASE}/110/Blue/Nokia_110_Power-Blue-FrontBack.avif`,
+      `${GALLERY_BASE}/110/Blue/Nokia_110_Power-Blue-Front.avif`,
+      `${GALLERY_BASE}/110/Blue/Nokia_110_Power-Blue-Back.avif`,
     ],
 
     category: "mobile-devices",
@@ -328,33 +315,33 @@ const newPhoneProducts = [
         color: "Blue",
         colorSlug: "blue",
         sku: "NOKIA-110-POWER-BLUE",
-        image: `${GALLERY_BASE}/110/Nokia_110_Power-Blue-FrontBack.avif`,
+        image: `${GALLERY_BASE}/110/Blue/Nokia_110_Power-Blue-FrontBack.avif`,
         gallery: [
-          `${GALLERY_BASE}/110/Nokia_110_Power-Blue-FrontBack.avif`,
-          `${GALLERY_BASE}/110/Nokia_110_Power-Blue-Front.avif`,
-          `${GALLERY_BASE}/110/Nokia_110_Power-Blue-Back.avif`,
+          `${GALLERY_BASE}/110/Blue/Nokia_110_Power-Blue-FrontBack.avif`,
+          `${GALLERY_BASE}/110/Blue/Nokia_110_Power-Blue-Front.avif`,
+          `${GALLERY_BASE}/110/Blue/Nokia_110_Power-Blue-Back.avif`,
         ],
       },
       {
         color: "Grey",
         colorSlug: "grey",
         sku: "NOKIA-110-POWER-GREY",
-        image: `${GALLERY_BASE}/110/Nokia_110_Power-Grey-FrontBack.avif`,
+        image: `${GALLERY_BASE}/110/Grey/Nokia_110_Power-Grey-FrontBack.avif`,
         gallery: [
-          `${GALLERY_BASE}/110/Nokia_110_Power-Grey-FrontBack.avif`,
-          `${GALLERY_BASE}/110/Nokia_110_Power-Grey-Front_.avif`,
-          `${GALLERY_BASE}/110/Nokia_110_Power-Grey-Back_.avif`,
+          `${GALLERY_BASE}/110/Grey/Nokia_110_Power-Grey-FrontBack.avif`,
+          `${GALLERY_BASE}/110/Grey/Nokia_110_Power-Grey-Front_.avif`,
+          `${GALLERY_BASE}/110/Grey/Nokia_110_Power-Grey-Back_.avif`,
         ],
       },
       {
         color: "Light Purple",
         colorSlug: "light-purple",
         sku: "NOKIA-110-POWER-LIGHT-PURPLE",
-        image: `${GALLERY_BASE}/110/Nokia_110_Power-Light_Purple-FrontBack.avif`,
+        image: `${GALLERY_BASE}/110/Purple/Nokia_110_Power-Light_Purple-FrontBack.avif`,
         gallery: [
-          `${GALLERY_BASE}/110/Nokia_110_Power-Light_Purple-FrontBack.avif`,
-          `${GALLERY_BASE}/110/Nokia_110_Power-Light_Purple-Front_.avif`,
-          `${GALLERY_BASE}/110/Nokia_110_Power-Light_Purple-Back_.avif`,
+          `${GALLERY_BASE}/110/Purple/Nokia_110_Power-Light_Purple-FrontBack.avif`,
+          `${GALLERY_BASE}/110/Purple/Nokia_110_Power-Light_Purple-Front_.avif`,
+          `${GALLERY_BASE}/110/Purple/Nokia_110_Power-Light_Purple-Back_.avif`,
         ],
       },
     ],
@@ -387,14 +374,11 @@ const newPhoneProducts = [
     },
 
     specificationSource: "Internal HMD/Nokia portfolio document",
-
     availability: "Available on Request",
     warranty: "Official",
-
     isFeatured: true,
     isNewArrival: true,
     isTrending: true,
-
     createdAt: "2026-08-22",
   },
 
@@ -408,12 +392,12 @@ const newPhoneProducts = [
     brand: "Nokia",
     brandSlug: "nokia",
 
-    // The uploaded gallery uses folder "125"; keep it unchanged so the paths match exactly.
-    image: `${GALLERY_BASE}/125/Nokia_110_4G-Blue-FrontBack-Int.avif`,
+    // The supplied media folder is named "125"; paths intentionally follow it exactly.
+    image: `${GALLERY_BASE}/125/Blue/Nokia_110_4G-Blue-FrontBack-Int.avif`,
     gallery: [
-      `${GALLERY_BASE}/125/Nokia_110_4G-Blue-FrontBack-Int.avif`,
-      `${GALLERY_BASE}/125/Nokia_110_4G-Blue-Front-Int.avif`,
-      `${GALLERY_BASE}/125/Nokia_110_4G-Blue-Back-Int.avif`,
+      `${GALLERY_BASE}/125/Blue/Nokia_110_4G-Blue-FrontBack-Int.avif`,
+      `${GALLERY_BASE}/125/Blue/Nokia_110_4G-Blue-Front-Int.avif`,
+      `${GALLERY_BASE}/125/Blue/Nokia_110_4G-Blue-Back-Int.avif`,
     ],
 
     category: "mobile-devices",
@@ -433,22 +417,22 @@ const newPhoneProducts = [
         color: "Blue",
         colorSlug: "blue",
         sku: "NOKIA-110-4G-2024-BLUE",
-        image: `${GALLERY_BASE}/125/Nokia_110_4G-Blue-FrontBack-Int.avif`,
+        image: `${GALLERY_BASE}/125/Blue/Nokia_110_4G-Blue-FrontBack-Int.avif`,
         gallery: [
-          `${GALLERY_BASE}/125/Nokia_110_4G-Blue-FrontBack-Int.avif`,
-          `${GALLERY_BASE}/125/Nokia_110_4G-Blue-Front-Int.avif`,
-          `${GALLERY_BASE}/125/Nokia_110_4G-Blue-Back-Int.avif`,
+          `${GALLERY_BASE}/125/Blue/Nokia_110_4G-Blue-FrontBack-Int.avif`,
+          `${GALLERY_BASE}/125/Blue/Nokia_110_4G-Blue-Front-Int.avif`,
+          `${GALLERY_BASE}/125/Blue/Nokia_110_4G-Blue-Back-Int.avif`,
         ],
       },
       {
         color: "Titanium",
         colorSlug: "titanium",
         sku: "NOKIA-110-4G-2024-TITANIUM",
-        image: `${GALLERY_BASE}/125/Nokia_110_4G-Titanium-FrontBack-Int.avif`,
+        image: `${GALLERY_BASE}/125/Titanium/Nokia_110_4G-Titanium-FrontBack-Int.avif`,
         gallery: [
-          `${GALLERY_BASE}/125/Nokia_110_4G-Titanium-FrontBack-Int.avif`,
-          `${GALLERY_BASE}/125/Nokia_110_4G-Titanium-Front-Int.avif`,
-          `${GALLERY_BASE}/125/Nokia_110_4G-Titanium-Back-Int.avif`,
+          `${GALLERY_BASE}/125/Titanium/Nokia_110_4G-Titanium-FrontBack-Int.avif`,
+          `${GALLERY_BASE}/125/Titanium/Nokia_110_4G-Titanium-Front-Int.avif`,
+          `${GALLERY_BASE}/125/Titanium/Nokia_110_4G-Titanium-Back-Int.avif`,
         ],
       },
     ],
@@ -462,35 +446,28 @@ const newPhoneProducts = [
     ],
 
     shortDescription:
-      "Nokia 110 4G feature phone with HD calling, a removable battery and essential everyday features.",
+      "Nokia 110 4G feature phone with HD calling, removable battery and everyday essentials.",
 
     description:
       "Explore the Nokia 110 4G (2024). Select a colour to view the matching official product gallery and key specifications.",
 
     specifications: {
-      display: "2.0-inch QVGA, 240 x 320",
-      processor: "Unisoc T127",
+      display: "2.0-inch QVGA",
       memory: "128MB RAM, 64MB internal storage",
-      expandableStorage: "microSDHC up to 32GB",
-      rearCamera: "Built-in rear camera with flash",
+      expandableStorage: "microSD supported",
       battery: "1000mAh removable",
       connectivity: "4G LTE, Bluetooth, USB Type-C, 3.5mm audio jack",
-      audio: "HD voice calling and wireless FM radio",
-      sim: "Nano SIM",
+      audio: "HD voice calling and FM radio",
     },
 
-    specificationSource: "https://www.hmd.com/en_int/nokia-110-4g-2024/",
-
+    specificationSource: "Internal HMD/Nokia portfolio document",
     availability: "Available on Request",
     warranty: "Official",
-
     isFeatured: true,
     isNewArrival: true,
     isTrending: true,
-
     createdAt: "2026-08-22",
   },
-
 ];
 
 export { newPhoneProducts };

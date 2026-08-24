@@ -253,69 +253,85 @@ const InvoiceAudit = ({ invoices = [], stock = [], onSelectInvoice, onInvoicesCh
     <div className="space-y-6 text-left">
       
       {/* 📊 SUMMARY METRICS CARDS */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         
         {/* Total Invoices */}
-        <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs flex items-center gap-4">
-          <div className="p-3.5 bg-sky-50 text-sky-700 rounded-2xl">
-            <FiFileText className="text-xl" />
-          </div>
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+        <div className="bg-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 truncate">
               Total Invoices
-            </p>
-            <p className="text-2xl font-black font-mono text-slate-900 mt-0.5">
+            </span>
+            <div className="p-2 bg-sky-50 text-sky-700 rounded-xl shrink-0">
+              <FiFileText className="text-base sm:text-lg" />
+            </div>
+          </div>
+          <div className="mt-2">
+            <p className="text-xl sm:text-2xl font-black font-mono text-slate-900 leading-none">
               {metrics.totalCount}
             </p>
-            <p className="text-[10px] text-slate-400">Recorded transactions</p>
+            <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1 truncate">
+              Recorded bills
+            </p>
           </div>
         </div>
 
         {/* Total Revenue */}
-        <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs flex items-center gap-4">
-          <div className="p-3.5 bg-emerald-50 text-emerald-700 rounded-2xl">
-            <FiDollarSign className="text-xl" />
-          </div>
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+        <div className="bg-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 truncate">
               Total Revenue
-            </p>
-            <p className="text-2xl font-black font-mono text-emerald-900 mt-0.5">
+            </span>
+            <div className="p-2 bg-emerald-50 text-emerald-700 rounded-xl shrink-0">
+              <FiDollarSign className="text-base sm:text-lg" />
+            </div>
+          </div>
+          <div className="mt-2">
+            <p className="text-base sm:text-2xl font-black font-mono text-emerald-900 leading-none">
               AED {Math.round(metrics.totalRevenue).toLocaleString()}
             </p>
-            <p className="text-[10px] text-slate-400">Cumulative billing</p>
+            <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1 truncate">
+              Cumulative sales
+            </p>
           </div>
         </div>
 
         {/* Today's Sales */}
-        <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs flex items-center gap-4">
-          <div className="p-3.5 bg-indigo-50 text-indigo-700 rounded-2xl">
-            <FiTrendingUp className="text-xl" />
-          </div>
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+        <div className="bg-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 truncate">
               Today's Sales
-            </p>
-            <p className="text-2xl font-black font-mono text-indigo-900 mt-0.5">
+            </span>
+            <div className="p-2 bg-indigo-50 text-indigo-700 rounded-xl shrink-0">
+              <FiTrendingUp className="text-base sm:text-lg" />
+            </div>
+          </div>
+          <div className="mt-2">
+            <p className="text-base sm:text-2xl font-black font-mono text-indigo-900 leading-none">
               AED {Math.round(metrics.todayRevenue).toLocaleString()}
             </p>
-            <p className="text-[10px] text-slate-400">Generated today</p>
+            <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1 truncate">
+              Generated today
+            </p>
           </div>
         </div>
 
         {/* VAT Collected */}
-        <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs flex items-center gap-4">
-          <div className="p-3.5 bg-purple-50 text-purple-700 rounded-2xl">
-            <FiPercent className="text-xl" />
-          </div>
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+        <div className="bg-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 truncate">
               VAT Collected
-            </p>
-            <p className="text-2xl font-black font-mono text-purple-900 mt-0.5">
+            </span>
+            <div className="p-2 bg-purple-50 text-purple-700 rounded-xl shrink-0">
+              <FiPercent className="text-base sm:text-lg" />
+            </div>
+          </div>
+          <div className="mt-2">
+            <p className="text-base sm:text-2xl font-black font-mono text-purple-900 leading-none">
               AED {Math.round(metrics.totalVat).toLocaleString()}
             </p>
-            <p className="text-[10px] text-slate-400">5% Tax element</p>
+            <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1 truncate">
+              5% Tax element
+            </p>
           </div>
         </div>
       </div>

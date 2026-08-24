@@ -3,48 +3,41 @@ import FooterSocial from "./FooterSocial";
 
 const FooterBottom = () => {
   return (
-    <div
-      className="
-      flex
-      flex-col
-      lg:flex-row
-      justify-between
-      items-center
-      gap-6
-      p-6 lg:px-10
-    "
-    >
-      <p className="text-slate-500 text-sm">
-        © {new Date().getFullYear()} Electronics All (E-ALL). All Rights
-        Reserved.
+    <div className="max-w-7xl mx-auto flex flex-col lg:flex-row justify-between items-center gap-5 p-6 lg:px-10 text-center lg:text-left">
+
+      {/* Copyright Notice */}
+      <p className="text-slate-400 text-xs sm:text-sm font-normal">
+        © {new Date().getFullYear()} Electronics All (E-ALL). All Rights Reserved.
       </p>
 
-      <div className="flex gap-6 text-sm">
-        <Link to="/privacy" className="text-slate-400 hover:text-white">
+      {/* Legal & Navigation Links (Responsive wrap) */}
+      <div className="flex flex-wrap justify-center items-center gap-x-5 gap-y-2 text-xs sm:text-sm">
+        <Link to="/privacy" className="text-slate-400 hover:text-white transition">
           Privacy
         </Link>
 
-        <Link to="/terms" className="text-slate-400 hover:text-white">
+        <Link to="/terms" className="text-slate-400 hover:text-white transition">
           Terms
         </Link>
 
-        <Link to="/cookies" className="text-slate-400 hover:text-white">
+        <Link to="/cookies" className="text-slate-400 hover:text-white transition">
           Cookies
         </Link>
 
-        <Link to="/sitemap" className="text-slate-400 hover:text-white">
+        <Link to="/sitemap" className="text-slate-400 hover:text-white transition">
           Sitemap
         </Link>
 
         <Link
           to="/portal"
-          className="text-slate-500 hover:text-sky-400 inline-flex items-center gap-1 transition"
+          className="text-slate-400 hover:text-sky-400 inline-flex items-center gap-1 transition"
           title="Staff Portal (Stock & Billing)"
         >
-          <span>Staff Portal</span>
+          Business Portal
         </Link>
       </div>
 
+      {/* Social Media Icons */}
       <FooterSocial />
     </div>
   );

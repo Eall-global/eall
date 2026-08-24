@@ -16,7 +16,7 @@ const MainLayout = () => {
   }, [location.pathname, location.search]);
 
   return (
-    <div className="flex flex-col min-h-screen pb-16 xl:pb-0">
+    <div className="flex flex-col min-h-screen pb-20 xl:pb-0">
       <Header />
 
       {/* Push content below fixed header */}
