@@ -3,21 +3,52 @@ import { products as catalogProducts } from "../data/products/index";
 
 const STORAGE_KEY = "eall_inventory_stock";
 
-// Helper to seed initial stock from existing product catalog
-const getInitialCatalogSeed = () => {
-  return catalogProducts.map((p, idx) => ({
-    sku: p.sku || `EALL-${p.brand?.toUpperCase() || "GEN"}-${p.id || idx + 1}`,
-    name: p.name || p.shortName || "Unnamed Product",
-    brand: p.brand || "General",
-    category: p.categoryName || p.category || "Electronics",
-    image: p.image || "/logo.png",
-    quantity: 15, // Default initial stock units
-    price: 999,   // Default selling price in AED
-    costPrice: 750,
-    minAlert: 3,  // Low stock warning threshold
-    updatedAt: new Date().toISOString(),
-  }));
+// Helper to seed initial stock from existing product catalog with guaranteed unique SKUs
+export const getInitialCatalogSeed = () => {
+  const seenSkus = new Set();
+  const items = [];
+
+  (catalogProducts || []).forEach((p, idx) => {
+    if (!p) return;
+    const baseSku = (p.sku || `EALL-${(p.brand || "GEN").toUpperCase()}-${p.id || idx + 1}`).trim().toUpperCase();
+    
+    let sku = baseSku;
+    let counter = 1;
+    while (seenSkus.has(sku)) {
+      sku = `${baseSku}-${counter}`;
+      counter++;
+    }
+    seenSkus.add(sku);
+
+    items.push({
+      sku,
+      name: String(p.name || p.shortName || "Unnamed Product").trim(),
+      brand: String(p.brand || "General").trim(),
+      category: String(p.categoryName || p.category || "Electronics").trim(),
+      image: String(p.image || "/logo.png"),
+      quantity: 15, // Default initial stock units
+      price: 999,   // Default selling price in AED
+      costPrice: 750,
+      minAlert: 3,  // Low stock warning threshold
+      updatedAt: new Date().toISOString(),
+    });
+  });
+
+  return items;
 };
+
+const mapDbToStockItem = (item) => ({
+  sku: item.sku,
+  name: item.name,
+  brand: item.brand,
+  category: item.category,
+  image: item.image,
+  quantity: Number(item.quantity) || 0,
+  price: Number(item.price) || 0,
+  costPrice: Number(item.cost_price ?? item.costPrice ?? 0),
+  minAlert: Number(item.min_alert ?? item.minAlert ?? 3),
+  updatedAt: item.updated_at || item.updatedAt || new Date().toISOString(),
+});
 
 // Local storage handlers for offline/sandbox mode
 const getLocalStock = () => {
@@ -44,7 +75,7 @@ const saveLocalStock = (stockList) => {
 };
 
 /**
- * Fetch all stock items
+ * Fetch all stock items (Live from Supabase, with automatic seeding if empty)
  */
 export const fetchStock = async () => {
   const supabase = getSupabase();
@@ -59,40 +90,28 @@ export const fetchStock = async () => {
 
       if (error) throw error;
 
-      // If Supabase table is completely empty, automatically seed it with catalog
+      // If Supabase table is empty, auto-seed it with the catalog products
       if (!data || data.length === 0) {
-        const seed = getInitialCatalogSeed();
-        const dbSeed = seed.map((s) => ({
-          sku: s.sku,
-          name: s.name,
-          brand: s.brand,
-          category: s.category,
-          image: s.image,
-          quantity: s.quantity,
-          price: s.price,
-          cost_price: s.costPrice,
-          min_alert: s.minAlert,
-          updated_at: s.updatedAt,
-        }));
+        console.log("Supabase product_stock is empty. Seeding catalog...");
+        await syncCatalogToStock();
+        
+        const { data: refreshedData } = await supabase
+          .from("product_stock")
+          .select("*")
+          .order("brand", { ascending: true });
 
-        await supabase.from("product_stock").upsert(dbSeed);
-        return seed;
+        if (refreshedData && refreshedData.length > 0) {
+          const formatted = refreshedData.map(mapDbToStockItem);
+          saveLocalStock(formatted);
+          return formatted;
+        }
       }
 
-      return data.map((item) => ({
-        sku: item.sku,
-        name: item.name,
-        brand: item.brand,
-        category: item.category,
-        image: item.image,
-        quantity: Number(item.quantity) || 0,
-        price: Number(item.price) || 0,
-        costPrice: Number(item.cost_price || item.costPrice) || 0,
-        minAlert: Number(item.min_alert || item.minAlert) || 3,
-        updatedAt: item.updated_at || item.updatedAt || new Date().toISOString(),
-      }));
+      const formatted = data.map(mapDbToStockItem);
+      saveLocalStock(formatted);
+      return formatted;
     } catch (err) {
-      console.warn("Supabase fetch failed, falling back to local stock:", err.message);
+      console.warn("Supabase stock fetch warning:", err.message);
     }
   }
 
@@ -100,7 +119,7 @@ export const fetchStock = async () => {
 };
 
 /**
- * Update stock quantity directly
+ * Update stock quantity directly in Supabase and locally
  */
 export const updateStockQuantity = async (sku, newQuantity) => {
   const qty = Math.max(0, parseInt(newQuantity, 10) || 0);
@@ -189,8 +208,9 @@ export const updateProductDetails = async (sku, { price, costPrice, minAlert }) 
  * Add a new custom product to inventory
  */
 export const addCustomProduct = async ({ sku, name, brand, category, quantity, price, minAlert }) => {
+  const cleanSku = sku.trim().toUpperCase();
   const newProduct = {
-    sku: sku.trim().toUpperCase(),
+    sku: cleanSku,
     name: name.trim(),
     brand: brand.trim() || "General",
     category: category.trim() || "Electronics",
@@ -205,7 +225,7 @@ export const addCustomProduct = async ({ sku, name, brand, category, quantity, p
   const supabase = getSupabase();
   if (supabase && isSupabaseConfigured()) {
     try {
-      await supabase.from("product_stock").upsert({
+      const { error } = await supabase.from("product_stock").upsert({
         sku: newProduct.sku,
         name: newProduct.name,
         brand: newProduct.brand,
@@ -217,37 +237,30 @@ export const addCustomProduct = async ({ sku, name, brand, category, quantity, p
         min_alert: newProduct.minAlert,
         updated_at: newProduct.updatedAt,
       });
+
+      if (error) throw error;
     } catch (e) {
       console.warn("Error adding custom product to Supabase:", e);
+      throw e;
     }
   }
 
   const current = getLocalStock();
-  const updated = [newProduct, ...current.filter((i) => i.sku !== newProduct.sku)];
+  const updated = [newProduct, ...current.filter((i) => i.sku !== cleanSku)];
   saveLocalStock(updated);
   return updated;
 };
 
 /**
- * Sync catalog to include all catalog items into database
+ * Sync entire catalog into Supabase product_stock table
  */
 export const syncCatalogToStock = async () => {
   const seed = getInitialCatalogSeed();
-  const currentStock = await fetchStock();
-  const existingSkus = new Set(currentStock.map((s) => s.sku));
-
-  // Merge seed products with any existing stock updates
-  const combined = seed.map((item) => {
-    const existing = currentStock.find((s) => s.sku === item.sku);
-    return existing || item;
-  });
-
-  saveLocalStock(combined);
-
   const supabase = getSupabase();
+
   if (supabase && isSupabaseConfigured()) {
     try {
-      const dbSeed = combined.map((s) => ({
+      const payload = seed.map((s) => ({
         sku: s.sku,
         name: s.name,
         brand: s.brand,
@@ -260,13 +273,21 @@ export const syncCatalogToStock = async () => {
         updated_at: new Date().toISOString(),
       }));
 
-      const { error } = await supabase.from("product_stock").upsert(dbSeed);
-      if (error) throw error;
+      // Insert in chunks of 20 to ensure reliability
+      const chunkSize = 20;
+      for (let i = 0; i < payload.length; i += chunkSize) {
+        const chunk = payload.slice(i, i + chunkSize);
+        const { error } = await supabase.from("product_stock").upsert(chunk, {
+          onConflict: "sku",
+        });
+        if (error) throw error;
+      }
     } catch (e) {
-      console.warn("Syncing to Supabase warning:", e);
+      console.error("Syncing catalog to Supabase error:", e);
       throw e;
     }
   }
 
-  return { added: combined.length, total: combined.length };
+  saveLocalStock(seed);
+  return { added: seed.length, total: seed.length };
 };

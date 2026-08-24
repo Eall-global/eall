@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import {
   FiPackage,
   FiFileText,
-  FiClock,
+  FiClipboard,
   FiSettings,
   FiLogOut,
   FiShield,
@@ -17,7 +17,7 @@ import { useStaffAuth } from "../../context/StaffAuthContext";
 import PortalLogin from "../../components/portal/PortalLogin";
 import StockTable from "../../components/portal/StockTable";
 import BillingPOS from "../../components/portal/BillingPOS";
-import InvoiceHistory from "../../components/portal/InvoiceHistory";
+import InvoiceAudit from "../../components/portal/InvoiceAudit";
 import PortalSettings from "../../components/portal/PortalSettings";
 import InvoiceDocument from "../../components/portal/InvoiceDocument";
 import { fetchStock } from "../../services/stockService";
@@ -64,7 +64,7 @@ const PortalPage = () => {
   const tabs = [
     { id: "stock", label: "Stock Manager", icon: FiPackage },
     { id: "billing", label: "Billing & POS", icon: FiFileText },
-    { id: "invoices", label: "Invoice History", icon: FiClock },
+    { id: "invoices", label: "Sales & Invoices Audit", icon: FiClipboard },
     ...(isAdmin ? [{ id: "settings", label: "Settings", icon: FiSettings }] : []),
   ];
 
@@ -182,7 +182,7 @@ const PortalPage = () => {
         {loading && stock.length === 0 ? (
           <div className="py-24 text-center">
             <div className="inline-block w-8 h-8 border-4 border-sky-600 border-t-transparent rounded-full animate-spin mb-3" />
-            <p className="text-sm font-semibold text-slate-600">Loading inventory data...</p>
+            <p className="text-sm font-semibold text-slate-600">Loading portal inventory & audit...</p>
           </div>
         ) : (
           <>
@@ -205,9 +205,11 @@ const PortalPage = () => {
             )}
 
             {activeTab === "invoices" && (
-              <InvoiceHistory
+              <InvoiceAudit
                 invoices={invoices}
+                stock={stock}
                 onSelectInvoice={(inv) => setViewingInvoice(inv)}
+                onInvoicesChanged={loadData}
               />
             )}
 
