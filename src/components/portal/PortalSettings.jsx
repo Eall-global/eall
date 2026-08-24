@@ -1,7 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   FiDatabase,
-  FiKey,
   FiCheck,
   FiCopy,
   FiSave,
@@ -15,6 +14,8 @@ import {
   FiUserCheck,
   FiAlertCircle,
   FiUploadCloud,
+  FiServer,
+  FiKey,
 } from "react-icons/fi";
 import {
   getActiveSupabaseConfig,
@@ -91,15 +92,55 @@ const PortalSettings = ({ onConfigUpdated }) => {
   const [copied, setCopied] = useState(false);
   const [testResult, setTestResult] = useState(null); // { success: boolean, message: string }
   const [testing, setTesting] = useState(false);
+  const [syncingAll, setSyncingAll] = useState(false);
 
   // Staff Team Management
-  const { members, addMember, updateMember, deleteMember, refreshStaff } = useStaffAuth();
+  const {
+    members,
+    addMember,
+    updateMember,
+    deleteMember,
+    refreshStaff,
+    pushAllMembersToCloud,
+  } = useStaffAuth();
+
   const [newSalesName, setNewSalesName] = useState("");
   const [newSalesPin, setNewSalesPin] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
 
   const isConnected = isSupabaseConfigured();
+
+  // 1-Click Complete Cloud Sync (Staff + Catalog Products)
+  const handleSyncAllToSupabase = async () => {
+    setSyncingAll(true);
+    setTestResult(null);
+
+    try {
+      // 1. Sync Staff Members
+      const staffRes = await pushAllMembersToCloud();
+      if (!staffRes.success) {
+        throw new Error("Staff sync failed: " + staffRes.error);
+      }
+
+      // 2. Sync Catalog Products
+      const prodRes = await syncCatalogToStock();
+
+      setTestResult({
+        success: true,
+        message: `🎉 Success! Database populated with ${staffRes.count || members.length} staff accounts and ${prodRes.total} catalog products. Refresh your Supabase table!`,
+      });
+
+      if (onConfigUpdated) onConfigUpdated();
+    } catch (err) {
+      setTestResult({
+        success: false,
+        message: err.message || "Failed to sync data to Supabase.",
+      });
+    } finally {
+      setSyncingAll(false);
+    }
+  };
 
   // Test live connection to Supabase
   const handleTestAndSave = async (e) => {
@@ -113,7 +154,7 @@ const PortalSettings = ({ onConfigUpdated }) => {
     if (!cleanUrl || !cleanKey) {
       setTestResult({
         success: false,
-        message: "Please enter both the Project URL and the Anon Public Key.",
+        message: "Please enter both the Project URL and the Anon Public API Key.",
       });
       setTesting(false);
       return;
@@ -127,33 +168,35 @@ const PortalSettings = ({ onConfigUpdated }) => {
         throw new Error("Invalid Supabase URL or Key format.");
       }
 
-      // Test querying product_stock table
+      // Test querying staff_members table
       const { data, error } = await client
-        .from("product_stock")
-        .select("sku")
+        .from("staff_members")
+        .select("id")
         .limit(1);
 
       if (error) {
         if (error.code === "42P01") {
           throw new Error(
-            "Connected to Supabase, but the tables are missing! Please copy and run the SQL query below in your Supabase SQL Editor."
+            "Connected to Supabase, but database tables are missing! Please copy and run the SQL query below in your Supabase SQL Editor."
           );
         }
         throw new Error(`Supabase error: ${error.message}`);
       }
 
+      // Auto-push staff members
+      await pushAllMembersToCloud();
+
       setTestResult({
         success: true,
-        message: "Connected to Supabase. Real-time sync is active across all devices.",
+        message: "Connected to Supabase. Staff accounts and stock are synchronized in real-time across all devices.",
       });
 
-      // Auto-sync staff and catalog
       await refreshStaff();
       if (onConfigUpdated) onConfigUpdated();
     } catch (err) {
       setTestResult({
         success: false,
-        message: err.message || "Failed to connect to Supabase. Please verify your URL and Key.",
+        message: err.message || "Failed to connect to Supabase. Please verify your Project URL and Key.",
       });
     } finally {
       setTesting(false);
@@ -190,72 +233,133 @@ const PortalSettings = ({ onConfigUpdated }) => {
   };
 
   return (
-    <div className="max-w-4xl space-y-8 text-left">
+    <div className="max-w-4xl mx-auto space-y-6 text-left">
       
-      {/* 👥 STAFF TEAM MANAGEMENT (ADMIN & MULTIPLE SALESPERSONS) */}
-      <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
-          <div>
+      {/* 🚀 QUICK DATABASE SYNC BANNER */}
+      {isConnected && (
+        <div className="bg-slate-900 text-white p-5 sm:p-6 rounded-3xl border border-slate-800 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[11px] mb-2 border border-emerald-500/30">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              Cloud Database Active
+            </div>
+            <h3 className="text-base font-bold text-white tracking-tight">
+              Populate & Sync Database Now
+            </h3>
+            <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+              Push all Staff Team members (*Admin, Iftikhar, Hidayat, Yafey*) and Website Catalog Products directly to your Supabase tables in 1 click.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleSyncAllToSupabase}
+            disabled={syncingAll}
+            className="shrink-0 whitespace-nowrap inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-slate-950 font-bold rounded-xl shadow-md transition cursor-pointer text-xs sm:text-sm"
+          >
+            <FiUploadCloud className="text-base" />
+            <span>{syncingAll ? "Syncing..." : "Populate Supabase Tables"}</span>
+          </button>
+        </div>
+      )}
+
+      {/* 👥 STAFF TEAM MANAGEMENT CARD */}
+      <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-5">
+        
+        {/* Card Header with Aligned Buttons */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+          <div className="min-w-0 flex-1">
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <FiUsers className="text-sky-700" />
-              Staff Team & Salesperson Access
+              <FiUsers className="text-sky-700 shrink-0" />
+              <span>Staff Team & Salesperson Access</span>
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
               Manage Admin and Sales team members. Changes automatically sync across all devices via Supabase.
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-sky-700 hover:bg-sky-800 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
-          >
-            <FiPlus />
-            Add Salesperson
-          </button>
+          <div className="flex items-center gap-2.5 shrink-0">
+            {/* Sync to Supabase Button */}
+            <button
+              type="button"
+              onClick={async () => {
+                const res = await pushAllMembersToCloud();
+                if (res.success) {
+                  alert(`Staff team (${res.count} members) successfully saved to Supabase! Refresh your Supabase table to view.`);
+                } else {
+                  alert("Sync error: " + res.error);
+                }
+              }}
+              className="whitespace-nowrap inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer"
+              title="Push current team members to Supabase"
+            >
+              <FiUploadCloud className="text-sm" />
+              <span>Sync to Cloud</span>
+            </button>
+
+            {/* Add Salesperson Button */}
+            <button
+              type="button"
+              onClick={() => setShowAddModal(true)}
+              className="whitespace-nowrap inline-flex items-center gap-1.5 px-4 py-2 bg-sky-700 hover:bg-sky-800 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+            >
+              <FiPlus className="text-sm" />
+              <span>Add Salesperson</span>
+            </button>
+          </div>
         </div>
 
-        {/* Team List Table */}
+        {/* Team List Table with Proper Column Alignment */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs sm:text-sm">
+          <table className="w-full text-left text-xs sm:text-sm border-collapse">
             <thead>
-              <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                <th className="py-2.5 px-3">Staff Name</th>
-                <th className="py-2.5 px-3">Role</th>
-                <th className="py-2.5 px-3 font-mono">Access PIN</th>
-                <th className="py-2.5 px-3 text-right">Actions</th>
+              <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50/50">
+                <th className="py-2.5 px-3.5 text-left">Staff Name</th>
+                <th className="py-2.5 px-3 text-left w-28">Role</th>
+                <th className="py-2.5 px-3 text-left w-32 font-mono">Access PIN</th>
+                <th className="py-2.5 px-3 text-right w-24">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
               {members.map((member) => (
-                <tr key={member.id} className="hover:bg-slate-50/50">
-                  <td className="py-3 px-3">
-                    <p className="font-bold text-slate-900">{member.name}</p>
+                <tr key={member.id} className="hover:bg-slate-50/60 transition-colors">
+                  
+                  {/* Name */}
+                  <td className="py-3 px-3.5 text-left">
+                    <p className="font-bold text-slate-900 text-xs sm:text-sm">
+                      {member.name}
+                    </p>
                   </td>
-                  <td className="py-3 px-3">
+
+                  {/* Role Badge */}
+                  <td className="py-3 px-3 text-left">
                     <span
-                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap ${
                         member.role === "admin"
-                          ? "bg-sky-50 text-sky-800"
-                          : "bg-emerald-50 text-emerald-800"
+                          ? "bg-sky-50 text-sky-800 border border-sky-200"
+                          : "bg-emerald-50 text-emerald-800 border border-emerald-200"
                       }`}
                     >
                       {member.role === "admin" ? <FiShield /> : <FiUserCheck />}
-                      {member.role === "admin" ? "Admin" : "Sales"}
+                      <span>{member.role === "admin" ? "Admin" : "Sales"}</span>
                     </span>
                   </td>
-                  <td className="py-3 px-3 font-mono font-bold text-slate-800">
+
+                  {/* PIN */}
+                  <td className="py-3 px-3 text-left font-mono font-bold text-slate-800 text-xs sm:text-sm whitespace-nowrap">
                     •••• ({member.pin})
                   </td>
+
+                  {/* Actions */}
                   <td className="py-3 px-3 text-right">
-                    <div className="flex items-center justify-end gap-2">
+                    <div className="flex items-center justify-end gap-1.5">
                       <button
                         type="button"
                         onClick={() => setEditingMember(member)}
                         className="p-1.5 text-slate-400 hover:text-sky-700 rounded-lg hover:bg-sky-50 transition cursor-pointer"
                         title="Edit Name & PIN"
                       >
-                        <FiEdit2 />
+                        <FiEdit2 className="text-sm" />
                       </button>
 
                       {member.id !== "admin" && (
@@ -265,7 +369,7 @@ const PortalSettings = ({ onConfigUpdated }) => {
                           className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition cursor-pointer"
                           title="Delete Member"
                         >
-                          <FiTrash2 />
+                          <FiTrash2 className="text-sm" />
                         </button>
                       )}
                     </div>
@@ -277,26 +381,28 @@ const PortalSettings = ({ onConfigUpdated }) => {
         </div>
       </div>
 
-      {/* 🚀 SUPABASE CONFIGURATION */}
-      <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-6">
+      {/* 🚀 SUPABASE CONFIGURATION CARD */}
+      <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-5">
+        
+        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
-          <div>
+          <div className="min-w-0 flex-1">
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <FiDatabase className="text-sky-700" />
-              Supabase Cloud Database Connection
+              <FiDatabase className="text-sky-700 shrink-0" />
+              <span>Supabase Cloud Database Connection</span>
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
               Live PostgreSQL database sync for stock, multi-device billing, and staff accounts.
             </p>
           </div>
 
-          <div>
+          <div className="shrink-0">
             {isConnected ? (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200 whitespace-nowrap">
                 <FiCheckCircle /> Supabase Connected
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-bold border border-amber-200">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-bold border border-amber-200 whitespace-nowrap">
                 <FiInfo /> Local Sandbox Mode (Not Synced)
               </span>
             )}
@@ -321,74 +427,81 @@ const PortalSettings = ({ onConfigUpdated }) => {
           </div>
         )}
 
+        {/* Form */}
         <form onSubmit={handleTestAndSave} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
               Project URL
             </label>
-            <input
-              type="url"
-              required
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="Paste URL (e.g. https://fwkglaflloekpzgdnujl.supabase.co)"
-              className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:bg-white focus:border-sky-600 outline-none"
-            />
+            <div className="relative">
+              <FiServer className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm" />
+              <input
+                type="url"
+                required
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://fwkglaflloekpzgdnujl.supabase.co"
+                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:bg-white focus:border-sky-600 outline-none"
+              />
+            </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
               Anon / Public API Key
             </label>
-            <input
-              type="password"
-              required
-              value={key}
-              onChange={(e) => setKey(e.target.value)}
-              placeholder="Paste Key (starts with eyJhbGciOi...)"
-              className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:bg-white focus:border-sky-600 outline-none"
-            />
+            <div className="relative">
+              <FiKey className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm" />
+              <input
+                type="password"
+                required
+                value={key}
+                onChange={(e) => setKey(e.target.value)}
+                placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..."
+                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:bg-white focus:border-sky-600 outline-none"
+              />
+            </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2">
             <p className="text-xs text-slate-400">
-              Credentials are encrypted and saved in your local configuration.
+              Credentials are securely saved in your browser and sync state.
             </p>
 
             <button
               type="submit"
               disabled={testing}
-              className="flex items-center justify-center gap-2 px-6 py-2.5 bg-sky-700 hover:bg-sky-800 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition shadow-md cursor-pointer"
+              className="whitespace-nowrap inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-sky-700 hover:bg-sky-800 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition shadow-md cursor-pointer"
             >
-              <FiSave />
-              {testing ? "Testing Connection..." : "Save & Connect"}
+              <FiSave className="text-sm" />
+              <span>{testing ? "Testing..." : "Save & Connect"}</span>
             </button>
           </div>
         </form>
       </div>
 
       {/* 📄 ONE-CLICK SQL SCHEMA SETUP */}
-      <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
-        <div className="flex items-center justify-between">
+      <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-bold text-slate-900">
               Supabase SQL Setup Query (Required Once)
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Run this query in your Supabase <strong>SQL Editor</strong> to create the 3 database tables (`product_stock`, `invoices`, and `staff_members`).
+              Run this query in your Supabase <strong>SQL Editor</strong> to create the 3 database tables.
             </p>
           </div>
 
           <button
             onClick={handleCopySQL}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition cursor-pointer"
+            className="whitespace-nowrap shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition cursor-pointer"
           >
             {copied ? <FiCheck className="text-emerald-600" /> : <FiCopy />}
-            {copied ? "Copied SQL!" : "Copy SQL Script"}
+            <span>{copied ? "Copied SQL!" : "Copy SQL Script"}</span>
           </button>
         </div>
 
-        <pre className="p-4 bg-slate-900 text-slate-200 rounded-2xl text-[11px] font-mono overflow-x-auto max-h-56 leading-relaxed">
+        <pre className="p-4 bg-slate-900 text-slate-200 rounded-2xl text-[11px] font-mono overflow-x-auto max-h-52 leading-relaxed">
           {SUPABASE_SQL_SCHEMA}
         </pre>
       </div>
@@ -406,7 +519,7 @@ const PortalSettings = ({ onConfigUpdated }) => {
 
             <form onSubmit={handleAddSalesperson} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Salesperson Name
                 </label>
                 <input
@@ -421,7 +534,7 @@ const PortalSettings = ({ onConfigUpdated }) => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   4-Digit Access PIN
                 </label>
                 <input
@@ -439,13 +552,13 @@ const PortalSettings = ({ onConfigUpdated }) => {
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-semibold transition"
+                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-semibold transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-sky-700 hover:bg-sky-800 text-white rounded-xl text-xs font-semibold transition"
+                  className="px-5 py-2 bg-sky-700 hover:bg-sky-800 text-white rounded-xl text-xs font-semibold transition cursor-pointer"
                 >
                   Create Member
                 </button>
@@ -468,7 +581,7 @@ const PortalSettings = ({ onConfigUpdated }) => {
 
             <form onSubmit={handleSaveMemberEdit} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Name
                 </label>
                 <input
@@ -483,7 +596,7 @@ const PortalSettings = ({ onConfigUpdated }) => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Access PIN
                 </label>
                 <input
@@ -502,13 +615,13 @@ const PortalSettings = ({ onConfigUpdated }) => {
                 <button
                   type="button"
                   onClick={() => setEditingMember(null)}
-                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-semibold transition"
+                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-semibold transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-sky-700 hover:bg-sky-800 text-white rounded-xl text-xs font-semibold transition"
+                  className="px-5 py-2 bg-sky-700 hover:bg-sky-800 text-white rounded-xl text-xs font-semibold transition cursor-pointer"
                 >
                   Save Changes
                 </button>
