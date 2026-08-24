@@ -41,7 +41,7 @@ export const StaffAuthProvider = ({ children }) => {
     created_at: m.created_at || new Date().toISOString(),
   });
 
-  // Fetch / Sync staff members from Supabase
+  // Fetch / Sync staff members from Supabase (stable callback, zero infinite loops)
   const loadStaffFromDatabase = useCallback(async () => {
     const supabase = getSupabase();
     if (supabase && isSupabaseConfigured()) {
@@ -57,7 +57,7 @@ export const StaffAuthProvider = ({ children }) => {
             localStorage.setItem(MEMBERS_KEY, JSON.stringify(data));
           } else {
             // Auto seed members into empty Supabase table
-            const toSeed = (members.length > 0 ? members : DEFAULT_MEMBERS).map(sanitizeMemberForDb);
+            const toSeed = DEFAULT_MEMBERS.map(sanitizeMemberForDb);
             const { error: seedErr } = await supabase.from("staff_members").upsert(toSeed);
             if (!seedErr) {
               setMembers(toSeed);
@@ -69,16 +69,16 @@ export const StaffAuthProvider = ({ children }) => {
         console.warn("Could not sync staff from Supabase:", err);
       }
     }
-  }, [members]);
+  }, []);
 
   useEffect(() => {
     loadStaffFromDatabase();
 
-    // Supabase Real-time live subscription
+    // Supabase Real-time live subscription (Single persistent channel)
     const supabase = getSupabase();
     if (supabase && isSupabaseConfigured()) {
       const channel = supabase
-        .channel("staff_members_realtime")
+        .channel("staff_members_realtime_sync")
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "staff_members" },

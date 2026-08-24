@@ -2,11 +2,14 @@
 
 import AppRoutes from "./routes/AppRoutes";
 import { StaffAuthProvider } from "./context/StaffAuthContext";
+import { WishlistProvider } from "./context/WishlistContext";
 
 const App = () => {
   return (
     <StaffAuthProvider>
-      <AppRoutes />
+      <WishlistProvider>
+        <AppRoutes />
+      </WishlistProvider>
     </StaffAuthProvider>
   );
 };

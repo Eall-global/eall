@@ -45,22 +45,47 @@ export const isSupabaseConfigured = () => {
 
 export const getActiveSupabaseConfig = () => getSupabaseConfig();
 
+// Singleton Client Cache to prevent multiple GoTrueClient instances & WebSocket leak
+let cachedClient = null;
+let cachedConfigKey = null;
+
 export const saveSupabaseConfig = (url, key) => {
   if (!url || !key) {
     localStorage.removeItem("eall_supabase_config");
-    return;
+  } else {
+    const clean = sanitizeUrl(url);
+    localStorage.setItem(
+      "eall_supabase_config",
+      JSON.stringify({ url: clean, key: key.trim() })
+    );
   }
-  const clean = sanitizeUrl(url);
-  localStorage.setItem(
-    "eall_supabase_config",
-    JSON.stringify({ url: clean, key: key.trim() })
-  );
+  // Invalidate cached client so it re-initializes with new credentials
+  cachedClient = null;
+  cachedConfigKey = null;
 };
 
 export const getSupabase = () => {
   const cfg = getSupabaseConfig();
   if (cfg.url && cfg.key && cfg.url.startsWith("https://")) {
-    return createClient(cfg.url, cfg.key);
+    const currentKey = `${cfg.url}:${cfg.key}`;
+    if (cachedClient && cachedConfigKey === currentKey) {
+      return cachedClient;
+    }
+
+    try {
+      cachedClient = createClient(cfg.url, cfg.key, {
+        auth: {
+          persistSession: false, // We use custom PIN staff auth, prevents multiple GoTrueClient warnings
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+        },
+      });
+      cachedConfigKey = currentKey;
+      return cachedClient;
+    } catch (e) {
+      console.warn("Failed to initialize Supabase singleton:", e);
+      return null;
+    }
   }
   return null;
 };

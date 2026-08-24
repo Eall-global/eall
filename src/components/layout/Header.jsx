@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { FiMenu } from "react-icons/fi";
+import { FiMenu, FiHeart } from "react-icons/fi";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useWishlist } from "../../context/WishlistContext";
 
 import useScrollPosition from "../../hooks/useScrollPosition";
 import Navigation from "../navigation/Navigation";
@@ -12,6 +13,7 @@ import ProductMegaMenu from "../navigation/megaMenu/ProductMegaMenu";
 import { brands } from "../../data/brandsData";
 
 const Header = () => {
+  const { wishlistCount, setIsWishlistOpen } = useWishlist();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [activeMenu, setActiveMenu] = useState(null);
@@ -136,7 +138,7 @@ const Header = () => {
             </div>
 
             {/* RIGHT: ACTIONS */}
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-1.5 sm:gap-2.5">
               {/* Quote Button */}
               <div className="hidden xl:block">
                 <QuoteButton
@@ -146,6 +148,29 @@ const Header = () => {
                   }}
                 />
               </div>
+
+              {/* Wishlist Button (Both Desktop and Mobile) */}
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveMenu(null);
+                  setIsWishlistOpen(true);
+                }}
+                className={`relative p-2 rounded-xl transition-colors duration-300 cursor-pointer ${
+                  isTransparent
+                    ? "text-white hover:bg-white/10"
+                    : "text-slate-700 hover:bg-slate-100"
+                }`}
+                title="View Saved Products / Wishlist"
+                aria-label="Wishlist"
+              >
+                <FiHeart className="text-xl sm:text-2xl" />
+                {wishlistCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 bg-rose-500 text-white text-[10px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center shadow-xs">
+                    {wishlistCount}
+                  </span>
+                )}
+              </button>
 
               {/* Search Button */}
               <div className="hidden xl:block">

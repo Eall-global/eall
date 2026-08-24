@@ -1,6 +1,7 @@
 import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
 import MobileBottomNav from "../components/navigation/MobileBottomNav";
+import WishlistDrawer from "../components/wishlist/WishlistDrawer";
 import { Outlet, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 
@@ -28,6 +29,9 @@ const MainLayout = () => {
 
       {/* Persistent Mobile Bottom Navigation */}
       <MobileBottomNav />
+
+      {/* Global Wishlist Drawer */}
+      <WishlistDrawer />
     </div>
   );
 };

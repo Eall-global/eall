@@ -1,26 +1,25 @@
 import { Link } from "react-router-dom";
-import { FiArrowRight, FiCheckCircle } from "react-icons/fi";
-import { FaStar } from "react-icons/fa";
+import { FiArrowRight, FiHeart } from "react-icons/fi";
 import { useState } from "react";
 import { getColorSwatch } from "../../utils/getColorSwatch";
+import { useWishlist } from "../../context/WishlistContext";
 
 const ProductCard = ({ product }) => {
+  const { isWishlisted, toggleWishlist } = useWishlist();
+
   const availabilityConfig = {
     "In Stock": {
       label: "In Stock",
       className: "bg-green-100 text-green-700",
     },
-
     "Limited Stock": {
       label: "Limited Stock",
       className: "bg-yellow-100 text-yellow-700",
     },
-
     "Available on Request": {
       label: "Available on Request",
       className: "bg-blue-100 text-blue-700",
     },
-
     "Out of Stock": {
       label: "Out of Stock",
       className: "bg-red-100 text-red-700",
@@ -36,114 +35,123 @@ const ProductCard = ({ product }) => {
 
   const [previewVariant, setPreviewVariant] = useState(defaultVariant);
 
-  return (
-    <Link to={`/products/${product.slug}`} className=" block group h-full ">
-      <article className="group bg-white rounded-2xl border-8 border-slate-100 overflow-hidden hover:shadow-lg transition-all duration-300 h-full flex flex-col cursor-pointer">
-        {/* IMAGE */}
+  const wishlisted = isWishlisted(product.slug || product.id);
 
-        <div className="relative bg-white-50 h-48 lg:h-64 flex items-center justify-center overflow-hidden">
+  const handleWishlistClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleWishlist(product);
+  };
+
+  // Up to 5 color swatches in preview
+  const visibleVariants = product.variants?.slice(0, 5) || [];
+  const extraCount = (product.variants?.length || 0) - 5;
+
+  return (
+    <Link to={`/products/${product.slug}`} className="block group h-full text-left">
+      <article className="group bg-white rounded-2xl border border-slate-200 hover:border-sky-300 hover:shadow-xl transition-all duration-300 h-full flex flex-col overflow-hidden cursor-pointer relative">
+        
+        {/* 📸 PURE WHITE IMAGE CONTAINER (Seamless blending for white background images) */}
+        <div className="relative bg-white h-48 sm:h-56 md:h-64 flex items-center justify-center overflow-hidden">
           <img
             src={previewVariant?.image || product.image}
             alt={product.name}
-            className="h-full w-full object-contain p-6 transition-transform duration-500 group-hover:scale-105"
+            className="h-full w-full object-contain p-4 sm:p-6 transition-transform duration-500 group-hover:scale-105"
+            onError={(e) => {
+              e.target.src = "/logo.png";
+            }}
           />
 
-          {/* BADGES */}
+          {/* NEW BADGE (Top-Left) */}
+          {product.isNewArrival && (
+            <span className="absolute top-0 left-0 bg-sky-700/15 text-sky-800 text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-br-xl">
+              NEW
+            </span>
+          )}
 
-          <div className="absolute top-0 left-0">
-            {product.isNewArrival && (
-              <span className="bg-sky-700/20 text-sky-700 text-[10px] lg:text-xs font-semibold px-3 rounded-br-2xl py-2">
-                NEW
-              </span>
-            )}
-          </div>
-          <div className="absolute top-0 right-0 px-3 py-2 rounded-bl-2xl">
-            {product.isFeatured && (
-              <FaStar className=" text-purple-700 lg:text-md font-semibold " />
-            )}
-          </div>
+          {/* ❤️ WISHLIST / FAVORITE BUTTON (Top-Right) */}
+          <button
+            type="button"
+            onClick={handleWishlistClick}
+            className={`
+              absolute top-2.5 right-2.5 p-1.5 rounded-full transition-all duration-200 cursor-pointer
+              ${
+                wishlisted
+                  ? "bg-rose-50 text-rose-600 scale-110"
+                  : "text-slate-400 hover:text-rose-500 hover:bg-slate-50"
+              }
+            `}
+            title={wishlisted ? "Remove from Wishlist" : "Add to Wishlist"}
+          >
+            <FiHeart className={`text-base sm:text-lg ${wishlisted ? "fill-rose-600" : ""}`} />
+          </button>
+
+          {/* 🏷️ FULL-WIDTH AVAILABILITY STRIP (Pinned at bottom of top half) */}
           <div
-            className={` absolute bottom-0 w-full text-[10px] lg:text-xs font-semibold px-3 py-1 ${availability.className} `}
+            className={`
+              absolute bottom-0 left-0 right-0 w-full text-center text-[10px] sm:text-xs font-semibold py-1.5
+              ${availability.className}
+            `}
           >
             {availability.label}
           </div>
         </div>
 
-        {/* CONTENT */}
+        {/* 🏷️ CONTENT DETAILS */}
+        <div className="p-4 sm:p-5 flex flex-col flex-1 bg-white justify-between">
+          <div>
+            {/* Brand Header */}
+            <p className="text-[10px] sm:text-xs uppercase tracking-wider text-sky-700 font-extrabold">
+              {product.brand}
+            </p>
 
-        <div className="lg:p-6 p-4 bg-slate-100 flex flex-col flex-1">
-          <p className=" text-xs uppercase tracking-wide text-sky-700 font-semibold">
-            {product.brand}
-          </p>
+            {/* Product Name (Full Name with 2-line clamp) */}
+            <h3 className="mt-1 text-sm sm:text-base font-bold text-slate-900 line-clamp-2 leading-snug min-h-[2.4rem]">
+              {product.name}
+            </h3>
 
-          <h3 className="mt-2 text-sm lg:text-lg font-bold text-slate-900 line-clamp-1">
-            {product.name}
-          </h3>
+            {/* COLOR SWATCHES (Compact Single Row) */}
+            {product.variants?.length > 0 && (
+              <div className="mt-3 flex items-center gap-1.5 flex-wrap">
+                {visibleVariants.map((variant) => (
+                  <button
+                    key={variant.colorSlug || variant.color}
+                    type="button"
+                    onMouseEnter={() => setPreviewVariant(variant)}
+                    onMouseLeave={() => setPreviewVariant(defaultVariant)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setPreviewVariant(variant);
+                    }}
+                    title={variant.color}
+                    className={`
+                      h-3.5 w-3.5 sm:h-4 sm:w-4 rounded-full border transition-all cursor-pointer
+                      ${
+                        previewVariant?.colorSlug === variant.colorSlug
+                          ? "border-sky-600 ring-2 ring-sky-400/30 scale-110"
+                          : "border-slate-300 hover:border-sky-500"
+                      }
+                    `}
+                    style={{
+                      backgroundColor: getColorSwatch(variant.color),
+                    }}
+                  />
+                ))}
 
-          <p className="mt-2 text-sm lg:text-sm text-slate-500 line-clamp-1">
-            {product.familyName}
-          </p>
-
-          {/* SKU */}
-
-          {/* {product.sku && (
-          <p className="mt-3 text-xs text-slate-400">
-            SKU:
-            {product.sku}
-          </p>
-        )} */}
-
-          {/* STATUS */}
-
-          {/* <div className="mt-5 flex items-center justify-between">
-            {product.warranty && (
-              <span className="flex items-center gap-1 text-xs text-slate-500">
-                <FiCheckCircle className="text-green-600" />
-
-                {product.warranty}
-              </span>
+                {extraCount > 0 && (
+                  <span className="text-[10px] font-medium text-slate-400 pl-0.5">
+                    +{extraCount}
+                  </span>
+                )}
+              </div>
             )}
-          </div> */}
+          </div>
 
-          {product.variants?.length > 0 && (
-            <div className="mt-5 flex items-center flex-wrap gap-2">
-              {product.variants.map((variant) => (
-                <button
-                  key={variant.colorSlug}
-                  type="button"
-                  onMouseEnter={() => setPreviewVariant(variant)}
-                  onMouseLeave={() => setPreviewVariant(defaultVariant)}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setPreviewVariant(variant);
-                  }}
-                  title={variant.color}
-                  className={`
-          h-5
-          w-5
-          rounded-full
-          border-2
-          transition-all
-          ${
-            previewVariant?.colorSlug === variant.colorSlug
-              ? "border-sky-600 scale-110"
-              : "border-slate-300 hover:border-sky-400"
-          }
-        `}
-                  style={{
-                    backgroundColor: getColorSwatch(variant.color),
-                  }}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* CTA */}
-          <div className="mt-auto">
-            <div className="mt-6 flex items-center justify-between text-sky-700 font-semibold text-sm group-hover:text-sky-800">
-              View Details
-              <FiArrowRight className="transition-transform group-hover:translate-x-1" />
-            </div>
+          {/* 🔗 BOTTOM ACTION CTA */}
+          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-sky-700 font-bold text-xs sm:text-sm group-hover:text-sky-800">
+            <span>View Details</span>
+            <FiArrowRight className="text-sm transition-transform duration-200 group-hover:translate-x-1" />
           </div>
         </div>
       </article>
