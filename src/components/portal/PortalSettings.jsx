@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   FiDatabase,
   FiKey,
@@ -13,13 +13,17 @@ import {
   FiEdit2,
   FiShield,
   FiUserCheck,
+  FiAlertCircle,
+  FiUploadCloud,
 } from "react-icons/fi";
 import {
   getActiveSupabaseConfig,
   saveSupabaseConfig,
   isSupabaseConfigured,
+  getSupabase,
 } from "../../lib/supabaseClient";
 import { useStaffAuth } from "../../context/StaffAuthContext";
+import { syncCatalogToStock } from "../../services/stockService";
 
 const SUPABASE_SQL_SCHEMA = `-- 1. PRODUCT STOCK TABLE
 CREATE TABLE IF NOT EXISTS public.product_stock (
@@ -56,12 +60,28 @@ CREATE TABLE IF NOT EXISTS public.invoices (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
--- 3. ENABLE PUBLIC READ/WRITE FOR DEMO/ANON (Or Configure RLS as desired)
+-- 3. STAFF MEMBERS TABLE (Syncs sales persons & pins across all devices)
+CREATE TABLE IF NOT EXISTS public.staff_members (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'sales',
+    pin TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+
+-- 4. ENABLE PUBLIC PERMISSIONS FOR ANON KEY
 ALTER TABLE public.product_stock ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.staff_members ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Allow public all access on product_stock" ON public.product_stock;
 CREATE POLICY "Allow public all access on product_stock" ON public.product_stock FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public all access on invoices" ON public.invoices;
 CREATE POLICY "Allow public all access on invoices" ON public.invoices FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public all access on staff_members" ON public.staff_members;
+CREATE POLICY "Allow public all access on staff_members" ON public.staff_members FOR ALL USING (true) WITH CHECK (true);
 `;
 
 const PortalSettings = ({ onConfigUpdated }) => {
@@ -69,10 +89,11 @@ const PortalSettings = ({ onConfigUpdated }) => {
   const [url, setUrl] = useState(currentConfig.url || "");
   const [key, setKey] = useState(currentConfig.key || "");
   const [copied, setCopied] = useState(false);
-  const [savedSuccess, setSavedSuccess] = useState(false);
+  const [testResult, setTestResult] = useState(null); // { success: boolean, message: string }
+  const [testing, setTesting] = useState(false);
 
   // Staff Team Management
-  const { members, addMember, updateMember, deleteMember } = useStaffAuth();
+  const { members, addMember, updateMember, deleteMember, refreshStaff } = useStaffAuth();
   const [newSalesName, setNewSalesName] = useState("");
   const [newSalesPin, setNewSalesPin] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
@@ -80,12 +101,63 @@ const PortalSettings = ({ onConfigUpdated }) => {
 
   const isConnected = isSupabaseConfigured();
 
-  const handleSaveSupabase = (e) => {
-    e.preventDefault();
-    saveSupabaseConfig(url, key);
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 3000);
-    if (onConfigUpdated) onConfigUpdated();
+  // Test live connection to Supabase
+  const handleTestAndSave = async (e) => {
+    e?.preventDefault();
+    setTesting(true);
+    setTestResult(null);
+
+    const cleanUrl = url.trim().replace(/\/rest\/v1\/?$/, "").replace(/\/$/, "");
+    const cleanKey = key.trim();
+
+    if (!cleanUrl || !cleanKey) {
+      setTestResult({
+        success: false,
+        message: "Please enter both the Project URL and the Anon Public Key.",
+      });
+      setTesting(false);
+      return;
+    }
+
+    try {
+      saveSupabaseConfig(cleanUrl, cleanKey);
+      const client = getSupabase();
+
+      if (!client) {
+        throw new Error("Invalid Supabase URL or Key format.");
+      }
+
+      // Test querying product_stock table
+      const { data, error } = await client
+        .from("product_stock")
+        .select("sku")
+        .limit(1);
+
+      if (error) {
+        if (error.code === "42P01") {
+          throw new Error(
+            "Connected to Supabase, but the tables are missing! Please copy and run the SQL query below in your Supabase SQL Editor."
+          );
+        }
+        throw new Error(`Supabase error: ${error.message}`);
+      }
+
+      setTestResult({
+        success: true,
+        message: "Connected to Supabase. Real-time sync is active across all devices.",
+      });
+
+      // Auto-sync staff and catalog
+      await refreshStaff();
+      if (onConfigUpdated) onConfigUpdated();
+    } catch (err) {
+      setTestResult({
+        success: false,
+        message: err.message || "Failed to connect to Supabase. Please verify your URL and Key.",
+      });
+    } finally {
+      setTesting(false);
+    }
   };
 
   const handleCopySQL = () => {
@@ -94,10 +166,10 @@ const PortalSettings = ({ onConfigUpdated }) => {
     setTimeout(() => setCopied(false), 2500);
   };
 
-  const handleAddSalesperson = (e) => {
+  const handleAddSalesperson = async (e) => {
     e.preventDefault();
     if (!newSalesName.trim() || !newSalesPin.trim()) return;
-    addMember({
+    await addMember({
       name: newSalesName.trim(),
       role: "sales",
       pin: newSalesPin.trim(),
@@ -107,10 +179,10 @@ const PortalSettings = ({ onConfigUpdated }) => {
     setShowAddModal(false);
   };
 
-  const handleSaveMemberEdit = (e) => {
+  const handleSaveMemberEdit = async (e) => {
     e.preventDefault();
     if (!editingMember) return;
-    updateMember(editingMember.id, {
+    await updateMember(editingMember.id, {
       name: editingMember.name,
       pin: editingMember.pin,
     });
@@ -118,7 +190,7 @@ const PortalSettings = ({ onConfigUpdated }) => {
   };
 
   return (
-    <div className="max-w-4xl space-y-8">
+    <div className="max-w-4xl space-y-8 text-left">
       
       {/* 👥 STAFF TEAM MANAGEMENT (ADMIN & MULTIPLE SALESPERSONS) */}
       <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-5">
@@ -129,7 +201,7 @@ const PortalSettings = ({ onConfigUpdated }) => {
               Staff Team & Salesperson Access
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Manage Admin and Sales team members. Each salesperson gets their own PIN and gets stamped on invoices.
+              Manage Admin and Sales team members. Changes automatically sync across all devices via Supabase.
             </p>
           </div>
 
@@ -214,7 +286,7 @@ const PortalSettings = ({ onConfigUpdated }) => {
               Supabase Cloud Database Connection
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Live PostgreSQL database sync for stock & multi-device billing.
+              Live PostgreSQL database sync for stock, multi-device billing, and staff accounts.
             </p>
           </div>
 
@@ -225,22 +297,41 @@ const PortalSettings = ({ onConfigUpdated }) => {
               </span>
             ) : (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-bold border border-amber-200">
-                <FiInfo /> Local Sandbox Mode
+                <FiInfo /> Local Sandbox Mode (Not Synced)
               </span>
             )}
           </div>
         </div>
 
-        <form onSubmit={handleSaveSupabase} className="space-y-4">
+        {/* Test Result Message */}
+        {testResult && (
+          <div
+            className={`p-4 rounded-2xl text-xs font-semibold flex items-start gap-3 border ${
+              testResult.success
+                ? "bg-emerald-50 text-emerald-900 border-emerald-200"
+                : "bg-rose-50 text-rose-900 border-rose-200"
+            }`}
+          >
+            {testResult.success ? (
+              <FiCheckCircle className="text-lg text-emerald-600 shrink-0 mt-0.5" />
+            ) : (
+              <FiAlertCircle className="text-lg text-rose-600 shrink-0 mt-0.5" />
+            )}
+            <p className="leading-relaxed">{testResult.message}</p>
+          </div>
+        )}
+
+        <form onSubmit={handleTestAndSave} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
               Project URL
             </label>
             <input
               type="url"
+              required
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://fwkglaflloekpzgdnujl.supabase.co"
+              placeholder="Paste URL (e.g. https://fwkglaflloekpzgdnujl.supabase.co)"
               className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:bg-white focus:border-sky-600 outline-none"
             />
           </div>
@@ -251,24 +342,26 @@ const PortalSettings = ({ onConfigUpdated }) => {
             </label>
             <input
               type="password"
+              required
               value={key}
               onChange={(e) => setKey(e.target.value)}
-              placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..."
+              placeholder="Paste Key (starts with eyJhbGciOi...)"
               className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:bg-white focus:border-sky-600 outline-none"
             />
           </div>
 
-          <div className="flex items-center justify-between pt-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
             <p className="text-xs text-slate-400">
-              Credentials are saved securely in your browser & environment.
+              Credentials are encrypted and saved in your local configuration.
             </p>
 
             <button
               type="submit"
-              className="flex items-center gap-2 px-5 py-2.5 bg-sky-700 hover:bg-sky-800 text-white rounded-xl text-xs font-bold transition shadow-md cursor-pointer"
+              disabled={testing}
+              className="flex items-center justify-center gap-2 px-6 py-2.5 bg-sky-700 hover:bg-sky-800 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition shadow-md cursor-pointer"
             >
               <FiSave />
-              {savedSuccess ? "Saved & Applied!" : "Save Credentials"}
+              {testing ? "Testing Connection..." : "Save & Connect"}
             </button>
           </div>
         </form>
@@ -279,10 +372,10 @@ const PortalSettings = ({ onConfigUpdated }) => {
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-sm font-bold text-slate-900">
-              Supabase SQL Setup Query
+              Supabase SQL Setup Query (Required Once)
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Run this in your Supabase <strong>SQL Editor</strong> to configure the tables.
+              Run this query in your Supabase <strong>SQL Editor</strong> to create the 3 database tables (`product_stock`, `invoices`, and `staff_members`).
             </p>
           </div>
 
@@ -295,7 +388,7 @@ const PortalSettings = ({ onConfigUpdated }) => {
           </button>
         </div>
 
-        <pre className="p-4 bg-slate-900 text-slate-200 rounded-2xl text-[11px] font-mono overflow-x-auto max-h-52 leading-relaxed">
+        <pre className="p-4 bg-slate-900 text-slate-200 rounded-2xl text-[11px] font-mono overflow-x-auto max-h-56 leading-relaxed">
           {SUPABASE_SQL_SCHEMA}
         </pre>
       </div>

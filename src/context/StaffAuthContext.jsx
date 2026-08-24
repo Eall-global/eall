@@ -1,12 +1,13 @@
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { getSupabase, isSupabaseConfigured } from "../lib/supabaseClient";
 
 const StaffAuthContext = createContext(null);
 
 const DEFAULT_MEMBERS = [
   { id: "admin", name: "E-ALL Admin", role: "admin", pin: "8888" },
-  { id: "sales-1", name: "Ahmed - Sales Executive", role: "sales", pin: "1234" },
-  { id: "sales-2", name: "Sara - Account Manager", role: "sales", pin: "2345" },
-  { id: "sales-3", name: "Bilal - Sales Rep", role: "sales", pin: "3456" },
+  { id: "sales-1", name: "Iftikhar - Account Manager", role: "sales", pin: "1234" },
+  { id: "sales-2", name: "Hidayat - Account Manager", role: "sales", pin: "2345" },
+  { id: "sales-3", name: "Yafey - Sales Executive", role: "sales", pin: "3456" },
 ];
 
 const SESSION_KEY = "eall_staff_auth_session";
@@ -31,30 +32,99 @@ export const StaffAuthProvider = ({ children }) => {
     }
   });
 
-  const saveMembers = (newMembers) => {
+  // Fetch / Sync staff members from Supabase
+  const loadStaffFromDatabase = useCallback(async () => {
+    const supabase = getSupabase();
+    if (supabase && isSupabaseConfigured()) {
+      try {
+        const { data, error } = await supabase
+          .from("staff_members")
+          .select("*")
+          .order("created_at", { ascending: true });
+
+        if (!error && data) {
+          if (data.length > 0) {
+            setMembers(data);
+            localStorage.setItem(MEMBERS_KEY, JSON.stringify(data));
+          } else {
+            // Seed defaults into empty Supabase table
+            await supabase.from("staff_members").upsert(DEFAULT_MEMBERS);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not sync staff from Supabase:", err);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    loadStaffFromDatabase();
+  }, [loadStaffFromDatabase]);
+
+  const saveMembers = async (newMembers) => {
     setMembers(newMembers);
     localStorage.setItem(MEMBERS_KEY, JSON.stringify(newMembers));
   };
 
-  const addMember = ({ name, role = "sales", pin }) => {
+  const addMember = async ({ name, role = "sales", pin }) => {
     const id = `member-${Date.now()}`;
-    const newMember = { id, name: name.trim(), role, pin: String(pin).trim() };
+    const newMember = {
+      id,
+      name: name.trim(),
+      role,
+      pin: String(pin).trim(),
+      created_at: new Date().toISOString(),
+    };
     const updated = [...members, newMember];
-    saveMembers(updated);
+    await saveMembers(updated);
+
+    // Sync to Supabase
+    const supabase = getSupabase();
+    if (supabase && isSupabaseConfigured()) {
+      try {
+        await supabase.from("staff_members").upsert(newMember);
+      } catch (e) {
+        console.warn("Failed to add member to Supabase:", e);
+      }
+    }
+
     return newMember;
   };
 
-  const updateMember = (id, updates) => {
+  const updateMember = async (id, updates) => {
     const updated = members.map((m) =>
       m.id === id ? { ...m, ...updates, pin: String(updates.pin || m.pin).trim() } : m
     );
-    saveMembers(updated);
+    await saveMembers(updated);
+
+    // Sync to Supabase
+    const supabase = getSupabase();
+    if (supabase && isSupabaseConfigured()) {
+      try {
+        const target = updated.find((m) => m.id === id);
+        if (target) {
+          await supabase.from("staff_members").upsert(target);
+        }
+      } catch (e) {
+        console.warn("Failed to update member in Supabase:", e);
+      }
+    }
   };
 
-  const deleteMember = (id) => {
+  const deleteMember = async (id) => {
     if (id === "admin") return; // Cannot delete primary admin
     const updated = members.filter((m) => m.id !== id);
-    saveMembers(updated);
+    await saveMembers(updated);
+
+    // Delete from Supabase
+    const supabase = getSupabase();
+    if (supabase && isSupabaseConfigured()) {
+      try {
+        await supabase.from("staff_members").delete().eq("id", id);
+      } catch (e) {
+        console.warn("Failed to delete member from Supabase:", e);
+      }
+    }
   };
 
   const loginByPin = (enteredPin) => {
@@ -116,6 +186,7 @@ export const StaffAuthProvider = ({ children }) => {
     addMember,
     updateMember,
     deleteMember,
+    refreshStaff: loadStaffFromDatabase,
   };
 
   return (
