@@ -314,10 +314,10 @@ const PortalSettings = ({ onConfigUpdated }) => {
           <table className="w-full text-left text-xs sm:text-sm border-collapse">
             <thead>
               <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50/50">
-                <th className="py-2.5 px-3.5 text-left">Staff Name</th>
-                <th className="py-2.5 px-3 text-left w-28">Role</th>
-                <th className="py-2.5 px-3 text-left w-32 font-mono">Access PIN</th>
-                <th className="py-2.5 px-3 text-right w-24">Actions</th>
+                <th className="py-2.5 px-3.5 text-left whitespace-nowrap">Staff Name</th>
+                <th className="py-2.5 px-3 text-left w-28 whitespace-nowrap">Role</th>
+                <th className="py-2.5 px-3 text-left w-32 font-mono whitespace-nowrap">Access PIN</th>
+                <th className="py-2.5 px-3 text-right w-24 whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
@@ -325,14 +325,14 @@ const PortalSettings = ({ onConfigUpdated }) => {
                 <tr key={member.id} className="hover:bg-slate-50/60 transition-colors">
                   
                   {/* Name */}
-                  <td className="py-3 px-3.5 text-left">
-                    <p className="font-bold text-slate-900 text-xs sm:text-sm">
+                  <td className="py-3 px-3.5 text-left whitespace-nowrap min-w-[150px]">
+                    <p className="font-bold text-slate-900 text-xs sm:text-sm whitespace-nowrap">
                       {member.name}
                     </p>
                   </td>
 
                   {/* Role Badge */}
-                  <td className="py-3 px-3 text-left">
+                  <td className="py-3 px-3 text-left whitespace-nowrap">
                     <span
                       className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap ${
                         member.role === "admin"
@@ -351,7 +351,7 @@ const PortalSettings = ({ onConfigUpdated }) => {
                   </td>
 
                   {/* Actions */}
-                  <td className="py-3 px-3 text-right">
+                  <td className="py-3 px-3 text-right whitespace-nowrap">
                     <div className="flex items-center justify-end gap-1.5">
                       <button
                         type="button"

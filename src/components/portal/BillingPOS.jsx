@@ -269,11 +269,11 @@ const BillingPOS = ({ stock = [], onInvoiceCreated }) => {
               <table className="w-full text-left text-xs sm:text-sm border-collapse">
                 <thead>
                   <tr className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 bg-slate-50/50">
-                    <th className="py-2.5 px-3">Item Description</th>
-                    <th className="py-2.5 px-3 text-center w-28">Unit Price (AED)</th>
-                    <th className="py-2.5 px-3 text-center w-28">Quantity</th>
-                    <th className="py-2.5 px-3 text-right w-28">Total (AED)</th>
-                    <th className="py-2.5 px-2 text-center w-10"></th>
+                    <th className="py-2.5 px-3 text-left whitespace-nowrap min-w-[140px]">Item Description</th>
+                    <th className="py-2.5 px-3 text-center whitespace-nowrap min-w-[110px]">Unit Price (AED)</th>
+                    <th className="py-2.5 px-3 text-center whitespace-nowrap min-w-[110px]">Quantity</th>
+                    <th className="py-2.5 px-3 text-right whitespace-nowrap min-w-[110px]">Total (AED)</th>
+                    <th className="py-2.5 px-2 text-center w-10 whitespace-nowrap"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
@@ -281,22 +281,22 @@ const BillingPOS = ({ stock = [], onInvoiceCreated }) => {
                     <tr key={item.sku} className="hover:bg-slate-50/60 transition-colors">
                       
                       {/* Product Name & SKU */}
-                      <td className="py-3 px-3">
+                      <td className="py-3 px-3 min-w-[140px]">
                         <p className="font-semibold text-slate-900 text-xs sm:text-sm">
                           {item.name}
                         </p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-[11px] font-mono text-slate-400">
+                        <div className="flex items-center gap-1.5 mt-0.5 whitespace-nowrap">
+                          <span className="text-[11px] font-mono text-slate-400 whitespace-nowrap">
                             {item.sku}
                           </span>
-                          <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-sky-50 text-sky-700 font-semibold">
+                          <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-sky-50 text-sky-700 font-semibold whitespace-nowrap shrink-0">
                             Max: {item.availableStock}
                           </span>
                         </div>
                       </td>
 
                       {/* Unit Price Input */}
-                      <td className="py-3 px-3 text-center">
+                      <td className="py-3 px-3 text-center whitespace-nowrap min-w-[110px]">
                         <div className="relative inline-block w-24">
                           <input
                             type="number"
@@ -310,7 +310,7 @@ const BillingPOS = ({ stock = [], onInvoiceCreated }) => {
                       </td>
 
                       {/* Quantity Stepper */}
-                      <td className="py-3 px-3 text-center">
+                      <td className="py-3 px-3 text-center whitespace-nowrap min-w-[110px]">
                         <div className="inline-flex items-center justify-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-200">
                           <button
                             type="button"
@@ -336,12 +336,12 @@ const BillingPOS = ({ stock = [], onInvoiceCreated }) => {
                       </td>
 
                       {/* Item Total */}
-                      <td className="py-3 px-3 text-right font-mono font-bold text-slate-900 text-xs sm:text-sm">
+                      <td className="py-3 px-3 text-right font-mono font-bold text-slate-900 text-xs sm:text-sm whitespace-nowrap min-w-[110px]">
                         AED {(item.unitPrice * item.quantity).toLocaleString("en-AE", { minimumFractionDigits: 2 })}
                       </td>
 
                       {/* Remove Button */}
-                      <td className="py-3 px-2 text-center">
+                      <td className="py-3 px-2 text-center whitespace-nowrap">
                         <button
                           type="button"
                           onClick={() => handleRemoveItem(item.sku)}

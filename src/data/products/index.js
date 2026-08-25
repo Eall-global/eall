@@ -1,5 +1,5 @@
 import appleProducts from "./apple";
-import hmdProducts from "./hmd";
+
 import hmdNokiaProducts from "./hmd-nokia-products";
 import hmdAccessories from "./hmd_accessories";
 import newPhoneProducts from "./new-phone-products";
@@ -10,7 +10,6 @@ import samsungTablets from "./samsung_tablets";
 
 export const products = [
   ...appleProducts,
-  ...hmdProducts,
   ...nokiaProducts,
   ...hmdAccessories,
   ...hmdNokiaProducts,

@@ -39,9 +39,9 @@ export const getInitialCatalogSeed = () => {
 
 const mapDbToStockItem = (item) => ({
   sku: item.sku,
-  name: item.name,
-  brand: item.brand,
-  category: item.category,
+  name: String(item.name || "").trim(),
+  brand: String(item.brand || "General").trim(),
+  category: String(item.category || "Electronics").trim(),
   image: item.image,
   quantity: Number(item.quantity) || 0,
   price: Number(item.price) || 0,
@@ -165,21 +165,31 @@ export const adjustStockDelta = async (sku, delta) => {
 };
 
 /**
- * Update product price and min alert threshold
+ * Update product details including name, brand, category, price, quantity, cost price, and min alert threshold
  */
-export const updateProductDetails = async (sku, { price, costPrice, minAlert }) => {
+export const updateProductDetails = async (
+  sku,
+  { name, brand, category, price, quantity, costPrice, minAlert }
+) => {
   const supabase = getSupabase();
 
   if (supabase && isSupabaseConfigured()) {
     try {
+      const updatePayload = {
+        updated_at: new Date().toISOString(),
+      };
+      if (name !== undefined) updatePayload.name = String(name).trim();
+      if (brand !== undefined) updatePayload.brand = String(brand).trim();
+      if (category !== undefined) updatePayload.category = String(category).trim();
+      if (price !== undefined) updatePayload.price = Number(price);
+      if (quantity !== undefined)
+        updatePayload.quantity = Math.max(0, parseInt(quantity, 10) || 0);
+      if (costPrice !== undefined) updatePayload.cost_price = Number(costPrice);
+      if (minAlert !== undefined) updatePayload.min_alert = Number(minAlert);
+
       const { error } = await supabase
         .from("product_stock")
-        .update({
-          price: Number(price),
-          cost_price: Number(costPrice || 0),
-          min_alert: Number(minAlert || 3),
-          updated_at: new Date().toISOString(),
-        })
+        .update(updatePayload)
         .eq("sku", sku);
 
       if (error) throw error;
@@ -193,7 +203,14 @@ export const updateProductDetails = async (sku, { price, costPrice, minAlert }) 
     item.sku === sku
       ? {
           ...item,
+          name: name !== undefined ? String(name).trim() : item.name,
+          brand: brand !== undefined ? String(brand).trim() : item.brand,
+          category: category !== undefined ? String(category).trim() : item.category,
           price: price !== undefined ? Number(price) : item.price,
+          quantity:
+            quantity !== undefined
+              ? Math.max(0, parseInt(quantity, 10) || 0)
+              : item.quantity,
           costPrice: costPrice !== undefined ? Number(costPrice) : item.costPrice,
           minAlert: minAlert !== undefined ? Number(minAlert) : item.minAlert,
           updatedAt: new Date().toISOString(),

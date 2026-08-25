@@ -97,10 +97,10 @@ const InvoiceDocument = ({ invoice, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/90 backdrop-blur-md flex flex-col items-center p-2 sm:p-4 md:p-6 print:p-0 print:bg-white print:static">
-      
+
       {/* 🛠️ CUSTOM DOCUMENT VIEWER TOOLBAR */}
       <div className="sticky top-2 z-20 w-full max-w-4xl bg-slate-900/95 backdrop-blur-lg text-white rounded-2xl shadow-2xl border border-slate-700/80 px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3 mb-4 print:hidden">
-        
+
         {/* Left: Document Info */}
         <div className="flex items-center gap-3">
           <div className="p-2 bg-sky-500/20 text-sky-400 rounded-xl">
@@ -121,7 +121,7 @@ const InvoiceDocument = ({ invoice, onClose }) => {
 
         {/* Right: Actions (1-Click Download, Share, Print, Close) */}
         <div className="flex items-center gap-2">
-          
+
           {/* 1-Click Download PDF */}
           <button
             type="button"
@@ -169,59 +169,57 @@ const InvoiceDocument = ({ invoice, onClose }) => {
         </div>
       </div>
 
-      {/* 📄 CRISP A4 SHEET PREVIEW */}
-      <div className="w-full flex justify-center pb-10">
+      {/* 📄 CRISP A4 SHEET PREVIEW (Zoom-out auto-scaled for mobile) */}
+      <div className="w-full overflow-x-auto flex justify-center py-2 sm:py-6 px-1 sm:px-4">
         <div
           style={{
-            width: "100%",
-            maxWidth: "794px", // Standard A4 width at 96 DPI
-            minHeight: "1123px", // Standard A4 height at 96 DPI
+            width: "794px",
+            minWidth: "794px",
+            minHeight: "1123px",
           }}
           className="
             bg-white text-slate-900 font-sans p-8 sm:p-12
             shadow-2xl rounded-2xl border border-slate-200
             flex flex-col justify-between text-left
+            shrink-0 origin-top
+            scale-[0.45] min-[400px]:scale-[0.52] min-[500px]:scale-[0.65] sm:scale-[0.8] md:scale-[0.9] lg:scale-100
+            -mb-[610px] min-[400px]:-mb-[520px] min-[500px]:-mb-[380px] sm:-mb-[220px] md:-mb-[110px] lg:mb-0
+            transition-transform duration-200
           "
         >
           {/* TOP HALF */}
           <div>
-            
+
             {/* 1. BRAND HEADER & TAX INVOICE BADGE */}
-            <div className="flex flex-row justify-between items-start gap-6 pb-6 border-b-2 border-slate-900 text-left">
-              
+            <div className="flex flex-row justify-between items-start gap-6 pb-4 border-b border-slate-300 text-left">
+
               {/* Top Left: Logo & Company Identification */}
               <div className="flex-1 text-left">
-                <div className="flex items-center gap-3">
-                  <img
-                    src="/logo.png"
-                    alt="E-ALL Logo"
-                    className="h-12 w-auto object-contain shrink-0"
-                    onError={(e) => {
-                      e.target.style.display = "none";
-                    }}
-                  />
-                  <div>
-                    <h1 className="text-3xl font-black tracking-tight text-slate-950 leading-none">
-                      E-ALL
-                    </h1>
-                    <p className="text-[11px] font-bold text-sky-800 uppercase tracking-wider mt-1">
-                      Electronics All FZCO
-                    </p>
-                  </div>
-                </div>
+                <img
+                  src="/logo.png"
+                  alt="E-ALL Logo"
+                  className="h-20! w-auto object-contain shrink-0 mb-2"
+                  onError={(e) => {
+                    e.target.style.display = "none";
+                  }}
+                />
 
-                <p className="text-xs text-slate-600 mt-2.5 font-medium">
-                  Premium Consumer Electronics Distribution & B2B Solutions
+                <h1 className="text-sm! font-bold! text-slate-900! tracking-widest!">
+                  E-ALL (ELECTRONICS ALL)
+                </h1>
+
+                <p className="text-[11px] text-slate-500 font-medium">
+                  Premium Consumer Electronics Distribution & Solutions
                 </p>
 
-                <div className="text-[11px] text-slate-600 mt-2 space-y-0.5 leading-relaxed">
+                <div className="text-[11px] text-slate-600 mt-1.2! space-y-0.5 leading-relaxed">
                   <p className="flex items-center gap-1.5">
                     <FiMapPin className="text-slate-400 shrink-0" />
                     Dubai Silicon Oasis, DDP, Building A2, Dubai, UAE
                   </p>
                   <p className="flex items-center gap-1.5 font-mono">
-                    <span className="font-bold text-slate-900">TRN (VAT):</span>
-                    <strong className="text-slate-950 font-extrabold tracking-wider bg-slate-100 px-1.5 py-0.2 rounded">
+                    <span className="font-semibold text-slate-700">TRN (VAT):</span>
+                    <strong className="text-slate-900 font-bold bg-slate-100 px-1.5 py-0.5 rounded">
                       100482910400003
                     </strong>
                   </p>
@@ -232,25 +230,23 @@ const InvoiceDocument = ({ invoice, onClose }) => {
                 </div>
               </div>
 
-              {/* Top Right: Tax Invoice Details */}
-              <div className="text-right shrink-0">
-                <div className="inline-block bg-slate-900 text-white px-4 py-1.5 rounded-lg font-black text-xs uppercase tracking-widest mb-2 shadow-xs">
+              {/* Top Right: Tax Invoice Details (Centered / Bottom Aligned in Header) */}
+              <div className="text-right shrink-0 flex flex-col justify-between items-end">
+                <div className="inline-block bg-slate-900 text-white px-3.5 py-1 rounded-md font-bold text-[11px] uppercase tracking-wider mb-2">
                   TAX INVOICE
                 </div>
 
-                <p className="text-2xl font-mono font-black text-slate-950 tracking-tight">
+                <p className="text-lg font-mono font-bold text-slate-900 tracking-tight">
                   {invoice.invoiceNo}
                 </p>
 
-                <div className="text-xs text-slate-600 mt-2 space-y-1 text-right">
-                  <p className="flex justify-end gap-2">
-                    <span className="text-slate-400">Invoice Date:</span>
-                    <strong className="text-slate-900 font-mono font-bold">
+                <div className="text-[11px] text-slate-600 mt-1.5 space-y-0.5 text-right">
+                  <p className="flex justify-end gap-1.5">
+                    <span className="text-slate-400">Date:</span>
+                    <strong className="text-slate-800 font-mono font-semibold">
                       {new Date(invoice.createdAt).toLocaleDateString("en-GB")}
                     </strong>
-                  </p>
-                  <p className="flex justify-end gap-2">
-                    <span className="text-slate-400">Time:</span>
+                    <span className="text-slate-400 ml-1">Time:</span>
                     <span className="text-slate-700 font-mono">
                       {new Date(invoice.createdAt).toLocaleTimeString([], {
                         hour: "2-digit",
@@ -258,52 +254,48 @@ const InvoiceDocument = ({ invoice, onClose }) => {
                       })}
                     </span>
                   </p>
-                  <p className="flex justify-end gap-2">
+                  <p className="flex justify-end gap-1.5">
                     <span className="text-slate-400">Issued By:</span>
-                    <strong className="text-sky-900 font-semibold">{invoice.createdBy}</strong>
-                  </p>
-                  <p className="flex justify-end gap-2 pt-0.5">
-                    <span className="text-slate-400">Payment:</span>
-                    <span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 rounded font-bold text-[11px] border border-emerald-200">
-                      {invoice.paymentMethod}
-                    </span>
+                    <strong className="text-slate-800 font-medium">{invoice.createdBy}</strong>
+                    <span className="text-slate-400 ml-1">Payment:</span>
+                    <span className="font-semibold text-slate-800">{invoice.paymentMethod}</span>
                   </p>
                 </div>
               </div>
             </div>
 
             {/* 2. CUSTOMER & BILL TO BOX */}
-            <div className="grid grid-cols-2 gap-4 my-6 p-4 rounded-xl bg-slate-50 border border-slate-200/80 text-left">
+            <div className="grid grid-cols-2 gap-4 my-4 p-3 rounded-xl bg-slate-50/80 border border-slate-200/80 text-left">
               <div>
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">
                   Billed To / Customer Details:
                 </span>
-                <p className="text-base font-extrabold text-slate-900">
+                <p className="text-sm font-bold text-slate-900">
                   {invoice.customerName}
                 </p>
-                <p className="text-xs text-slate-700 mt-1 font-mono font-medium">
+                <p className="text-xs text-slate-700 mt-0.5 font-mono font-medium">
                   Phone: <strong className="text-slate-900">{invoice.customerPhone}</strong>
+                  {invoice.customerEmail && (
+                    <span className="text-slate-600 font-sans font-normal ml-2">
+                      | Email: {invoice.customerEmail}
+                    </span>
+                  )}
                 </p>
-                {invoice.customerEmail && (
-                  <p className="text-xs text-slate-600 mt-0.5">
-                    Email: {invoice.customerEmail}
-                  </p>
-                )}
               </div>
 
               <div className="text-right flex flex-col justify-between">
                 <div>
                   {invoice.customerTrn ? (
                     <>
-                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">
                         Buyer TRN / Tax Registration No:
                       </span>
-                      <p className="text-xs font-mono font-black text-slate-900 bg-white inline-block px-2 py-0.5 rounded border border-slate-200">
+                      <p className="text-xs font-mono font-bold text-slate-900 bg-white inline-block px-2 py-0.5 rounded border border-slate-200">
                         {invoice.customerTrn}
                       </p>
                     </>
                   ) : (
-                    <div className="inline-flex items-center justify-end gap-1.5 text-emerald-700 text-xs font-bold">
+                    <div className="inline-flex items-center justify-end gap-1.5 text-emerald-700 text-xs font-semibold">
                       <FiCheckCircle />
                       Direct Sales / Retail Invoice
                     </div>
@@ -311,48 +303,50 @@ const InvoiceDocument = ({ invoice, onClose }) => {
                 </div>
 
                 {invoice.notes && (
-                  <p className="text-xs text-slate-500 italic mt-2">
+                  <p className="text-xs text-slate-500 italic mt-1">
                     Remarks: {invoice.notes}
                   </p>
                 )}
               </div>
             </div>
 
-            {/* 3. ITEMIZED PRODUCTS TABLE */}
-            <div className="mt-6 overflow-hidden rounded-xl border border-slate-200">
-              <table className="w-full text-left border-collapse text-xs sm:text-sm">
+            {/* 3. ITEMIZED PRODUCTS TABLE (Compact Vertical Padding & Professional Font Size) */}
+            <div className="mt-4 overflow-hidden rounded-xl border border-slate-200">
+              <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-slate-900 text-white text-[11px] font-bold uppercase tracking-wider">
-                    <th className="py-3 px-3 text-center w-10">#</th>
-                    <th className="py-3 px-3 w-32">SKU Code</th>
-                    <th className="py-3 px-4">Item & Description</th>
-                    <th className="py-3 px-3 text-center w-16">Qty</th>
-                    <th className="py-3 px-3 text-right w-28">Unit Price</th>
-                    <th className="py-3 px-4 text-right w-32">Total (AED)</th>
+                    <th className="py-2 px-3 text-center w-10">#</th>
+                    <th className="py-2 px-3 w-32">SKU Code</th>
+                    <th className="py-2 px-3">Item & Description</th>
+                    <th className="py-2 px-3 text-center w-14">Qty</th>
+                    <th className="py-2 px-3 text-right w-28">Unit Price</th>
+                    <th className="py-2 px-3 text-right w-28">Total (AED)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 font-medium text-slate-700">
                   {invoice.items?.map((item, idx) => (
                     <tr key={item.sku || idx} className="hover:bg-slate-50/50">
-                      <td className="py-3 px-3 text-center text-slate-400 font-mono text-xs">
+                      <td className="py-1.5 px-3 text-center text-slate-400 font-mono text-xs">
                         {idx + 1}
                       </td>
-                      <td className="py-3 px-3 font-mono text-slate-700 text-xs font-semibold">
+                      <td className="py-1.5 px-3 font-mono text-slate-700 text-xs font-medium">
                         {item.sku}
                       </td>
-                      <td className="py-3 px-4 text-left">
-                        <p className="font-bold text-slate-900">{item.name}</p>
+                      <td className="py-1.5 px-3 text-left">
+                        <span className="font-semibold text-slate-900 text-xs">{item.name}</span>
                         {item.brand && (
-                          <p className="text-[10px] text-slate-500 font-semibold">{item.brand}</p>
+                          <span className="text-[10px] text-slate-400 font-medium ml-1.5">
+                            ({item.brand})
+                          </span>
                         )}
                       </td>
-                      <td className="py-3 px-3 text-center font-extrabold text-slate-900 text-sm">
+                      <td className="py-1.5 px-3 text-center font-bold text-slate-900 text-xs">
                         {item.quantity}
                       </td>
-                      <td className="py-3 px-3 text-right font-mono text-slate-800">
+                      <td className="py-1.5 px-3 text-right font-mono text-slate-800 text-xs">
                         {Number(item.unitPrice).toLocaleString("en-AE", { minimumFractionDigits: 2 })}
                       </td>
-                      <td className="py-3 px-4 text-right font-mono font-extrabold text-slate-950 text-sm">
+                      <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900 text-xs">
                         {(item.quantity * item.unitPrice).toLocaleString("en-AE", { minimumFractionDigits: 2 })}
                       </td>
                     </tr>
@@ -363,7 +357,7 @@ const InvoiceDocument = ({ invoice, onClose }) => {
 
             {/* 4. TOTALS & TAX BREAKDOWN */}
             <div className="flex flex-row justify-between items-start mt-6 pt-4 border-t-2 border-slate-200 gap-6 text-left">
-              
+
               {/* Terms & Conditions */}
               <div className="max-w-xs text-[11px] text-slate-500 leading-relaxed text-left">
                 <p className="font-bold text-slate-800 uppercase tracking-wider mb-1">

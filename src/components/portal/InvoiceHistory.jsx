@@ -198,13 +198,13 @@ const InvoiceHistory = ({ invoices = [], onSelectInvoice }) => {
           <table className="w-full text-left text-sm border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                <th className="py-3.5 px-4">Invoice #</th>
-                <th className="py-3.5 px-4">Date & Time</th>
-                <th className="py-3.5 px-4">Customer</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Invoice #</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Date & Time</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Customer</th>
                 <th className="py-3.5 px-4">Items Summary</th>
-                <th className="py-3.5 px-4 text-center">Payment</th>
-                <th className="py-3.5 px-4 text-right">Total (AED)</th>
-                <th className="py-3.5 px-4 text-right">Action</th>
+                <th className="py-3.5 px-4 text-center whitespace-nowrap">Payment</th>
+                <th className="py-3.5 px-4 text-right whitespace-nowrap">Total (AED)</th>
+                <th className="py-3.5 px-4 text-right whitespace-nowrap">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
@@ -221,21 +221,21 @@ const InvoiceHistory = ({ invoices = [], onSelectInvoice }) => {
                     className="hover:bg-slate-50/70 transition-colors"
                   >
                     {/* Invoice Number */}
-                    <td className="py-3.5 px-4">
-                      <span className="font-mono font-bold text-sky-800 text-xs sm:text-sm">
+                    <td className="py-3.5 px-4 whitespace-nowrap min-w-[130px]">
+                      <span className="font-mono font-bold text-sky-800 text-xs sm:text-sm whitespace-nowrap block">
                         {inv.invoiceNo}
                       </span>
-                      <p className="text-[10px] text-slate-400">
+                      <p className="text-[10px] text-slate-400 whitespace-nowrap truncate max-w-[130px]" title={inv.createdBy}>
                         By {inv.createdBy}
                       </p>
                     </td>
 
                     {/* Date */}
-                    <td className="py-3.5 px-4 text-xs text-slate-600">
+                    <td className="py-3.5 px-4 text-xs text-slate-600 whitespace-nowrap min-w-[100px]">
                       <p className="font-semibold text-slate-800">
                         {new Date(inv.createdAt).toLocaleDateString("en-GB")}
                       </p>
-                      <p className="text-[10px] text-slate-400">
+                      <p className="text-[10px] text-slate-400 font-mono">
                         {new Date(inv.createdAt).toLocaleTimeString([], {
                           hour: "2-digit",
                           minute: "2-digit",
@@ -244,7 +244,7 @@ const InvoiceHistory = ({ invoices = [], onSelectInvoice }) => {
                     </td>
 
                     {/* Customer */}
-                    <td className="py-3.5 px-4">
+                    <td className="py-3.5 px-4 whitespace-nowrap min-w-[120px]">
                       <p className="font-semibold text-slate-900 text-xs sm:text-sm">
                         {inv.customerName}
                       </p>
@@ -254,24 +254,24 @@ const InvoiceHistory = ({ invoices = [], onSelectInvoice }) => {
                     </td>
 
                     {/* Items */}
-                    <td className="py-3.5 px-4 max-w-xs truncate text-xs text-slate-600">
+                    <td className="py-3.5 px-4 max-w-xs truncate text-xs text-slate-600 min-w-[150px]">
                       {inv.items?.map((i) => `${i.name} (x${i.quantity})`).join(", ")}
                     </td>
 
                     {/* Payment */}
-                    <td className="py-3.5 px-4 text-center">
+                    <td className="py-3.5 px-4 text-center whitespace-nowrap">
                       <span className="inline-block px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">
                         {inv.paymentMethod}
                       </span>
                     </td>
 
                     {/* Total Amount */}
-                    <td className="py-3.5 px-4 text-right font-mono font-extrabold text-slate-900">
+                    <td className="py-3.5 px-4 text-right font-mono font-extrabold text-slate-900 whitespace-nowrap">
                       AED {Number(inv.totalAmount).toLocaleString("en-AE", { minimumFractionDigits: 2 })}
                     </td>
 
                     {/* View Action */}
-                    <td className="py-3.5 px-4 text-right">
+                    <td className="py-3.5 px-4 text-right whitespace-nowrap">
                       <button
                         type="button"
                         onClick={() => onSelectInvoice(inv)}

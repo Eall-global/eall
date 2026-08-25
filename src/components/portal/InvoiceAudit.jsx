@@ -406,13 +406,13 @@ const InvoiceAudit = ({ invoices = [], stock = [], onSelectInvoice, onInvoicesCh
             <table className="w-full text-left border-collapse text-xs sm:text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50/50">
-                  <th className="py-3.5 px-4">Invoice #</th>
-                  <th className="py-3.5 px-3">Date & Time</th>
-                  <th className="py-3.5 px-3">Customer</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Invoice #</th>
+                  <th className="py-3.5 px-3 whitespace-nowrap">Date & Time</th>
+                  <th className="py-3.5 px-3 whitespace-nowrap">Customer</th>
                   <th className="py-3.5 px-3">Items Summary</th>
-                  <th className="py-3.5 px-3">Payment</th>
-                  <th className="py-3.5 px-3 text-right">Total (AED)</th>
-                  <th className="py-3.5 px-4 text-right">Actions</th>
+                  <th className="py-3.5 px-3 whitespace-nowrap">Payment</th>
+                  <th className="py-3.5 px-3 text-right whitespace-nowrap">Total (AED)</th>
+                  <th className="py-3.5 px-4 text-right whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
@@ -420,17 +420,19 @@ const InvoiceAudit = ({ invoices = [], stock = [], onSelectInvoice, onInvoicesCh
                   <tr key={inv.invoiceNo} className="hover:bg-slate-50/60 transition-colors">
                     
                     {/* Invoice No */}
-                    <td className="py-3.5 px-4">
+                    <td className="py-3.5 px-4 whitespace-nowrap min-w-[130px]">
                       <button
                         onClick={() => onSelectInvoice(inv)}
-                        className="font-mono font-bold text-sky-800 hover:text-sky-950 hover:underline cursor-pointer"
+                        className="font-mono font-bold text-sky-800 hover:text-sky-950 hover:underline cursor-pointer text-xs sm:text-sm tracking-tight whitespace-nowrap block"
                       >
                         {inv.invoiceNo}
                       </button>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="text-[10px] text-slate-400">By {inv.createdBy}</span>
+                      <div className="flex items-center gap-1.5 mt-0.5 whitespace-nowrap">
+                        <span className="text-[10px] text-slate-400 truncate max-w-[130px]" title={inv.createdBy}>
+                          By {inv.createdBy}
+                        </span>
                         {inv.updatedAt && (
-                          <span className="text-[9px] px-1 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200 font-bold">
+                          <span className="text-[9px] px-1 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200 font-bold shrink-0">
                             Edited
                           </span>
                         )}
@@ -438,7 +440,7 @@ const InvoiceAudit = ({ invoices = [], stock = [], onSelectInvoice, onInvoicesCh
                     </td>
 
                     {/* Date */}
-                    <td className="py-3.5 px-3 text-xs text-slate-600">
+                    <td className="py-3.5 px-3 text-xs text-slate-600 whitespace-nowrap min-w-[100px]">
                       <p className="font-semibold text-slate-800">
                         {new Date(inv.createdAt).toLocaleDateString("en-GB")}
                       </p>
@@ -448,30 +450,30 @@ const InvoiceAudit = ({ invoices = [], stock = [], onSelectInvoice, onInvoicesCh
                     </td>
 
                     {/* Customer */}
-                    <td className="py-3.5 px-3">
+                    <td className="py-3.5 px-3 whitespace-nowrap min-w-[120px]">
                       <p className="font-bold text-slate-900 text-xs sm:text-sm">{inv.customerName}</p>
                       <p className="text-[11px] font-mono text-slate-400">{inv.customerPhone}</p>
                     </td>
 
                     {/* Items Summary */}
-                    <td className="py-3.5 px-3 text-xs text-slate-600 max-w-xs truncate">
+                    <td className="py-3.5 px-3 text-xs text-slate-600 max-w-xs truncate min-w-[150px]">
                       {inv.items?.map((item) => `${item.name} (x${item.quantity})`).join(", ")}
                     </td>
 
                     {/* Payment */}
-                    <td className="py-3.5 px-3">
+                    <td className="py-3.5 px-3 whitespace-nowrap">
                       <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
                         {inv.paymentMethod}
                       </span>
                     </td>
 
                     {/* Total Amount */}
-                    <td className="py-3.5 px-3 text-right font-mono font-bold text-slate-900 text-xs sm:text-sm">
+                    <td className="py-3.5 px-3 text-right font-mono font-bold text-slate-900 text-xs sm:text-sm whitespace-nowrap">
                       AED {Number(inv.totalAmount).toLocaleString("en-AE", { minimumFractionDigits: 2 })}
                     </td>
 
                     {/* Actions: View/Print, Edit, Delete */}
-                    <td className="py-3.5 px-4 text-right">
+                    <td className="py-3.5 px-4 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1.5">
                         
                         {/* View / Print A4 Document */}

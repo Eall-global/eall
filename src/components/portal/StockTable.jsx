@@ -1,8 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import {
   FiSearch,
   FiPlus,
-  FiMinus,
   FiAlertTriangle,
   FiCheckCircle,
   FiXCircle,
@@ -10,9 +9,13 @@ import {
   FiRefreshCw,
   FiEdit2,
   FiPackage,
+  FiGlobe,
+  FiChevronLeft,
+  FiChevronRight,
+  FiChevronsLeft,
+  FiChevronsRight,
 } from "react-icons/fi";
 import {
-  updateStockQuantity,
   updateProductDetails,
   syncCatalogToStock,
   addCustomProduct,
@@ -24,9 +27,19 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
   const [statusFilter, setStatusFilter] = useState("All"); // All | in-stock | low-stock | out-of-stock
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
-  const [editingItem, setEditingItem] = useState(null); // For Admin Price / Alert threshold editing
+  const [editingItem, setEditingItem] = useState(null); // For Admin Price / Stock / Details editing
+  const [editName, setEditName] = useState("");
+  const [editBrand, setEditBrand] = useState("");
+  const [editCategory, setEditCategory] = useState("");
   const [editPrice, setEditPrice] = useState("");
+  const [editQty, setEditQty] = useState("");
   const [editAlert, setEditAlert] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Pagination State & Ref
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const tableRef = useRef(null);
 
   // New Product Modal State
   const [showAddProductModal, setShowAddProductModal] = useState(false);
@@ -38,26 +51,43 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
   const [newPrice, setNewPrice] = useState(999);
   const [newAlert, setNewAlert] = useState(3);
 
+  // Reset pagination to page 1 whenever filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, brandFilter, statusFilter, itemsPerPage]);
+
   const brands = useMemo(() => {
-    const list = Array.from(new Set(stock.map((s) => s.brand).filter(Boolean)));
-    return ["All", ...list.sort()];
+    const list = Array.from(
+      new Set(
+        stock
+          .map((s) => (s.brand ? String(s.brand).trim() : ""))
+          .filter(Boolean)
+      )
+    );
+    return ["All", ...list.sort((a, b) => a.localeCompare(b))];
   }, [stock]);
 
   const filteredStock = useMemo(() => {
     return stock.filter((item) => {
+      const itemBrand = (item.brand || "").trim();
+      const targetBrand = brandFilter.trim();
+
       // Search
       if (search.trim()) {
-        const q = search.toLowerCase();
+        const q = search.toLowerCase().trim();
         const matches =
-          item.name.toLowerCase().includes(q) ||
-          item.sku.toLowerCase().includes(q) ||
-          item.brand.toLowerCase().includes(q) ||
-          item.category.toLowerCase().includes(q);
+          (item.name || "").toLowerCase().includes(q) ||
+          (item.sku || "").toLowerCase().includes(q) ||
+          itemBrand.toLowerCase().includes(q) ||
+          (item.category || "").toLowerCase().includes(q);
         if (!matches) return false;
       }
 
       // Brand
-      if (brandFilter !== "All" && item.brand !== brandFilter) {
+      if (
+        brandFilter !== "All" &&
+        itemBrand.toLowerCase() !== targetBrand.toLowerCase()
+      ) {
         return false;
       }
 
@@ -74,6 +104,42 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
     });
   }, [stock, search, brandFilter, statusFilter]);
 
+  // Pagination Calculations
+  const totalItems = filteredStock.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+  const validPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const startIndex = (validPage - 1) * itemsPerPage;
+  const endIndex = Math.min(totalItems, startIndex + itemsPerPage);
+
+  const paginatedStock = useMemo(() => {
+    return filteredStock.slice(startIndex, endIndex);
+  }, [filteredStock, startIndex, endIndex]);
+
+  const handlePageChange = (newPage) => {
+    const pageNum = Math.max(1, Math.min(newPage, totalPages));
+    setCurrentPage(pageNum);
+    if (tableRef.current) {
+      tableRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxVisible = 5;
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      let start = Math.max(1, validPage - 2);
+      let end = Math.min(totalPages, start + maxVisible - 1);
+      if (end - start < maxVisible - 1) {
+        start = Math.max(1, end - maxVisible + 1);
+      }
+      for (let i = start; i <= end; i++) pages.push(i);
+    }
+    return pages;
+  };
+
   // Summary Metrics
   const metrics = useMemo(() => {
     const totalSkus = stock.length;
@@ -84,20 +150,6 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
     const outOfStockCount = stock.filter((s) => s.quantity === 0).length;
     return { totalSkus, totalUnits, lowStockCount, outOfStockCount };
   }, [stock]);
-
-  const handleAdjust = async (sku, currentQty, delta) => {
-    const newQty = Math.max(0, currentQty + delta);
-    await updateStockQuantity(sku, newQty);
-    onStockChanged();
-  };
-
-  const handleDirectChange = async (sku, value) => {
-    const num = parseInt(value, 10);
-    if (!isNaN(num) && num >= 0) {
-      await updateStockQuantity(sku, num);
-      onStockChanged();
-    }
-  };
 
   const handleSync = async () => {
     setSyncing(true);
@@ -138,19 +190,34 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
 
   const handleOpenEdit = (item) => {
     setEditingItem(item);
-    setEditPrice(item.price);
-    setEditAlert(item.minAlert);
+    setEditName(item.name || "");
+    setEditBrand(item.brand || "");
+    setEditCategory(item.category || "");
+    setEditPrice(item.price ?? "");
+    setEditQty(item.quantity ?? 0);
+    setEditAlert(item.minAlert ?? 3);
   };
 
   const handleSaveEdit = async (e) => {
     e.preventDefault();
     if (!editingItem) return;
-    await updateProductDetails(editingItem.sku, {
-      price: editPrice,
-      minAlert: editAlert,
-    });
-    setEditingItem(null);
-    onStockChanged();
+    setIsSaving(true);
+    try {
+      await updateProductDetails(editingItem.sku, {
+        name: editName,
+        brand: editBrand,
+        category: editCategory,
+        price: editPrice,
+        quantity: editQty,
+        minAlert: editAlert,
+      });
+      setEditingItem(null);
+      onStockChanged();
+    } catch (err) {
+      console.error("Save edit error:", err);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleExportCSV = () => {
@@ -316,19 +383,22 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
           >
             {brands.map((b) => (
               <option key={b} value={b}>
-                Brand: {b}
+                {b === "All" ? "All Brands" : `Brand: ${b}`}
               </option>
             ))}
           </select>
 
           <span className="ml-auto text-xs text-slate-400">
-            Showing <strong className="text-slate-700">{filteredStock.length}</strong> items
+            Showing <strong className="text-slate-700">{totalItems}</strong> matching items
           </span>
         </div>
       </div>
 
       {/* 📋 INVENTORY TABLE */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+      <div
+        ref={tableRef}
+        className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden scroll-mt-24"
+      >
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm border-collapse">
             <thead>
@@ -342,14 +412,14 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-              {filteredStock.length === 0 ? (
+              {paginatedStock.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-slate-400">
                     No products match your search or filter criteria.
                   </td>
                 </tr>
               ) : (
-                filteredStock.map((item) => {
+                paginatedStock.map((item) => {
                   const isOutOfStock = item.quantity === 0;
                   const isLowStock = !isOutOfStock && item.quantity <= item.minAlert;
 
@@ -397,34 +467,19 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
                         AED {Number(item.price).toLocaleString("en-AE", { minimumFractionDigits: 2 })}
                       </td>
 
-                      {/* Quantity Stepper */}
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => handleAdjust(item.sku, item.quantity, -1)}
-                            disabled={item.quantity === 0}
-                            className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-rose-100 hover:text-rose-700 text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
-                          >
-                            <FiMinus className="text-xs" />
-                          </button>
-
-                          <input
-                            type="number"
-                            min="0"
-                            value={item.quantity}
-                            onChange={(e) => handleDirectChange(item.sku, e.target.value)}
-                            className="w-14 text-center font-mono font-extrabold text-slate-900 py-1 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:bg-white focus:border-sky-600"
-                          />
-
-                          <button
-                            type="button"
-                            onClick={() => handleAdjust(item.sku, item.quantity, 1)}
-                            className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-emerald-100 hover:text-emerald-700 text-slate-600 transition cursor-pointer"
-                          >
-                            <FiPlus className="text-xs" />
-                          </button>
-                        </div>
+                      {/* Available Stock */}
+                      <td className="py-3.5 px-4 text-center font-mono font-bold">
+                        <span
+                          className={`inline-flex items-center px-3 py-1 rounded-xl text-xs font-extrabold ${
+                            isOutOfStock
+                              ? "bg-rose-100/80 text-rose-700 border border-rose-200"
+                              : isLowStock
+                              ? "bg-amber-100/80 text-amber-800 border border-amber-200"
+                              : "bg-slate-100 text-slate-800 border border-slate-200/60"
+                          }`}
+                        >
+                          {item.quantity} <span className="text-[10px] text-slate-500 font-semibold ml-1">units</span>
+                        </span>
                       </td>
 
                       {/* Status Badge */}
@@ -451,7 +506,7 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
                             type="button"
                             onClick={() => handleOpenEdit(item)}
                             className="p-2 text-slate-400 hover:text-sky-700 hover:bg-sky-50 rounded-xl transition cursor-pointer"
-                            title="Edit Price & Alert Level"
+                            title="Edit Product Info & Stock Quantity"
                           >
                             <FiEdit2 className="text-base" />
                           </button>
@@ -464,45 +519,219 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
             </tbody>
           </table>
         </div>
+
+        {/* 📄 PAGINATION FOOTER */}
+        {totalItems > 0 && (
+          <div className="px-4 py-3.5 bg-slate-50/80 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+            {/* Page Info & Items Per Page Selector */}
+            <div className="flex flex-wrap items-center gap-3 text-slate-500 font-medium">
+              <div>
+                Showing <strong className="text-slate-900 font-bold">{startIndex + 1}</strong> to{" "}
+                <strong className="text-slate-900 font-bold">{endIndex}</strong> of{" "}
+                <strong className="text-slate-900 font-bold">{totalItems}</strong> entries
+              </div>
+
+              <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200">
+                <label htmlFor="itemsPerPageSelect" className="text-slate-500 font-medium">
+                  Show:
+                </label>
+                <select
+                  id="itemsPerPageSelect"
+                  value={itemsPerPage}
+                  onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                  className="bg-white border border-slate-200 rounded-lg px-2 py-1 font-semibold text-slate-800 outline-none focus:border-sky-600 cursor-pointer"
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+                <span className="text-slate-500 font-medium">per page</span>
+              </div>
+            </div>
+
+            {/* Page Controls */}
+            <div className="flex items-center gap-1">
+              {/* First Page */}
+              <button
+                type="button"
+                onClick={() => handlePageChange(1)}
+                disabled={validPage === 1}
+                title="First Page"
+                className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-slate-600 transition cursor-pointer"
+              >
+                <FiChevronsLeft className="text-sm" />
+              </button>
+
+              {/* Prev Page */}
+              <button
+                type="button"
+                onClick={() => handlePageChange(validPage - 1)}
+                disabled={validPage === 1}
+                title="Previous Page"
+                className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-slate-600 transition cursor-pointer"
+              >
+                <FiChevronLeft className="text-sm" />
+              </button>
+
+              {/* Page Numbers */}
+              <div className="flex items-center gap-1 mx-1">
+                {getPageNumbers().map((pg) => (
+                  <button
+                    key={pg}
+                    type="button"
+                    onClick={() => handlePageChange(pg)}
+                    className={`
+                      w-7 h-7 rounded-lg text-xs font-extrabold font-mono transition cursor-pointer
+                      ${
+                        validPage === pg
+                          ? "bg-sky-700 text-white shadow-xs"
+                          : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"
+                      }
+                    `}
+                  >
+                    {pg}
+                  </button>
+                ))}
+              </div>
+
+              {/* Next Page */}
+              <button
+                type="button"
+                onClick={() => handlePageChange(validPage + 1)}
+                disabled={validPage === totalPages}
+                title="Next Page"
+                className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-slate-600 transition cursor-pointer"
+              >
+                <FiChevronRight className="text-sm" />
+              </button>
+
+              {/* Last Page */}
+              <button
+                type="button"
+                onClick={() => handlePageChange(totalPages)}
+                disabled={validPage === totalPages}
+                title="Last Page"
+                className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-slate-600 transition cursor-pointer"
+              >
+                <FiChevronsRight className="text-sm" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ADMIN EDIT MODAL */}
       {editingItem && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl">
-            <h3 className="text-lg font-bold text-slate-900 mb-1">
-              Edit Product Info
-            </h3>
-            <p className="text-xs text-slate-500 mb-4">{editingItem.name} ({editingItem.sku})</p>
+          <div className="bg-white rounded-3xl p-6 w-full max-w-lg shadow-2xl space-y-4">
+            <div>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-slate-900">
+                  Edit Product Info & Stock
+                </h3>
+                <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-mono font-bold border border-slate-200">
+                  {editingItem.sku}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                Modifying product details will update the live database and sync in real-time for all connected users.
+              </p>
+            </div>
 
             <form onSubmit={handleSaveEdit} className="space-y-4">
+              {/* Product Name */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                  Selling Price (AED)
+                  Product Full Name
                 </label>
                 <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={editPrice}
-                  onChange={(e) => setEditPrice(e.target.value)}
-                  className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-sm outline-none focus:bg-white focus:border-sky-600"
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:bg-white focus:border-sky-600 transition"
                   required
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                  Low Stock Alert Threshold (Units)
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={editAlert}
-                  onChange={(e) => setEditAlert(e.target.value)}
-                  className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-sm outline-none focus:bg-white focus:border-sky-600"
-                  required
-                />
+              {/* Brand & Category */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                    Brand
+                  </label>
+                  <input
+                    type="text"
+                    value={editBrand}
+                    onChange={(e) => setEditBrand(e.target.value)}
+                    className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:bg-white focus:border-sky-600 transition"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                    Category
+                  </label>
+                  <input
+                    type="text"
+                    value={editCategory}
+                    onChange={(e) => setEditCategory(e.target.value)}
+                    className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:bg-white focus:border-sky-600 transition"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Price, Stock Quantity, Min Alert */}
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                    Price (AED)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={editPrice}
+                    onChange={(e) => setEditPrice(e.target.value)}
+                    className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-sm outline-none focus:bg-white focus:border-sky-600 transition"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                    Stock Quantity
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editQty}
+                    onChange={(e) => setEditQty(e.target.value)}
+                    className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-sm outline-none focus:bg-white focus:border-sky-600 transition"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                    Min Alert
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={editAlert}
+                    onChange={(e) => setEditAlert(e.target.value)}
+                    className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-sm outline-none focus:bg-white focus:border-sky-600 transition"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Live sync note */}
+              <div className="p-3 bg-sky-50 border border-sky-100 rounded-xl flex items-center gap-2 text-xs text-sky-800 font-medium">
+                <FiGlobe className="text-sky-600 text-sm shrink-0" />
+                <span>Saves directly to Supabase DB & updates live globally across all devices.</span>
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
@@ -515,9 +744,10 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-sky-700 hover:bg-sky-800 text-white rounded-xl text-xs font-semibold transition"
+                  disabled={isSaving}
+                  className="px-5 py-2 bg-sky-700 hover:bg-sky-800 text-white rounded-xl text-xs font-semibold transition cursor-pointer disabled:opacity-50"
                 >
-                  Save Changes
+                  {isSaving ? "Saving to Database..." : "Save Changes"}
                 </button>
               </div>
             </form>
