@@ -20,16 +20,19 @@ export const getInitialCatalogSeed = () => {
     }
     seenSkus.add(sku);
 
+    const initialPrice = p.price !== undefined && p.price !== null ? Number(p.price) : 0;
+    const initialQty = p.quantity !== undefined ? Number(p.quantity) : (p.stock !== undefined ? Number(p.stock) : 0);
+
     items.push({
       sku,
       name: String(p.name || p.shortName || "Unnamed Product").trim(),
       brand: String(p.brand || "General").trim(),
       category: String(p.categoryName || p.category || "Electronics").trim(),
       image: String(p.image || "/logo.png"),
-      quantity: 15, // Default initial stock units
-      price: 999,   // Default selling price in AED
-      costPrice: 750,
-      minAlert: 3,  // Low stock warning threshold
+      quantity: initialQty,
+      price: initialPrice,
+      costPrice: p.costPrice !== undefined ? Number(p.costPrice) : Math.round(initialPrice * 0.8),
+      minAlert: p.minAlert !== undefined ? Number(p.minAlert) : 3,
       updatedAt: new Date().toISOString(),
     });
   });
@@ -277,18 +280,32 @@ export const syncCatalogToStock = async () => {
 
   if (supabase && isSupabaseConfigured()) {
     try {
-      const payload = seed.map((s) => ({
-        sku: s.sku,
-        name: s.name,
-        brand: s.brand,
-        category: s.category,
-        image: s.image,
-        quantity: s.quantity,
-        price: s.price,
-        cost_price: s.costPrice || 0,
-        min_alert: s.minAlert || 3,
-        updated_at: new Date().toISOString(),
-      }));
+      // Fetch existing DB stock rows to PRESERVE user edits!
+      const { data: existingRows } = await supabase
+        .from("product_stock")
+        .select("sku, price, quantity, cost_price, min_alert");
+
+      const existingMap = new Map();
+      if (existingRows) {
+        existingRows.forEach((r) => existingMap.set(r.sku, r));
+      }
+
+      const payload = seed.map((s) => {
+        const existing = existingMap.get(s.sku);
+        return {
+          sku: s.sku,
+          name: s.name,
+          brand: s.brand,
+          category: s.category,
+          image: s.image,
+          // If product already exists in DB, keep its DB price & quantity!
+          quantity: existing && existing.quantity !== null && existing.quantity !== undefined ? Number(existing.quantity) : s.quantity,
+          price: existing && existing.price !== null && existing.price !== undefined ? Number(existing.price) : s.price,
+          cost_price: existing && existing.cost_price !== null ? Number(existing.cost_price) : (s.costPrice || 0),
+          min_alert: existing && existing.min_alert !== null ? Number(existing.min_alert) : (s.minAlert || 3),
+          updated_at: new Date().toISOString(),
+        };
+      });
 
       // Insert in chunks of 20 to ensure reliability
       const chunkSize = 20;

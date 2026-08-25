@@ -93,9 +93,19 @@ export const CatalogProvider = ({ children }) => {
       const cleanSku = (prod.sku || `EALL-${(prod.brand || "GEN").toUpperCase()}-${prod.id}`).toUpperCase();
       const liveItem = liveStockMap.get(cleanSku);
 
-      const liveQty = liveItem ? Number(liveItem.quantity) : 15; // default initial fallback
+      const liveQty = liveItem
+        ? Number(liveItem.quantity)
+        : prod.quantity !== undefined
+        ? Number(prod.quantity)
+        : prod.stock !== undefined
+        ? Number(prod.stock)
+        : 0;
       const minAlert = liveItem ? Number(liveItem.minAlert || 3) : 3;
-      const livePrice = liveItem ? Number(liveItem.price) : (prod.price || 999);
+      const livePrice = liveItem
+        ? Number(liveItem.price)
+        : prod.price !== undefined && prod.price !== null
+        ? Number(prod.price)
+        : 0;
 
       const availabilityInfo = computeLiveAvailability(liveQty, minAlert);
 

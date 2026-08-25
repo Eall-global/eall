@@ -73,7 +73,7 @@ const BillingPOS = ({ stock = [], onInvoiceCreated }) => {
           sku: product.sku,
           name: product.name,
           brand: product.brand,
-          unitPrice: product.price || 999,
+          unitPrice: Number(product.price) || 0,
           quantity: 1,
           availableStock: product.quantity,
         },

@@ -189,7 +189,7 @@ const InvoiceAudit = ({ invoices = [], stock = [], onSelectInvoice, onInvoicesCh
             name: prod.name,
             brand: prod.brand,
             quantity: 1,
-            unitPrice: prod.price || 999,
+            unitPrice: Number(prod.price) || 0,
           },
         ],
       };
