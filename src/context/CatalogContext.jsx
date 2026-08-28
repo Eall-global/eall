@@ -1,7 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
 import { products as staticCatalog } from "../data/products/index";
-import { fetchStock } from "../services/stockService";
-import { getSupabase, isSupabaseConfigured } from "../lib/supabaseClient";
+import { fetchStock, subscribeToStock } from "../services/stockService";
 
 const CatalogContext = createContext(null);
 
@@ -46,7 +45,7 @@ export const CatalogProvider = ({ children }) => {
   const [liveStockMap, setLiveStockMap] = useState(new Map());
   const [loading, setLoading] = useState(true);
 
-  // Fetch live inventory from Supabase / stockService
+  // Fetch live inventory from Firestore / stockService
   const refreshStock = useCallback(async () => {
     try {
       const stockData = await fetchStock();
@@ -64,27 +63,23 @@ export const CatalogProvider = ({ children }) => {
     }
   }, []);
 
-  // Initial fetch and Supabase Realtime WebSocket subscription
+  // Initial fetch and Google Firestore Real-time listener (unlimited connections, zero quota trap)
   useEffect(() => {
     refreshStock();
 
-    const supabase = getSupabase();
-    if (supabase && isSupabaseConfigured()) {
-      const channel = supabase
-        .channel("catalog_live_stock_sync")
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "product_stock" },
-          () => {
-            refreshStock();
-          }
-        )
-        .subscribe();
+    const unsubscribe = subscribeToStock((stockData) => {
+      const map = new Map();
+      (stockData || []).forEach((item) => {
+        if (item.sku) {
+          map.set(item.sku.toUpperCase(), item);
+        }
+      });
+      setLiveStockMap(map);
+    });
 
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }
+    return () => {
+      unsubscribe();
+    };
   }, [refreshStock]);
 
   // Merge static catalog specifications with dynamic live inventory on SKU

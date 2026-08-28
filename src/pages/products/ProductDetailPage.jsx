@@ -1,13 +1,12 @@
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { useState, useEffect } from "react";
+import { FiArrowLeft, FiChevronRight } from "react-icons/fi";
 
-import ProductVariants from "../../components/products/ProductVariants";
 import Container from "../../components/common/Container";
 import ProductGallery from "../../components/products/ProductGallery";
 import ProductInfo from "../../components/products/ProductInfo";
 import ProductFeatures from "../../components/products/ProductFeatures";
 import ProductSpecifications from "../../components/products/ProductSpecifications";
-import InquiryCard from "../../components/products/InquiryCard";
 import RelatedProducts from "../../components/products/RelatedProducts";
 
 import { products as fallbackProducts } from "../../data/products/index";
@@ -34,7 +33,7 @@ const ProductDetailPage = () => {
   if (!product) {
     return (
       <Container>
-        <div className="py-20 text-center text-red-500">Product not found</div>
+        <div className="py-32 text-center text-rose-500 font-bold">Product not found</div>
       </Container>
     );
   }
@@ -43,45 +42,67 @@ const ProductDetailPage = () => {
 
   return (
     <Container>
-      {/* BREADCRUMB
-      <div className="py-6 text-left pt-20 text-sm text-slate-500">
-        Home / {brand?.name} / {product.name}
-      </div> */}
+      <div className="pt-24 sm:pt-28 lg:pt-32 pb-16 space-y-6">
 
-      {/* MAIN PRODUCT SECTION */}
-      <div className="grid lg:grid-cols-2 gap-12 py-10 pt-24 lg:pt-32 text-left">
-        {/* LEFT: GALLERY */}
+        {/* 🧭 TOP BREADCRUMB & BACK NAVIGATION */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/80 pb-3 text-left">
+          <Link
+            to="/products"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-sky-700 hover:text-sky-900 transition shrink-0"
+          >
+            <FiArrowLeft className="text-sm" />
+            <span>Back to Products</span>
+          </Link>
 
-        <ProductGallery
-          gallery={selectedVariant?.gallery || product.gallery}
-          image={selectedVariant?.image || product.image}
-          name={product.name}
-        />
+          {/* Breadcrumbs Trail (Visible on desktop only to keep mobile clean and non-redundant) */}
+          <nav className="hidden sm:flex items-center gap-1.5 text-[11px] sm:text-xs text-slate-500 font-medium overflow-x-auto no-scrollbar whitespace-nowrap">
+            <Link to="/" className="hover:text-slate-900 transition">Home</Link>
+            <FiChevronRight className="text-slate-300 shrink-0" />
+            <Link to="/products" className="hover:text-slate-900 transition">Products</Link>
+            {brand && (
+              <>
+                <FiChevronRight className="text-slate-300 shrink-0" />
+                <Link to={`/brands/${brand.slug}`} className="hover:text-slate-900 transition font-semibold text-slate-700">
+                  {brand.name}
+                </Link>
+              </>
+            )}
+            <FiChevronRight className="text-slate-300 shrink-0" />
+            <span className="font-bold text-slate-900 truncate max-w-45 sm:max-w-xs">{product.name}</span>
+          </nav>
+        </div>
 
-        {/* RIGHT: INFO + CTA (sticky on desktop) */}
+        {/* MAIN PRODUCT SECTION (Gallery + Info & Add to Cart) */}
+        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 text-left items-start">
+          {/* LEFT: GALLERY */}
+          <ProductGallery
+            gallery={selectedVariant?.gallery || product.gallery}
+            image={selectedVariant?.image || product.image}
+            name={product.name}
+          />
 
-        <ProductInfo
-          product={product}
-          selectedVariant={selectedVariant || getDefaultVariant(product)}
-          onVariantChange={setSelectedVariant}
-        />
-      </div>
-      <div className="grid lg:grid-cols-2 gap-12 py-6 lg:py-10 text-left">
-        <div className=" space-y-10">
-          {/* FEATURES */}
+          {/* RIGHT: INFO + PRICING + CART CTA */}
+          <ProductInfo
+            product={product}
+            selectedVariant={selectedVariant || getDefaultVariant(product)}
+            onVariantChange={setSelectedVariant}
+          />
+        </div>
 
+        {/* FULL-WIDTH FEATURES & SPECIFICATIONS OVERVIEW */}
+        <div className="py-6 sm:py-10 space-y-10 text-left border-t border-slate-200/80 mt-4">
+          {/* KEY HIGHLIGHTS CARDS */}
           <ProductFeatures features={product.features} />
 
-          {/* SPECIFICATIONS */}
-
-          <ProductSpecifications specifications={product.specifications} />
+          {/* COMPREHENSIVE TECHNICAL SPECIFICATIONS MATRIX & TRUST BADGES */}
+          <ProductSpecifications specifications={product.specifications} product={product} />
         </div>
-        <InquiryCard product={product} />
-      </div>
 
-      {/* RELATED PRODUCTS */}
-      <div className="py-10">
-        <RelatedProducts currentProduct={product} />
+        {/* RELATED PRODUCTS */}
+        <div className="py-6 sm:py-10 border-t border-slate-200/80">
+          <RelatedProducts currentProduct={product} />
+        </div>
+
       </div>
     </Container>
   );

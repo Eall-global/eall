@@ -1,7 +1,16 @@
-import { getSupabase, isSupabaseConfigured } from "../lib/supabaseClient";
-import { fetchStock, updateStockQuantity, adjustStockDelta } from "./stockService";
+import {
+  getFirebaseDb,
+  isFirebaseConfigured,
+  collection,
+  doc,
+  getDocs,
+  setDoc,
+  deleteDoc,
+} from "../lib/firebaseClient";
+import { fetchStock, updateStockQuantity } from "./stockService";
 
 const INVOICES_STORAGE_KEY = "eall_billing_invoices";
+const COLLECTION_NAME = "invoices";
 
 const getLocalInvoices = () => {
   try {
@@ -31,47 +40,48 @@ export const generateInvoiceNumber = (existingCount = 0) => {
 };
 
 /**
- * Fetch all invoices
+ * Fetch all invoices from Google Firebase Firestore
  */
 export const fetchInvoices = async () => {
-  const supabase = getSupabase();
+  const db = getFirebaseDb();
 
-  if (supabase && isSupabaseConfigured()) {
+  if (db && isFirebaseConfigured()) {
     try {
-      const { data, error } = await supabase
-        .from("invoices")
-        .select("*")
-        .order("created_at", { ascending: false });
+      const snapshot = await getDocs(collection(db, COLLECTION_NAME));
+      if (!snapshot.empty) {
+        const formatted = [];
+        snapshot.forEach((docSnap) => {
+          const inv = docSnap.data();
+          formatted.push({
+            id: inv.id || inv.invoiceNo || docSnap.id,
+            invoiceNo: inv.invoiceNo || docSnap.id,
+            customerName: inv.customerName || "",
+            customerPhone: inv.customerPhone || "",
+            customerEmail: inv.customerEmail || "",
+            customerTrn: inv.customerTrn || "",
+            paymentMethod: inv.paymentMethod || "Cash",
+            items: typeof inv.items === "string" ? JSON.parse(inv.items) : (inv.items || []),
+            subtotal: Number(inv.subtotal) || 0,
+            vatRate: Number(inv.vatRate ?? 5),
+            vatAmount: Number(inv.vatAmount) || 0,
+            discount: Number(inv.discount) || 0,
+            totalAmount: Number(inv.totalAmount) || 0,
+            createdBy: inv.createdBy || "Staff",
+            role: inv.role || "Salesperson",
+            notes: inv.notes || "",
+            createdAt: inv.createdAt || new Date().toISOString(),
+            updatedAt: inv.updatedAt || null,
+            updatedBy: inv.updatedBy || null,
+          });
+        });
 
-      if (error) throw error;
-
-      if (data) {
-        const formatted = data.map((inv) => ({
-          id: inv.id || inv.invoice_no,
-          invoiceNo: inv.invoice_no,
-          customerName: inv.customer_name,
-          customerPhone: inv.customer_phone,
-          customerEmail: inv.customer_email || "",
-          customerTrn: inv.customer_trn || "",
-          paymentMethod: inv.payment_method || "Cash",
-          items: typeof inv.items === "string" ? JSON.parse(inv.items) : (inv.items || []),
-          subtotal: Number(inv.subtotal) || 0,
-          vatRate: Number(inv.vat_rate ?? 5),
-          vatAmount: Number(inv.vat_amount) || 0,
-          discount: Number(inv.discount) || 0,
-          totalAmount: Number(inv.total_amount) || 0,
-          createdBy: inv.created_by || "Staff",
-          role: inv.role || "Salesperson",
-          notes: inv.notes || "",
-          createdAt: inv.created_at || new Date().toISOString(),
-          updatedAt: inv.updated_at || null,
-          updatedBy: inv.updated_by || null,
-        }));
+        // Sort descending by creation date
+        formatted.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
         saveLocalInvoices(formatted);
         return formatted;
       }
     } catch (err) {
-      console.warn("Supabase invoices fetch failed, using local:", err.message);
+      console.warn("Firestore invoices fetch failed, using local:", err.message);
     }
   }
 
@@ -152,34 +162,14 @@ export const createInvoice = async ({
     await updateStockQuantity(item.sku, newQty);
   }
 
-  // 5. Save invoice to Supabase if configured
-  const supabase = getSupabase();
-  if (supabase && isSupabaseConfigured()) {
+  // 5. Save invoice to Google Firebase Firestore
+  const db = getFirebaseDb();
+  if (db && isFirebaseConfigured()) {
     try {
-      const { error } = await supabase.from("invoices").insert({
-        invoice_no: invoiceNo,
-        customer_name: newInvoice.customerName,
-        customer_phone: newInvoice.customerPhone,
-        customer_email: newInvoice.customerEmail,
-        customer_trn: newInvoice.customerTrn,
-        payment_method: newInvoice.paymentMethod,
-        items: newInvoice.items,
-        subtotal: newInvoice.subtotal,
-        vat_rate: newInvoice.vatRate,
-        vat_amount: newInvoice.vatAmount,
-        discount: newInvoice.discount,
-        total_amount: newInvoice.totalAmount,
-        created_by: newInvoice.createdBy,
-        role: newInvoice.role,
-        notes: newInvoice.notes,
-        created_at: now,
-      });
-
-      if (error) {
-        console.warn("Supabase invoice insert error:", error);
-      }
+      const docRef = doc(db, COLLECTION_NAME, invoiceNo);
+      await setDoc(docRef, newInvoice);
     } catch (err) {
-      console.warn("Supabase insert failed:", err.message);
+      console.warn("Firestore invoice insert error:", err.message);
     }
   }
 
@@ -211,9 +201,7 @@ export const updateInvoice = async (invoiceNo, {
   if (!existing) throw new Error(`Invoice ${invoiceNo} not found`);
 
   // 1. Calculate stock difference (Delta reconciliation)
-  // Old items map: { sku: qty }
   const oldItemsMap = new Map((existing.items || []).map((i) => [i.sku, i.quantity]));
-  // New items map: { sku: qty }
   const newItemsMap = new Map((items || []).map((i) => [i.sku, i.quantity]));
 
   const allSkus = new Set([...oldItemsMap.keys(), ...newItemsMap.keys()]);
@@ -224,7 +212,7 @@ export const updateInvoice = async (invoiceNo, {
   for (const sku of allSkus) {
     const oldQty = oldItemsMap.get(sku) || 0;
     const newQty = newItemsMap.get(sku) || 0;
-    const diff = newQty - oldQty; // If positive, we need more stock; if negative, return stock
+    const diff = newQty - oldQty;
 
     if (diff > 0) {
       const stockItem = stockMap.get(sku);
@@ -234,7 +222,7 @@ export const updateInvoice = async (invoiceNo, {
     }
   }
 
-  // Apply stock adjustments: newQty - oldQty deducted from stock (or restored if diff < 0)
+  // Apply stock adjustments
   for (const sku of allSkus) {
     const oldQty = oldItemsMap.get(sku) || 0;
     const newQty = newItemsMap.get(sku) || 0;
@@ -274,31 +262,14 @@ export const updateInvoice = async (invoiceNo, {
     updatedBy,
   };
 
-  // 3. Update Supabase
-  const supabase = getSupabase();
-  if (supabase && isSupabaseConfigured()) {
+  // 3. Update Firestore
+  const db = getFirebaseDb();
+  if (db && isFirebaseConfigured()) {
     try {
-      const { error } = await supabase
-        .from("invoices")
-        .update({
-          customer_name: updatedInvoice.customerName,
-          customer_phone: updatedInvoice.customerPhone,
-          customer_email: updatedInvoice.customerEmail,
-          customer_trn: updatedInvoice.customerTrn,
-          payment_method: updatedInvoice.paymentMethod,
-          items: updatedInvoice.items,
-          subtotal: updatedInvoice.subtotal,
-          vat_rate: updatedInvoice.vatRate,
-          vat_amount: updatedInvoice.vatAmount,
-          discount: updatedInvoice.discount,
-          total_amount: updatedInvoice.totalAmount,
-          notes: updatedInvoice.notes,
-        })
-        .eq("invoice_no", invoiceNo);
-
-      if (error) console.warn("Supabase invoice update error:", error);
+      const docRef = doc(db, COLLECTION_NAME, invoiceNo);
+      await setDoc(docRef, updatedInvoice, { merge: true });
     } catch (e) {
-      console.warn("Supabase update error:", e);
+      console.warn("Firestore invoice update error:", e);
     }
   }
 
@@ -332,18 +303,14 @@ export const deleteInvoice = async (invoiceNo) => {
     }
   }
 
-  // 2. Delete from Supabase
-  const supabase = getSupabase();
-  if (supabase && isSupabaseConfigured()) {
+  // 2. Delete from Firestore
+  const db = getFirebaseDb();
+  if (db && isFirebaseConfigured()) {
     try {
-      const { error } = await supabase
-        .from("invoices")
-        .delete()
-        .eq("invoice_no", invoiceNo);
-
-      if (error) console.warn("Supabase invoice delete error:", error);
+      const docRef = doc(db, COLLECTION_NAME, invoiceNo);
+      await deleteDoc(docRef);
     } catch (e) {
-      console.warn("Supabase delete error:", e);
+      console.warn("Firestore invoice delete error:", e);
     }
   }
 

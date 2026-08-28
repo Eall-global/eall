@@ -1,6 +1,8 @@
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { FiHome, FiBox, FiTag, FiShield, FiPhoneCall } from "react-icons/fi";
+import { FiHome, FiBox, FiTag, FiShoppingCart, FiUser } from "react-icons/fi";
+import { useCart } from "../../context/CartContext";
+import { useCustomerAuth } from "../../context/CustomerAuthContext";
 
 const NAV_ITEMS = [
   {
@@ -25,24 +27,27 @@ const NAV_ITEMS = [
     exact: false,
   },
   {
-    id: "verify",
-    label: "Verify",
-    to: "/verify",
-    icon: FiShield,
-    badge: "IMEI",
+    id: "cart",
+    label: "Cart",
+    to: "/cart",
+    icon: FiShoppingCart,
+    isCart: true,
     exact: false,
   },
   {
-    id: "contact",
-    label: "Contact",
-    to: "/contact",
-    icon: FiPhoneCall,
-    exact: true,
+    id: "profile",
+    label: "Profile",
+    to: "/profile",
+    icon: FiUser,
+    isProfile: true,
+    exact: false,
   },
 ];
 
 const MobileBottomNav = () => {
   const location = useLocation();
+  const { cartCount, setIsCartOpen } = useCart();
+  const { isLoggedIn, user } = useCustomerAuth();
 
   const isItemActive = (item) => {
     if (item.exact) {
@@ -101,18 +106,31 @@ const MobileBottomNav = () => {
                   `}
                 />
 
-                {/* Optional Badge (e.g., IMEI for Verify) */}
-                {item.badge && !active && (
+                {/* Cart Badge */}
+                {item.isCart && cartCount > 0 && (
                   <span
                     className="
-                      absolute -top-1 -right-3
-                      bg-emerald-600 text-white
-                      text-[9px] font-bold tracking-tight
-                      px-1 py-0.2 rounded-full shadow-xs
+                      absolute -top-1.5 -right-2.5
+                      bg-sky-700 text-white
+                      text-[10px] font-black
+                      w-4 h-4 rounded-full shadow-xs
+                      flex items-center justify-center
                     "
                   >
-                    {item.badge}
+                    {cartCount}
                   </span>
+                )}
+
+                {/* Profile Logged-In Indicator */}
+                {item.isProfile && isLoggedIn && (
+                  <span
+                    className="
+                      absolute -top-0.5 -right-1
+                      w-2.5 h-2.5 rounded-full
+                      bg-emerald-500 ring-2 ring-white
+                    "
+                    title={`Logged in as ${user?.fullName}`}
+                  />
                 )}
               </div>
 

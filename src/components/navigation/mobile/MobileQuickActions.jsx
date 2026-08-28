@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { FiBox, FiTag, FiLayers } from "react-icons/fi";
+import { FiBox, FiTag, FiShield } from "react-icons/fi";
 
 const MobileQuickActions = ({ onClose }) => {
   const actions = [
@@ -16,9 +16,9 @@ const MobileQuickActions = ({ onClose }) => {
       color: "text-emerald-700",
     },
     {
-      label: "Solutions",
-      icon: FiLayers,
-      to: "/solutions",
+      label: "Verify",
+      icon: FiShield,
+      to: "/verify",
       color: "text-violet-700",
     },
   ];

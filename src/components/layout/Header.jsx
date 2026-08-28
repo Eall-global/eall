@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { FiMenu, FiHeart } from "react-icons/fi";
+import { FiMenu, FiHeart, FiUser } from "react-icons/fi";
+import { MdOutlineShoppingCart } from "react-icons/md";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useWishlist } from "../../context/WishlistContext";
+import { useCart } from "../../context/CartContext";
+import { useCustomerAuth } from "../../context/CustomerAuthContext";
 
 import useScrollPosition from "../../hooks/useScrollPosition";
 import Navigation from "../navigation/Navigation";
@@ -14,6 +17,8 @@ import { brands } from "../../data/brandsData";
 
 const Header = () => {
   const { wishlistCount, setIsWishlistOpen } = useWishlist();
+  const { cartCount, setIsCartOpen } = useCart();
+  const { isLoggedIn, openAuthModal, user } = useCustomerAuth();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [activeMenu, setActiveMenu] = useState(null);
@@ -114,8 +119,8 @@ const Header = () => {
                   <Link
                     to={`/brands/${brand.slug}`}
                     className={`flex items-center transition-all duration-300 ${isTransparent
-                        ? "bg-white/90 px-2 py-0.5 rounded-md shadow-xs backdrop-blur-xs"
-                        : ""
+                      ? "bg-white/90 px-2 py-0.5 rounded-md shadow-xs backdrop-blur-xs"
+                      : ""
                       }`}
                   >
                     <img
@@ -149,18 +154,17 @@ const Header = () => {
                 />
               </div>
 
-              {/* Wishlist Button (Both Desktop and Mobile) */}
+              {/* Wishlist Button */}
               <button
                 type="button"
                 onClick={() => {
                   setActiveMenu(null);
                   setIsWishlistOpen(true);
                 }}
-                className={`relative p-2 rounded-xl transition-colors duration-300 cursor-pointer ${
-                  isTransparent
-                    ? "text-white hover:bg-white/10"
-                    : "text-slate-700 hover:bg-slate-100"
-                }`}
+                className={`relative p-2 rounded-xl transition-colors duration-300 cursor-pointer ${isTransparent
+                  ? "text-white hover:bg-white/10"
+                  : "text-slate-700 hover:bg-slate-100"
+                  }`}
                 title="View Saved Products / Wishlist"
                 aria-label="Wishlist"
               >
@@ -169,6 +173,52 @@ const Header = () => {
                   <span className="absolute -top-0.5 -right-0.5 bg-rose-500 text-white text-[10px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center shadow-xs">
                     {wishlistCount}
                   </span>
+                )}
+              </button>
+
+              {/* Shopping Cart Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveMenu(null);
+                  setIsCartOpen(true);
+                }}
+                className={`relative p-2 rounded-xl transition-colors duration-300 cursor-pointer ${isTransparent
+                  ? "text-white hover:bg-white/10"
+                  : "text-slate-700 hover:bg-slate-100"
+                  }`}
+                title="View Shopping Cart"
+                aria-label="Shopping Cart"
+              >
+                <MdOutlineShoppingCart className="text-xl sm:text-2xl" />
+                {cartCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 bg-sky-600 text-white text-[10px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center shadow-xs">
+                    {cartCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Customer Profile Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveMenu(null);
+                  if (isLoggedIn) {
+                    navigate("/profile");
+                  } else {
+                    openAuthModal("login", "/profile");
+                  }
+                }}
+                className={`relative p-2 rounded-xl transition-colors duration-300 cursor-pointer ${isTransparent
+                  ? "text-white hover:bg-white/10"
+                  : "text-slate-700 hover:bg-slate-100"
+                  }`}
+                title={isLoggedIn ? `Profile (${user?.fullName})` : "Sign In / Profile"}
+                aria-label="User Profile"
+              >
+                <FiUser className="text-xl sm:text-2xl" />
+                {isLoggedIn && (
+                  <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white" />
                 )}
               </button>
 
@@ -185,11 +235,10 @@ const Header = () => {
 
               {/* Mobile Menu Toggle */}
               <button
-                className={`xl:hidden text-2xl p-1.5 rounded-lg cursor-pointer transition-colors duration-300 ${
-                  isTransparent
-                    ? "text-white hover:bg-white/10"
-                    : "text-slate-900 hover:bg-slate-100"
-                }`}
+                className={`xl:hidden text-2xl p-1.5 rounded-lg cursor-pointer transition-colors duration-300 ${isTransparent
+                  ? "text-white hover:bg-white/10"
+                  : "text-slate-900 hover:bg-slate-100"
+                  }`}
                 onClick={() => setIsMobileOpen(true)}
                 aria-label="Toggle mobile menu"
               >

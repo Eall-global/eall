@@ -1,255 +1,133 @@
+import { useState } from "react";
 import {
   FiCheckCircle,
   FiPackage,
   FiTag,
   FiGrid,
   FiLayers,
+  FiShoppingCart,
+  FiHeart,
+  FiPlus,
+  FiMinus,
+  FiCheck,
 } from "react-icons/fi";
+import { useCart } from "../../context/CartContext";
+import { useWishlist } from "../../context/WishlistContext";
 
 const availabilityStyles = {
   "In Stock": {
-    bg: "bg-green-100",
-    text: "text-green-700",
+    bg: "bg-emerald-50 border-emerald-200 text-emerald-800",
   },
-
   "Limited Stock": {
-    bg: "bg-yellow-100",
-    text: "text-yellow-700",
+    bg: "bg-amber-50 border-amber-200 text-amber-800",
   },
-
   "Available on Request": {
-    bg: "bg-blue-100",
-    text: "text-blue-700",
+    bg: "bg-sky-50 border-sky-200 text-sky-800",
   },
-
   "Out of Stock": {
-    bg: "bg-red-100",
-    text: "text-red-700",
+    bg: "bg-rose-50 border-rose-200 text-rose-800",
   },
 };
 
 const ProductInfo = ({ product, selectedVariant, onVariantChange }) => {
+  const { addToCart } = useCart();
+  const { isWishlisted, toggleWishlist } = useWishlist();
+
+  const [quantity, setQuantity] = useState(1);
+  const [addedNotice, setAddedNotice] = useState(false);
+
   const availability =
     availabilityStyles[product.availability] ||
     availabilityStyles["Available on Request"];
 
+  const displayPrice = product.livePrice !== undefined
+    ? Number(product.livePrice)
+    : (product.price !== undefined ? Number(product.price) : 0);
+
+  const wishlisted = isWishlisted(product.slug);
+
+  const handleAddToCart = (e) => {
+    e.preventDefault();
+    addToCart(product, quantity, {
+      color: selectedVariant?.color || "",
+      storage: selectedVariant?.storage || "",
+      openDrawer: true,
+    });
+    setAddedNotice(true);
+    setTimeout(() => setAddedNotice(false), 2500);
+  };
+
   return (
-    <div className="space-y-8">
-      {/* Brand */}
+    <div className="space-y-6 text-left">
+      {/* Brand & Title */}
       <div>
-        <p
-          className="
-            text-sky-700
-            font-semibold
-            uppercase
-            tracking-wider
-            text-sm
-          "
-        >
+        <span className="text-xs uppercase font-extrabold tracking-widest text-sky-700 bg-sky-50 px-2.5 py-1 rounded-md border border-sky-200/60 inline-block mb-2">
           {product.brand}
-        </p>
+        </span>
 
-        <p
-          className="
-            mt-2
-            lg:text-3xl
-            text-2xl
-            font-bold
-            text-slate-900
-            leading-tight
-          "
-        >
+        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 leading-tight">
           {product.name}
-        </p>
+        </h1>
 
-        <p
-          className="
-            mt-5
-            text-slate-600
-            leading-7
-          "
-        >
+        <p className="mt-3 text-xs sm:text-sm text-slate-600 leading-relaxed">
           {product.shortDescription}
         </p>
       </div>
 
-      {/* Status */}
-      <div className="flex flex-wrap gap-3">
+      {/* Availability & Warranty Status */}
+      <div className="flex flex-wrap gap-2.5 items-center">
         <span
-          className={`
-            px-4
-            py-2
-            rounded-full
-            text-sm
-            font-semibold
-            ${availability.bg}
-            ${availability.text}
-          `}
+          className={`px-3 py-1 rounded-full text-xs font-bold border ${availability.bg}`}
         >
           ● {product.availabilityBadge || product.availability}
         </span>
 
         {product.warranty && (
-          <span
-            className="
-              flex
-              items-center
-              gap-2
-              px-4
-              py-2
-              rounded-full
-              bg-slate-100
-              text-slate-700
-              text-sm
-            "
-          >
-            <FiCheckCircle />
-
-            {product.warranty}
+          <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-xs font-semibold">
+            <FiCheckCircle className="text-emerald-600" /> {product.warranty} Warranty
           </span>
         )}
       </div>
 
       {/* Colour Selection */}
-
       {product.variants?.length > 0 && (
-        <div>
-          <h3 className="text-lg font-semibold text-slate-900">
-            Available Colours
-          </h3>
-
-          <div className="flex flex-wrap gap-3 mt-4">
+        <div className="pt-2 border-t border-slate-100">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Available Colours</h3>
+          <div className="flex flex-wrap gap-2.5">
             {product.variants.map((variant) => (
               <button
                 key={variant.colorSlug}
+                type="button"
                 onClick={() => onVariantChange(variant)}
-                className={`
-                        flex
-                        items-center
-                        gap-3
-                        px-3
-                        py-2
-                        rounded-xl
-                        border-2
-                        transition
-
-                        ${
-                          selectedVariant.colorSlug === variant.colorSlug
-                            ? "border-sky-700 bg-sky-50"
-                            : "border-slate-200 hover:border-slate-300"
-                        }
-                    `}
+                className={`flex items-center gap-2.5 px-3 py-1.5 rounded-xl border transition cursor-pointer ${
+                  selectedVariant.colorSlug === variant.colorSlug
+                    ? "border-sky-600 bg-sky-50/80 text-sky-900 ring-2 ring-sky-600/20 font-bold"
+                    : "border-slate-200 hover:border-slate-300 text-slate-700"
+                }`}
               >
-                <img
-                  src={variant.image}
-                  alt={variant.color}
-                  className="w-10 h-10 object-contain"
-                />
-
-                <span className="font-medium">{variant.color}</span>
+                <img src={variant.image} alt={variant.color} className="w-7 h-7 object-contain" />
+                <span className="text-xs font-medium">{variant.color}</span>
               </button>
             ))}
           </div>
         </div>
       )}
 
-      {/* Information Grid */}
-      <div
-        className="
-          grid
-          grid-cols-2
-          
-          gap-5
-          border
-          rounded-2xl
-          border-slate-200
-          p-6
-        "
-      >
-        <InfoItem
-          icon={<FiPackage />}
-          label="SKU"
-          value={selectedVariant?.sku || product.sku}
-        />
-
-        <InfoItem
-          icon={<FiGrid />}
-          label="Category"
-          value={product.categoryName || product.category}
-        />
-
-        <InfoItem
-          icon={<FiLayers />}
-          label="Sub Category"
-          value={product.subCategory}
-        />
-
-        <InfoItem icon={<FiTag />} label="Series" value={product.series} />
-
+      {/* Key Specifications Grid */}
+      <div className="grid grid-cols-2 gap-3 border rounded-2xl border-slate-200/80 p-4 bg-slate-50/50 text-xs">
+        <InfoItem icon={<FiPackage />} label="SKU" value={selectedVariant?.sku || product.sku} />
+        <InfoItem icon={<FiGrid />} label="Category" value={product.categoryName || product.category} />
+        <InfoItem icon={<FiLayers />} label="Sub Category" value={product.subCategory} />
         <InfoItem icon={<FiTag />} label="Model" value={product.model} />
       </div>
 
-      {/* Business Segments */}
-      {product.businessSegment?.length > 0 && (
-        <div>
-          <h3
-            className="
-              text-lg
-              font-semibold
-              text-slate-900
-            "
-          >
-            Suitable For
-          </h3>
-
-          <div className="flex flex-wrap gap-3 mt-4">
-            {product.businessSegment.map((item) => (
-              <span
-                key={item}
-                className="
-                  bg-sky-50
-                  text-sky-700
-                  px-4
-                  py-2
-                  rounded-full
-                  text-sm
-                  font-medium
-                "
-              >
-                {item}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Tags */}
+      {/* Highlights */}
       {product.tags?.length > 0 && (
         <div>
-          <h3
-            className="
-              text-lg
-              font-semibold
-              text-slate-900
-            "
-          >
-            Highlights
-          </h3>
-
-          <div className="flex flex-wrap gap-3 mt-4">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Highlights</h3>
+          <div className="flex flex-wrap gap-2">
             {product.tags.map((tag) => (
-              <span
-                key={tag}
-                className="
-                  border
-                  border-slate-200
-                  rounded-full
-                  px-4
-                  py-2
-                  text-sm
-                  bg-white
-                "
-              >
+              <span key={tag} className="border border-slate-200 rounded-full px-3 py-1 text-xs bg-white text-slate-700">
                 {tag}
               </span>
             ))}
@@ -257,36 +135,80 @@ const ProductInfo = ({ product, selectedVariant, onVariantChange }) => {
         </div>
       )}
 
-      {/* Quote Notice */}
-      <div
-        className="
-          rounded-2xl
-          bg-sky-50
-          border
-          border-sky-100
-          p-6
-        "
-      >
-        <h3
-          className="
-            font-semibold
-            text-slate-900
-          "
-        >
-          Pricing & Availability
-        </h3>
+      {/* SLEEK PRICING & ADD TO CART CARD */}
+      <div className="p-5 bg-white border border-slate-200 rounded-2xl shadow-2xs space-y-4 pt-4 border-t-2 border-t-sky-700">
+        <div className="flex justify-between items-baseline">
+          <div>
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
+              Unit Price
+            </span>
+            <div className="flex items-baseline gap-2 mt-0.5">
+              <span className="text-2xl sm:text-3xl font-black font-mono text-sky-900">
+                AED {displayPrice.toFixed(2)}
+              </span>
+              <span className="text-xs font-mono text-slate-400">
+                ≈ USD {(displayPrice / 3.6725).toFixed(2)}
+              </span>
+            </div>
+          </div>
+        </div>
 
-        <p
-          className="
-            mt-3
-            text-slate-600
-            leading-7
-          "
-        >
-          Product pricing varies depending on quantity, destination, and market
-          conditions. Contact our sales team to receive the latest availability,
-          lead time, and a customized quotation.
-        </p>
+        {/* Action Controls */}
+        <div className="flex items-stretch gap-3">
+          {/* Quantity Stepper */}
+          <div className="flex items-center justify-between border border-slate-200 rounded-xl px-3 py-1.5 bg-slate-50 w-28 shrink-0">
+            <button
+              type="button"
+              onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+              className="p-1 text-slate-500 hover:text-slate-900 rounded cursor-pointer"
+            >
+              <FiMinus className="text-xs" />
+            </button>
+            <span className="font-mono font-bold text-xs text-slate-900">
+              {quantity}
+            </span>
+            <button
+              type="button"
+              onClick={() => setQuantity((q) => q + 1)}
+              className="p-1 text-slate-500 hover:text-slate-900 rounded cursor-pointer"
+            >
+              <FiPlus className="text-xs" />
+            </button>
+          </div>
+
+          {/* Add to Cart Button */}
+          <button
+            type="button"
+            onClick={handleAddToCart}
+            className="flex-1 py-3 px-4 bg-sky-700 hover:bg-sky-800 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition flex items-center justify-center gap-2 shadow-xs cursor-pointer"
+          >
+            {addedNotice ? (
+              <>
+                <FiCheck className="text-sm text-emerald-300" />
+                <span>Added to Cart!</span>
+              </>
+            ) : (
+              <>
+                <FiShoppingCart className="text-sm" />
+                <span>Add to Cart</span>
+              </>
+            )}
+          </button>
+
+          {/* Wishlist Button */}
+          <button
+            type="button"
+            onClick={() => toggleWishlist(product)}
+            className={`p-3 rounded-xl border transition cursor-pointer flex items-center justify-center shrink-0 ${
+              wishlisted
+                ? "bg-rose-50 border-rose-300 text-rose-600"
+                : "bg-white border-slate-200 text-slate-600 hover:border-slate-300"
+            }`}
+            title={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
+          >
+            <FiHeart className={`text-lg ${wishlisted ? "fill-rose-600" : ""}`} />
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -294,26 +216,11 @@ const ProductInfo = ({ product, selectedVariant, onVariantChange }) => {
 
 const InfoItem = ({ icon, label, value }) => (
   <div>
-    <p
-      className="
-        flex
-        items-center
-        gap-2
-        text-sm
-        text-slate-500
-      "
-    >
+    <p className="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium">
       {icon}
       {label}
     </p>
-
-    <p
-      className="
-        mt-2
-        font-semibold
-        text-slate-900
-      "
-    >
+    <p className="mt-0.5 font-semibold text-xs text-slate-800">
       {value || "-"}
     </p>
   </div>

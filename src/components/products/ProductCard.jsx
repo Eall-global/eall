@@ -1,19 +1,22 @@
 import { Link } from "react-router-dom";
-import { FiArrowRight, FiHeart } from "react-icons/fi";
+import { FiHeart } from "react-icons/fi";
+import { MdOutlineAddShoppingCart } from "react-icons/md";
 import { useState } from "react";
 import { getColorSwatch } from "../../utils/getColorSwatch";
 import { useWishlist } from "../../context/WishlistContext";
+import { useCart } from "../../context/CartContext";
 
 const ProductCard = ({ product }) => {
   const { isWishlisted, toggleWishlist } = useWishlist();
+  const { addToCart } = useCart();
 
   const availabilityBadgeText = product.availabilityBadge || product.availability || "Available on Request";
   const availabilityClass = product.availabilityClass || (
     product.availability === "In Stock"
       ? "bg-green-100 text-green-700"
       : product.availability === "Limited Stock"
-      ? "bg-yellow-100 text-yellow-700"
-      : "bg-blue-100 text-blue-700"
+        ? "bg-yellow-100 text-yellow-700"
+        : "bg-blue-100 text-blue-700"
   );
 
   const defaultVariant =
@@ -134,10 +137,28 @@ const ProductCard = ({ product }) => {
             )}
           </div>
 
-          {/* 🔗 BOTTOM ACTION CTA */}
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-sky-700 font-bold text-xs sm:text-sm group-hover:text-sky-800">
-            <span>View Details</span>
-            <FiArrowRight className="text-sm transition-transform duration-200 group-hover:translate-x-1" />
+          {/* 🏷️ LIVE PRICE & BOTTOM ACTION CTA */}
+          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+            <div>
+              <span className="font-mono font-black text-sm text-sky-900">
+                AED {(product.livePrice !== undefined ? Number(product.livePrice) : (product.price || 0)).toFixed(2)}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  addToCart(product, 1, { openDrawer: true });
+                }}
+                className="p-1.5 rounded-lg bg-sky-50/80 hover:bg-sky-700 text-sky-600 hover:text-sky-50 border border-sky-500 transition shadow-2xs cursor-pointer flex items-center gap-1 text-xs font-bold"
+                title="Add to Cart"
+              >
+                <MdOutlineAddShoppingCart className="text-sm sm:text-base font-semibold" />
+              </button>
+            </div>
           </div>
         </div>
       </article>

@@ -731,7 +731,7 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
               {/* Live sync note */}
               <div className="p-3 bg-sky-50 border border-sky-100 rounded-xl flex items-center gap-2 text-xs text-sky-800 font-medium">
                 <FiGlobe className="text-sky-600 text-sm shrink-0" />
-                <span>Saves directly to Supabase DB & updates live globally across all devices.</span>
+                <span>Saves directly to Cloud Firestore &amp; updates live globally across all devices.</span>
               </div>
 
               <div className="flex justify-end gap-2 pt-2">

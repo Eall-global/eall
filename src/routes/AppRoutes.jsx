@@ -11,13 +11,9 @@ import ServicesPage from "../pages/ServicesPage";
 import SolutionsPage from "../pages/SolutionsPage";
 import VerifyPage from "../pages/verify/VerifyPage";
 import PortalPage from "../pages/portal/PortalPage";
-
-// Placeholder pages (can be expanded later)
-const Placeholder = ({ title }) => (
-  <div className="p-20 text-center text-2xl font-bold">
-    {title} Page Coming Soon
-  </div>
-);
+import CartPage from "../pages/cart/CartPage";
+import CheckoutPage from "../pages/checkout/CheckoutPage";
+import ProfilePage from "../pages/profile/ProfilePage";
 
 const AppRoutes = () => {
   return (
@@ -38,6 +34,10 @@ const AppRoutes = () => {
         <Route path="/services" element={<ServicesPage />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/contact" element={<Contact />} />
+        {/* E-COMMERCE CART, CHECKOUT & PROFILE */}
+        <Route path="/cart" element={<CartPage />} />
+        <Route path="/checkout" element={<CheckoutPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
         {/* AUTHENTICITY CHECKER */}
         <Route path="/verify" element={<VerifyPage />} />
         <Route path="/verify/:imei" element={<VerifyPage />} />

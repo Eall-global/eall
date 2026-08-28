@@ -22,7 +22,12 @@ import PortalSettings from "../../components/portal/PortalSettings";
 import InvoiceDocument from "../../components/portal/InvoiceDocument";
 import { fetchStock } from "../../services/stockService";
 import { fetchInvoices } from "../../services/billingService";
-import { getSupabase, isSupabaseConfigured } from "../../lib/supabaseClient";
+import {
+  getFirebaseDb,
+  isFirebaseConfigured,
+  collection,
+  onSnapshot,
+} from "../../lib/firebaseClient";
 
 const PortalPage = () => {
   const { isAuthenticated, currentUser, role, isAdmin, logout } = useStaffAuth();
@@ -49,42 +54,29 @@ const PortalPage = () => {
     }
   }, []);
 
-  // ⚡ AUTOMATIC REALTIME SUBSCRIPTION (Synchronizes every operation across all devices)
+  // ⚡ AUTOMATIC REALTIME SUBSCRIPTION (Google Firebase Firestore onSnapshot)
   useEffect(() => {
     if (!isAuthenticated) return;
 
     loadData();
 
-    const supabase = getSupabase();
-    if (supabase && isSupabaseConfigured()) {
-      const channel = supabase
-        .channel("portal_realtime_global_sync")
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "product_stock" },
-          () => {
-            loadData();
-          }
-        )
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "invoices" },
-          () => {
-            loadData();
-          }
-        )
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "staff_members" },
-          () => {
-            loadData();
-          }
-        )
-        .subscribe();
+    const db = getFirebaseDb();
+    if (db && isFirebaseConfigured()) {
+      try {
+        const un過程1 = onSnapshot(collection(db, "product_stock"), () => {
+          loadData();
+        });
+        const un過程2 = onSnapshot(collection(db, "invoices"), () => {
+          loadData();
+        });
 
-      return () => {
-        supabase.removeChannel(channel);
-      };
+        return () => {
+          un過程1();
+          un過程2();
+        };
+      } catch (e) {
+        console.warn("Could not attach Firestore portal listener:", e);
+      }
     }
   }, [isAuthenticated, loadData]);
 
@@ -92,175 +84,177 @@ const PortalPage = () => {
     return <PortalLogin />;
   }
 
-  const isConnected = isSupabaseConfigured();
+  const isConnected = isFirebaseConfigured();
 
   const tabs = [
     { id: "stock", label: "Stock Manager", icon: FiPackage },
     { id: "billing", label: "Billing & POS", icon: FiFileText },
     { id: "invoices", label: "Sales & Invoices Audit", icon: FiClipboard },
-    ...(isAdmin ? [{ id: "settings", label: "Settings", icon: FiSettings }] : []),
   ];
 
+  if (isAdmin) {
+    tabs.push({ id: "settings", label: "System & Settings", icon: FiSettings });
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans text-left">
+      {/* 🧭 TOP PORTAL NAVIGATION BAR */}
+      <header className="sticky top-0 z-30 bg-slate-950/90 backdrop-blur-md border-b border-slate-800 px-4 sm:px-8 py-3.5 flex items-center justify-between gap-4">
+        
+        {/* Left: Branding & Role */}
+        <div className="flex items-center gap-3">
+          <Link
+            to="/"
+            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+            title="Return to Public Website"
+          >
+            <FiArrowLeft className="text-lg" />
+          </Link>
 
-      {/* 🚀 TOP PORTAL HEADER */}
-      <header className="sticky top-0 z-30 bg-slate-900 text-white shadow-md border-b border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between gap-4">
-
-          {/* Brand & Mode */}
-          <div className="flex items-center gap-3">
-            <Link
-              to="/"
-              className="flex items-center gap-2 text-slate-400 hover:text-white text-xs font-semibold transition"
-              title="Return to public store"
-            >
-              <FiArrowLeft className="text-base" />
-              <span className="hidden sm:inline">Storefront</span>
-            </Link>
-
-            <span className="text-slate-700 hidden sm:inline">|</span>
-
+          <div>
             <div className="flex items-center gap-2">
-              <span className="font-extrabold text-sm sm:text-base tracking-tight text-white">
-                E-ALL Business
+              <span className="text-base sm:text-lg font-black tracking-tight text-white flex items-center gap-1.5">
+                E-ALL <span className="text-sky-400 text-xs sm:text-sm font-semibold uppercase px-2 py-0.5 rounded-md bg-sky-500/10 border border-sky-500/20">Portal</span>
               </span>
 
-              {/* Role badge */}
-              <span
-                className={`
-                  inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold
-                  ${isAdmin
-                    ? "bg-sky-500/20 text-sky-300 border border-sky-500/30"
-                    : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                  }
-                `}
-              >
-                {isAdmin ? <FiShield /> : <FiUserCheck />}
-                {isAdmin ? "Admin" : "Sales"}
-              </span>
-            </div>
-          </div>
-
-          {/* User info, Sync Status & Logout */}
-          <div className="flex items-center gap-3 sm:gap-4">
-            {/* Sync Badge */}
-            <div className="hidden md:flex items-center gap-1.5 text-xs text-slate-400">
+              {/* Real-time Cloud Connection Indicator */}
               {isConnected ? (
-                <span className="flex items-center gap-1.5 text-emerald-400 font-medium bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  Live Cloud Sync Active
+                <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[11px] font-medium border border-emerald-500/20">
+                  <FiCheckCircle className="text-xs" />
+                  <span>Firestore Live</span>
                 </span>
               ) : (
-                <span className="flex items-center gap-1 text-amber-400 font-medium">
-                  <FiInfo className="text-sm" /> Local Sandbox Mode
+                <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 text-[11px] font-medium border border-amber-500/20">
+                  <FiInfo className="text-xs" />
+                  <span>Local Mode</span>
                 </span>
               )}
             </div>
-
-            {/* Refresh */}
-            <button
-              type="button"
-              onClick={loadData}
-              title="Refresh Data"
-              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition cursor-pointer"
-            >
-              <FiRefreshCw className={loading ? "animate-spin text-sky-400" : ""} />
-            </button>
-
-            {/* User Name */}
-            <span className="hidden sm:inline text-xs text-slate-300 font-medium">
-              {currentUser?.name}
-            </span>
-
-            {/* Logout */}
-            <button
-              type="button"
-              onClick={logout}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 rounded-xl text-xs font-semibold transition cursor-pointer"
-            >
-              <FiLogOut />
-              <span className="hidden sm:inline">Logout</span>
-            </button>
+            <p className="text-[11px] text-slate-400">
+              Inventory, Real-Time POS &amp; Tax Invoicing Engine
+            </p>
           </div>
         </div>
 
-        {/* 📑 SUB-NAV TABS */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex overflow-x-auto gap-2 border-t border-slate-800/80 pt-1 pb-2">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const active = activeTab === tab.id;
+        {/* Right: User Info & Actions */}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={loadData}
+            disabled={loading}
+            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition disabled:opacity-50"
+            title="Refresh Live Data"
+          >
+            <FiRefreshCw className={`text-base ${loading ? "animate-spin" : ""}`} />
+          </button>
 
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`
-                  flex items-center gap-2 py-2 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap cursor-pointer
-                  ${active
-                    ? "bg-sky-700 text-white shadow-md shadow-sky-900/50"
-                    : "text-slate-400 hover:text-white hover:bg-slate-800"
-                  }
-                `}
-              >
-                <Icon className="text-base" />
-                {tab.label}
-              </button>
-            );
-          })}
+          <div className="hidden sm:flex flex-col text-right">
+            <span className="text-xs font-bold text-white flex items-center justify-end gap-1">
+              {isAdmin ? <FiShield className="text-sky-400" /> : <FiUserCheck className="text-emerald-400" />}
+              {currentUser?.name}
+            </span>
+            <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
+              {role === "admin" ? "Master Admin" : "Sales Executive"}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={logout}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-xs font-semibold transition"
+          >
+            <FiLogOut className="text-sm" />
+            <span className="hidden sm:inline">Lock PIN</span>
+          </button>
         </div>
       </header>
 
-      {/* 📦 MAIN CONTENT CONTAINER */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
-        {loading && stock.length === 0 ? (
-          <div className="py-24 text-center">
-            <div className="inline-block w-8 h-8 border-4 border-sky-600 border-t-transparent rounded-full animate-spin mb-3" />
-            <p className="text-sm font-semibold text-slate-600">Syncing live inventory & audit records...</p>
+      {/* 📑 TAB NAVIGATION STRIP */}
+      <nav className="bg-slate-950 border-b border-slate-800/80 px-4 sm:px-8 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => {
+                setActiveTab(tab.id);
+                setViewingInvoice(null);
+              }}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                isActive
+                  ? "bg-sky-600 text-white shadow-md shadow-sky-600/30"
+                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+              }`}
+            >
+              <Icon className="text-sm" />
+              <span>{tab.label}</span>
+              {tab.id === "stock" && (
+                <span className="text-[10px] bg-black/30 px-1.5 py-0.5 rounded-full font-mono">
+                  {stock.length}
+                </span>
+              )}
+              {tab.id === "invoices" && (
+                <span className="text-[10px] bg-black/30 px-1.5 py-0.5 rounded-full font-mono">
+                  {invoices.length}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* 💻 MAIN PORTAL CONTENT AREA */}
+      <main className="flex-1 p-4 sm:p-6 lg:p-8 bg-slate-900 text-slate-900">
+        {/* INVOICE VIEWER OVERLAY / FULL MODAL */}
+        {viewingInvoice && (
+          <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+            <div className="relative w-full max-w-4xl bg-white rounded-3xl p-6 sm:p-8 shadow-2xl my-8">
+              <InvoiceDocument
+                invoice={viewingInvoice}
+                onClose={() => setViewingInvoice(null)}
+              />
+            </div>
           </div>
-        ) : (
-          <>
-            {activeTab === "stock" && (
-              <StockTable
-                stock={stock}
-                onStockChanged={loadData}
-                isAdmin={isAdmin}
-              />
-            )}
+        )}
 
-            {activeTab === "billing" && (
-              <BillingPOS
-                stock={stock}
-                onInvoiceCreated={(newInv) => {
-                  loadData();
-                  setViewingInvoice(newInv);
-                }}
-              />
-            )}
+        {/* TAB 1: STOCK MANAGER */}
+        {activeTab === "stock" && (
+          <StockTable
+            stock={stock}
+            onStockUpdated={loadData}
+            isAdmin={isAdmin}
+          />
+        )}
 
-            {activeTab === "invoices" && (
-              <InvoiceAudit
-                invoices={invoices}
-                stock={stock}
-                onSelectInvoice={(inv) => setViewingInvoice(inv)}
-                onInvoicesChanged={loadData}
-              />
-            )}
+        {/* TAB 2: BILLING & POS */}
+        {activeTab === "billing" && (
+          <BillingPOS
+            stock={stock}
+            onInvoiceCreated={(newInv) => {
+              loadData();
+              setViewingInvoice(newInv);
+            }}
+            currentUser={currentUser}
+          />
+        )}
 
-            {activeTab === "settings" && isAdmin && (
-              <PortalSettings onConfigUpdated={loadData} />
-            )}
-          </>
+        {/* TAB 3: INVOICES & SALES AUDIT */}
+        {activeTab === "invoices" && (
+          <InvoiceAudit
+            invoices={invoices}
+            onViewInvoice={(inv) => setViewingInvoice(inv)}
+            onInvoicesUpdated={loadData}
+            isAdmin={isAdmin}
+          />
+        )}
+
+        {/* TAB 4: SYSTEM SETTINGS (Admin Only) */}
+        {activeTab === "settings" && isAdmin && (
+          <PortalSettings onConfigUpdated={loadData} />
         )}
       </main>
-
-      {/* 📄 INVOICE PREVIEW / PRINT MODAL */}
-      {viewingInvoice && (
-        <InvoiceDocument
-          invoice={viewingInvoice}
-          onClose={() => setViewingInvoice(null)}
-        />
-      )}
     </div>
   );
 };

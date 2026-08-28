@@ -1,5 +1,15 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { getSupabase, isSupabaseConfigured } from "../lib/supabaseClient";
+import {
+  getFirebaseDb,
+  isFirebaseConfigured,
+  collection,
+  doc,
+  getDocs,
+  setDoc,
+  deleteDoc,
+  onSnapshot,
+  writeBatch,
+} from "../lib/firebaseClient";
 
 const StaffAuthContext = createContext(null);
 
@@ -12,6 +22,7 @@ const DEFAULT_MEMBERS = [
 
 const SESSION_KEY = "eall_staff_auth_session";
 const MEMBERS_KEY = "eall_staff_team_members";
+const COLLECTION_NAME = "staff_members";
 
 export const StaffAuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(() => {
@@ -32,41 +43,41 @@ export const StaffAuthProvider = ({ children }) => {
     }
   });
 
-  // Clean data helper for Supabase staff_members table
   const sanitizeMemberForDb = (m) => ({
     id: String(m.id),
     name: String(m.name),
     role: String(m.role || "sales"),
     pin: String(m.pin),
-    created_at: m.created_at || new Date().toISOString(),
+    createdAt: m.createdAt || m.created_at || new Date().toISOString(),
   });
 
-  // Fetch / Sync staff members from Supabase (stable callback, zero infinite loops)
+  // Fetch / Sync staff members from Firestore
   const loadStaffFromDatabase = useCallback(async () => {
-    const supabase = getSupabase();
-    if (supabase && isSupabaseConfigured()) {
+    const db = getFirebaseDb();
+    if (db && isFirebaseConfigured()) {
       try {
-        const { data, error } = await supabase
-          .from("staff_members")
-          .select("id, name, role, pin, created_at")
-          .order("created_at", { ascending: true });
-
-        if (!error && data) {
-          if (data.length > 0) {
-            setMembers(data);
-            localStorage.setItem(MEMBERS_KEY, JSON.stringify(data));
-          } else {
-            // Auto seed members into empty Supabase table
-            const toSeed = DEFAULT_MEMBERS.map(sanitizeMemberForDb);
-            const { error: seedErr } = await supabase.from("staff_members").upsert(toSeed);
-            if (!seedErr) {
-              setMembers(toSeed);
-              localStorage.setItem(MEMBERS_KEY, JSON.stringify(toSeed));
-            }
-          }
+        const snapshot = await getDocs(collection(db, COLLECTION_NAME));
+        if (!snapshot.empty) {
+          const list = [];
+          snapshot.forEach((docSnap) => {
+            list.push(docSnap.data());
+          });
+          list.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+          setMembers(list);
+          localStorage.setItem(MEMBERS_KEY, JSON.stringify(list));
+        } else {
+          // Auto seed members into empty Firestore collection
+          const batch = writeBatch(db);
+          const toSeed = DEFAULT_MEMBERS.map(sanitizeMemberForDb);
+          toSeed.forEach((m) => {
+            batch.set(doc(db, COLLECTION_NAME, m.id), m);
+          });
+          await batch.commit();
+          setMembers(toSeed);
+          localStorage.setItem(MEMBERS_KEY, JSON.stringify(toSeed));
         }
       } catch (err) {
-        console.warn("Could not sync staff from Supabase:", err);
+        console.warn("Could not sync staff from Firestore:", err);
       }
     }
   }, []);
@@ -74,23 +85,34 @@ export const StaffAuthProvider = ({ children }) => {
   useEffect(() => {
     loadStaffFromDatabase();
 
-    // Supabase Real-time live subscription (Single persistent channel)
-    const supabase = getSupabase();
-    if (supabase && isSupabaseConfigured()) {
-      const channel = supabase
-        .channel("staff_members_realtime_sync")
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "staff_members" },
-          () => {
-            loadStaffFromDatabase();
+    // Firestore Real-time live subscription with zero connection penalties
+    const db = getFirebaseDb();
+    if (db && isFirebaseConfigured()) {
+      try {
+        const unsubscribe = onSnapshot(
+          collection(db, COLLECTION_NAME),
+          (snapshot) => {
+            if (!snapshot.empty) {
+              const list = [];
+              snapshot.forEach((docSnap) => {
+                list.push(docSnap.data());
+              });
+              list.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+              setMembers(list);
+              localStorage.setItem(MEMBERS_KEY, JSON.stringify(list));
+            }
+          },
+          (err) => {
+            console.warn("Firestore staff onSnapshot warning:", err);
           }
-        )
-        .subscribe();
+        );
 
-      return () => {
-        supabase.removeChannel(channel);
-      };
+        return () => {
+          unsubscribe();
+        };
+      } catch (e) {
+        console.warn("Could not attach Firestore staff listener:", e);
+      }
     }
   }, [loadStaffFromDatabase]);
 
@@ -106,18 +128,18 @@ export const StaffAuthProvider = ({ children }) => {
       name: name.trim(),
       role,
       pin: String(pin).trim(),
-      created_at: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
     });
     const updated = [...members, newMember];
     await saveMembers(updated);
 
-    // Sync to Supabase
-    const supabase = getSupabase();
-    if (supabase && isSupabaseConfigured()) {
+    // Sync to Firestore
+    const db = getFirebaseDb();
+    if (db && isFirebaseConfigured()) {
       try {
-        await supabase.from("staff_members").upsert(newMember);
+        await setDoc(doc(db, COLLECTION_NAME, id), newMember);
       } catch (e) {
-        console.warn("Failed to add member to Supabase:", e);
+        console.warn("Failed to add member to Firestore:", e);
       }
     }
 
@@ -130,16 +152,16 @@ export const StaffAuthProvider = ({ children }) => {
     );
     await saveMembers(updated);
 
-    // Sync to Supabase
-    const supabase = getSupabase();
-    if (supabase && isSupabaseConfigured()) {
+    // Sync to Firestore
+    const db = getFirebaseDb();
+    if (db && isFirebaseConfigured()) {
       try {
         const target = updated.find((m) => m.id === id);
         if (target) {
-          await supabase.from("staff_members").upsert(sanitizeMemberForDb(target));
+          await setDoc(doc(db, COLLECTION_NAME, id), sanitizeMemberForDb(target), { merge: true });
         }
       } catch (e) {
-        console.warn("Failed to update member in Supabase:", e);
+        console.warn("Failed to update member in Firestore:", e);
       }
     }
   };
@@ -149,31 +171,34 @@ export const StaffAuthProvider = ({ children }) => {
     const updated = members.filter((m) => m.id !== id);
     await saveMembers(updated);
 
-    // Delete from Supabase
-    const supabase = getSupabase();
-    if (supabase && isSupabaseConfigured()) {
+    // Delete from Firestore
+    const db = getFirebaseDb();
+    if (db && isFirebaseConfigured()) {
       try {
-        await supabase.from("staff_members").delete().eq("id", id);
+        await deleteDoc(doc(db, COLLECTION_NAME, id));
       } catch (e) {
-        console.warn("Failed to delete member from Supabase:", e);
+        console.warn("Failed to delete member from Firestore:", e);
       }
     }
   };
 
-  // Push all local members to Supabase (Forces cloud overwrite)
+  // Push all local members to Firestore
   const pushAllMembersToCloud = async () => {
-    const supabase = getSupabase();
-    if (supabase && isSupabaseConfigured()) {
+    const db = getFirebaseDb();
+    if (db && isFirebaseConfigured()) {
       try {
+        const batch = writeBatch(db);
         const payload = members.map(sanitizeMemberForDb);
-        const { error } = await supabase.from("staff_members").upsert(payload);
-        if (error) throw error;
+        payload.forEach((m) => {
+          batch.set(doc(db, COLLECTION_NAME, m.id), m);
+        });
+        await batch.commit();
         return { success: true, count: payload.length };
       } catch (e) {
         return { success: false, error: e.message };
       }
     }
-    return { success: false, error: "Supabase connection not active." };
+    return { success: false, error: "Firebase connection not active." };
   };
 
   const loginByPin = (enteredPin) => {
