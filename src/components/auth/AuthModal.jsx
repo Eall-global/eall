@@ -10,8 +10,8 @@ import {
   FiMapPin,
   FiArrowRight,
   FiAlertCircle,
-  FiCheckCircle,
 } from "react-icons/fi";
+import { FcGoogle } from "react-icons/fc";
 import { useCustomerAuth } from "../../context/CustomerAuthContext";
 
 const AuthModal = () => {
@@ -22,6 +22,7 @@ const AuthModal = () => {
     setAuthMode,
     login,
     register,
+    loginWithGoogle,
     loading,
     error,
     redirectAfterAuth,
@@ -45,23 +46,26 @@ const AuthModal = () => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleSubmit = async (e) => {
+  const handleEmailSubmit = async (e) => {
     e.preventDefault();
 
     if (authMode === "login") {
       const res = await login(formData.email, formData.password);
-      if (res.success) {
-        if (redirectAfterAuth) {
-          navigate(redirectAfterAuth);
-        }
+      if (res.success && redirectAfterAuth) {
+        navigate(redirectAfterAuth);
       }
     } else {
       const res = await register(formData);
-      if (res.success) {
-        if (redirectAfterAuth) {
-          navigate(redirectAfterAuth);
-        }
+      if (res.success && redirectAfterAuth) {
+        navigate(redirectAfterAuth);
       }
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    const res = await loginWithGoogle();
+    if (res.success && redirectAfterAuth) {
+      navigate(redirectAfterAuth);
     }
   };
 
@@ -70,7 +74,7 @@ const AuthModal = () => {
       <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-200">
         
         {/* HEADER */}
-        <div className="p-6 bg-linear-to-br from-slate-900 via-sky-950 to-slate-900 text-white relative">
+        <div className="p-6 bg-gradient-to-br from-slate-900 via-sky-950 to-slate-900 text-white relative">
           <button
             type="button"
             onClick={closeAuthModal}
@@ -85,18 +89,18 @@ const AuthModal = () => {
             </div>
             <div>
               <h2 className="text-lg font-bold text-white leading-tight">
-                {authMode === "login" ? "Welcome Back to E-ALL" : "Create Customer Account"}
+                {authMode === "login" ? "Customer Sign In" : "Create Customer Account"}
               </h2>
               <p className="text-xs text-sky-200/80 mt-0.5">
                 {authMode === "login"
-                  ? "Sign in to access your orders & process checkout"
-                  : "Register to track orders & seamless Wave checkout"}
+                  ? "Sign in with your registered account to proceed"
+                  : "Register with your verified delivery details"}
               </p>
             </div>
           </div>
 
           {/* TAB TOGGLE */}
-          <div className="mt-6 flex bg-slate-800/80 p-1 rounded-xl border border-slate-700/80">
+          <div className="mt-5 flex bg-slate-800/80 p-1 rounded-xl border border-slate-700/80">
             <button
               type="button"
               onClick={() => setAuthMode("login")}
@@ -122,176 +126,227 @@ const AuthModal = () => {
           </div>
         </div>
 
-        {/* FORM BODY */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
+        {/* BODY CONTENT */}
+        <div className="p-6 space-y-4">
+          
+          {/* ⚡ ONE-CLICK GOOGLE SIGN IN */}
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            disabled={loading}
+            className="w-full py-3 px-4 bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs rounded-xl border border-slate-300 shadow-2xs transition flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50"
+          >
+            <FcGoogle className="text-xl" />
+            <span>Continue with Google</span>
+          </button>
+
+          {/* DIVIDER */}
+          <div className="flex items-center gap-3 my-2">
+            <div className="h-px bg-slate-200 flex-1" />
+            <span className="text-[11px] text-slate-400 font-medium uppercase tracking-wider">
+              or use email
+            </span>
+            <div className="h-px bg-slate-200 flex-1" />
+          </div>
+
+          {/* ERROR ALERT */}
           {error && (
-            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl flex items-center gap-2">
-              <FiAlertCircle className="text-base shrink-0" />
-              <span>{error}</span>
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs flex items-start gap-2">
+              <FiAlertCircle className="text-base shrink-0 mt-0.5" />
+              <p className="leading-relaxed font-semibold">{error}</p>
             </div>
           )}
 
-          {authMode === "register" && (
-            <div>
-              <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-wider mb-1">
-                Full Name *
-              </label>
-              <div className="relative">
-                <FiUser className="absolute left-3 top-3 text-slate-400" />
-                <input
-                  required
-                  type="text"
-                  name="fullName"
-                  value={formData.fullName}
-                  onChange={handleChange}
-                  placeholder="e.g. Ousmane Diop"
-                  className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-sky-500 text-xs text-slate-900 font-semibold"
-                />
+          {/* SIGN IN FORM */}
+          {authMode === "login" && (
+            <form onSubmit={handleEmailSubmit} className="space-y-3.5 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-wider mb-1">
+                  Email Address *
+                </label>
+                <div className="relative">
+                  <FiMail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm" />
+                  <input
+                    required
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    placeholder="name@example.com"
+                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:border-sky-700 outline-none"
+                  />
+                </div>
               </div>
-            </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-wider mb-1">
+                  Password *
+                </label>
+                <div className="relative">
+                  <FiLock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm" />
+                  <input
+                    required
+                    type="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    placeholder="••••••••"
+                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:border-sky-700 outline-none"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3.5 bg-sky-700 hover:bg-sky-800 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition flex items-center justify-center gap-2 shadow-md cursor-pointer mt-2"
+              >
+                {loading ? "Authenticating..." : "Sign In to Account"}
+                <FiArrowRight />
+              </button>
+
+              <div className="text-center pt-1 text-[11px] text-slate-500">
+                Don't have an account?{" "}
+                <button
+                  type="button"
+                  onClick={() => setAuthMode("register")}
+                  className="font-bold text-sky-700 hover:underline cursor-pointer"
+                >
+                  Create one now
+                </button>
+              </div>
+            </form>
           )}
 
-          <div>
-            <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-wider mb-1">
-              Email Address *
-            </label>
-            <div className="relative">
-              <FiMail className="absolute left-3 top-3 text-slate-400" />
-              <input
-                required
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="ousmane@example.com"
-                className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-sky-500 text-xs text-slate-900 font-semibold"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-wider mb-1">
-              Password *
-            </label>
-            <div className="relative">
-              <FiLock className="absolute left-3 top-3 text-slate-400" />
-              <input
-                required
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="••••••••"
-                className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-sky-500 text-xs text-slate-900 font-semibold"
-              />
-            </div>
-          </div>
-
+          {/* CREATE ACCOUNT FORM */}
           {authMode === "register" && (
-            <>
-              <div className="grid grid-cols-2 gap-3">
+            <form onSubmit={handleEmailSubmit} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-wider mb-1">
+                  Full Name *
+                </label>
+                <div className="relative">
+                  <FiUser className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm" />
+                  <input
+                    required
+                    type="text"
+                    name="fullName"
+                    value={formData.fullName}
+                    onChange={handleChange}
+                    placeholder="e.g. Amadou Diallo"
+                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:border-sky-700 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-wider mb-1">
-                    Phone / Wave No. *
+                    Email *
                   </label>
-                  <div className="relative">
-                    <FiPhone className="absolute left-3 top-3 text-slate-400" />
-                    <input
-                      required
-                      type="text"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleChange}
-                      placeholder="+221 77 123 4567"
-                      className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-sky-500 text-xs text-slate-900 font-semibold"
-                    />
-                  </div>
+                  <input
+                    required
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    placeholder="name@mail.com"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:border-sky-700 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-wider mb-1">
+                    Password *
+                  </label>
+                  <input
+                    required
+                    type="password"
+                    name="password"
+                    minLength={6}
+                    value={formData.password}
+                    onChange={handleChange}
+                    placeholder="Min 6 chars"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:border-sky-700 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-wider mb-1">
+                    Phone / Wave Number *
+                  </label>
+                  <input
+                    required
+                    type="text"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    placeholder="+221 77 123 4567"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:border-sky-700 outline-none"
+                  />
                 </div>
 
                 <div>
                   <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-wider mb-1">
                     Country *
                   </label>
-                  <div className="relative">
-                    <FiGlobe className="absolute left-3 top-3 text-slate-400" />
-                    <select
-                      name="country"
-                      value={formData.country}
-                      onChange={handleChange}
-                      className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-sky-500 text-xs text-slate-900 font-semibold"
-                    >
-                      <option value="Senegal">Senegal</option>
-                      <option value="Côte d'Ivoire">Côte d'Ivoire</option>
-                      <option value="Mali">Mali</option>
-                      <option value="Burkina Faso">Burkina Faso</option>
-                      <option value="Gambia">Gambia</option>
-                      <option value="Uganda">Uganda</option>
-                      <option value="United Arab Emirates">United Arab Emirates</option>
-                    </select>
-                  </div>
+                  <select
+                    name="country"
+                    value={formData.country}
+                    onChange={handleChange}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:border-sky-700 outline-none"
+                  >
+                    <option value="Senegal">Senegal</option>
+                    <option value="Côte d'Ivoire">Côte d'Ivoire</option>
+                    <option value="Mali">Mali</option>
+                    <option value="Burkina Faso">Burkina Faso</option>
+                    <option value="Gambia">Gambia</option>
+                    <option value="Uganda">Uganda</option>
+                    <option value="United Arab Emirates">United Arab Emirates</option>
+                  </select>
                 </div>
               </div>
 
               <div>
                 <label className="block font-bold text-slate-700 uppercase text-[10px] tracking-wider mb-1">
-                  Delivery Address
+                  Default Delivery Address *
                 </label>
-                <div className="relative">
-                  <FiMapPin className="absolute left-3 top-3 text-slate-400" />
-                  <input
-                    type="text"
-                    name="shippingAddress"
-                    value={formData.shippingAddress}
-                    onChange={handleChange}
-                    placeholder="Street, District, City"
-                    className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-sky-500 text-xs text-slate-900 font-semibold"
-                  />
-                </div>
+                <textarea
+                  required
+                  rows={2}
+                  name="shippingAddress"
+                  value={formData.shippingAddress}
+                  onChange={handleChange}
+                  placeholder="Street, District, Building number"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:border-sky-700 outline-none"
+                />
               </div>
-            </>
-          )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3.5 px-4 bg-sky-700 hover:bg-sky-800 disabled:opacity-50 text-white font-bold uppercase tracking-wider rounded-xl transition flex items-center justify-center gap-2 shadow-md cursor-pointer mt-2"
-          >
-            {loading ? (
-              <span>Authenticating...</span>
-            ) : (
-              <>
-                <span>{authMode === "login" ? "Sign In to Continue" : "Create Account & Continue"}</span>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition flex items-center justify-center gap-2 shadow-md cursor-pointer mt-1"
+              >
+                {loading ? "Creating Account..." : "Create Customer Account"}
                 <FiArrowRight />
-              </>
-            )}
-          </button>
+              </button>
 
-          <div className="pt-2 text-center text-[11px] text-slate-500">
-            {authMode === "login" ? (
-              <p>
-                Don't have an account?{" "}
-                <button
-                  type="button"
-                  onClick={() => setAuthMode("register")}
-                  className="text-sky-700 font-bold hover:underline cursor-pointer"
-                >
-                  Create Account
-                </button>
-              </p>
-            ) : (
-              <p>
-                Already registered?{" "}
+              <div className="text-center pt-1 text-[11px] text-slate-500">
+                Already have an account?{" "}
                 <button
                   type="button"
                   onClick={() => setAuthMode("login")}
-                  className="text-sky-700 font-bold hover:underline cursor-pointer"
+                  className="font-bold text-sky-700 hover:underline cursor-pointer"
                 >
-                  Sign In
+                  Sign in here
                 </button>
-              </p>
-            )}
-          </div>
-        </form>
+              </div>
+            </form>
+          )}
+
+        </div>
 
       </div>
     </div>

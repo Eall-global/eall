@@ -17,12 +17,13 @@ import {
 } from "react-icons/fi";
 import { useCart } from "../../context/CartContext";
 import { useCustomerAuth } from "../../context/CustomerAuthContext";
+import { adjustStockDelta } from "../../services/stockService";
 import { PAYMENT_METHODS, WAVE_PAYMENT_CONFIG } from "../../constants/paymentConfig";
 import OrderSuccessModal from "../../components/checkout/OrderSuccessModal";
 
 const CheckoutPage = () => {
   const { items, cartSubtotal, shippingFee, cartTotal, clearCart } = useCart();
-  const { user, isLoggedIn, openAuthModal, addOrderToHistory } = useCustomerAuth();
+  const { user, isLoggedIn, openAuthModal, updateProfile, addOrderToHistory } = useCustomerAuth();
   const navigate = useNavigate();
 
   const [selectedPayment, setSelectedPayment] = useState("wave");
@@ -66,7 +67,7 @@ const CheckoutPage = () => {
           </div>
           <h2 className="text-lg sm:text-xl font-bold text-slate-900">Sign In to Proceed to Checkout</h2>
           <p className="text-xs text-slate-500 max-w-xs mx-auto">
-            Please log in or create an account to process your cart, enter shipping details, and access Wave Transfer payment options.
+            Please log in or register with your delivery address to process your cart and access Wave Transfer payment.
           </p>
           <div className="pt-2 flex justify-center gap-3">
             <button
@@ -115,7 +116,7 @@ const CheckoutPage = () => {
     setTimeout(() => setCopiedCode(false), 2000);
   };
 
-  const handlePlaceOrder = (e) => {
+  const handlePlaceOrder = async (e) => {
     e.preventDefault();
     setSubmitting(true);
 
@@ -123,7 +124,7 @@ const CheckoutPage = () => {
 
     const newOrder = {
       orderId,
-      customerId: user.id,
+      customerId: user.uid || user.id,
       customerName: shippingForm.fullName,
       email: shippingForm.email,
       phone: shippingForm.phone,
@@ -141,12 +142,32 @@ const CheckoutPage = () => {
       createdAt: new Date().toISOString(),
     };
 
-    setTimeout(() => {
-      addOrderToHistory(newOrder);
-      setPlacedOrder(newOrder);
-      clearCart();
-      setSubmitting(false);
-    }, 600);
+    // 1. Update customer profile in Firestore with saved address/phone
+    updateProfile({
+      fullName: shippingForm.fullName,
+      phone: shippingForm.phone,
+      country: shippingForm.country,
+      city: shippingForm.city,
+      shippingAddress: shippingForm.shippingAddress,
+    });
+
+    // 2. Deduct inventory stock for ordered items
+    for (const item of items) {
+      if (item.sku) {
+        try {
+          await adjustStockDelta(item.sku, -(item.quantity || 1));
+        } catch (err) {
+          console.warn(`Could not adjust stock for ${item.sku}:`, err);
+        }
+      }
+    }
+
+    // 3. Save order to Firestore
+    await addOrderToHistory(newOrder);
+
+    setPlacedOrder(newOrder);
+    clearCart();
+    setSubmitting(false);
   };
 
   return (
@@ -169,7 +190,7 @@ const CheckoutPage = () => {
 
           <div className="flex items-center gap-2 text-xs text-slate-700 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-2xs self-start sm:self-auto">
             <FiUser className="text-sky-700 shrink-0" />
-            <span>LoggedIn as <strong className="text-slate-900">{user?.fullName}</strong></span>
+            <span>LoggedIn as <strong className="text-slate-900">{user?.fullName || user?.email}</strong></span>
           </div>
         </div>
 
@@ -284,10 +305,11 @@ const CheckoutPage = () => {
                     <div
                       key={method.id}
                       onClick={() => setSelectedPayment(method.id)}
-                      className={`p-3.5 sm:p-4 rounded-2xl border transition cursor-pointer flex items-start gap-3 sm:gap-4 ${isSelected
-                        ? "bg-sky-50/70 border-sky-600 ring-2 ring-sky-600/20"
-                        : "bg-white border-slate-200 hover:border-slate-300"
-                        }`}
+                      className={`p-3.5 sm:p-4 rounded-2xl border transition cursor-pointer flex items-start gap-3 sm:gap-4 ${
+                        isSelected
+                          ? "bg-sky-50/70 border-sky-600 ring-2 ring-sky-600/20"
+                          : "bg-white border-slate-200 hover:border-slate-300"
+                      }`}
                     >
                       <div className="text-xl sm:text-2xl pt-0.5 shrink-0">{method.icon}</div>
                       <div className="flex-1 min-w-0">

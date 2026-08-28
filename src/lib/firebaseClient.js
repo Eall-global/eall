@@ -14,16 +14,26 @@ import {
   where,
   writeBatch,
 } from "firebase/firestore";
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  updateProfile as updateAuthProfile,
+} from "firebase/auth";
 
-// Default Production Firebase Config
+// Production Firebase Configuration
 const DEFAULT_FIREBASE_CONFIG = {
-  apiKey: "AIzaSyBduwVsxZSqKFJh4VQKLkiYPD5I2a6G-9w",
-  authDomain: "e-all-store.firebaseapp.com",
-  projectId: "e-all-store",
-  storageBucket: "e-all-store.firebasestorage.app",
-  messagingSenderId: "148250949115",
-  appId: "1:148250949115:web:cbd3d7a3283f7e4b53075e",
-  measurementId: "G-3T69EZK0V7",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyBduwVsxZSqKFJh4VQKLkiYPD5I2a6G-9w",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "e-all-store.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "e-all-store",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "e-all-store.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "148250949115",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:148250949115:web:cbd3d7a3283f7e4b53075e",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-3T69EZK0V7",
 };
 
 const STORAGE_KEY = "eall_firebase_config";
@@ -51,6 +61,7 @@ export const saveFirebaseConfig = (configObj) => {
 
 let appInstance = null;
 let dbInstance = null;
+let authInstance = null;
 
 export const getFirebaseApp = () => {
   const config = getActiveFirebaseConfig();
@@ -74,6 +85,16 @@ export const getFirebaseDb = () => {
   return null;
 };
 
+export const getFirebaseAuth = () => {
+  if (authInstance) return authInstance;
+  const app = getFirebaseApp();
+  if (app) {
+    authInstance = getAuth(app);
+    return authInstance;
+  }
+  return null;
+};
+
 export const isFirebaseConfigured = () => {
   const cfg = getActiveFirebaseConfig();
   return Boolean(cfg && cfg.apiKey && cfg.projectId);
@@ -92,4 +113,11 @@ export {
   orderBy,
   where,
   writeBatch,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  updateAuthProfile,
 };
