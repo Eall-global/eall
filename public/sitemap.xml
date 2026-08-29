@@ -19,28 +19,28 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://www.eall.ae/brands/apple</loc>
-    <lastmod>2026-08-30</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
-  </url>
-  <url>
-    <loc>https://www.eall.ae/brands/samsung</loc>
-    <lastmod>2026-08-30</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
-  </url>
-  <url>
     <loc>https://www.eall.ae/brands/hmd</loc>
     <lastmod>2026-08-30</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.9</priority>
   </url>
   <url>
     <loc>https://www.eall.ae/brands/nokia</loc>
     <lastmod>2026-08-30</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://www.eall.ae/brands/apple</loc>
+    <lastmod>2026-08-30</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.eall.ae/brands/samsung</loc>
+    <lastmod>2026-08-30</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
   </url>
   <url>
     <loc>https://www.eall.ae/solutions</loc>
@@ -72,56 +72,80 @@
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
-  <!-- Main High-Intent Subcategory Landing Pages -->
+
+  <!-- ⌚ HMD SMARTWATCHES -->
   <url>
-    <loc>https://www.eall.ae/products?category=mobile-devices&amp;subcategory=smartphones</loc>
+    <loc>https://www.eall.ae/products/hmd-watch-x1</loc>
     <lastmod>2026-08-30</lastmod>
     <changefreq>daily</changefreq>
-    <priority>0.85</priority>
+    <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://www.eall.ae/products?category=mobile-devices&amp;subcategory=feature-phones</loc>
+    <loc>https://www.eall.ae/products/hmd-watch-p1</loc>
     <lastmod>2026-08-30</lastmod>
     <changefreq>daily</changefreq>
-    <priority>0.85</priority>
+    <priority>0.9</priority>
   </url>
-  <url>
-    <loc>https://www.eall.ae/products?category=accessories&amp;subcategory=audio</loc>
-    <lastmod>2026-08-30</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.85</priority>
-  </url>
-  <!-- Individual Product Deep Links -->
+
+  <!-- 🎧 HMD DUB AUDIO -->
   <url>
     <loc>https://www.eall.ae/products/hmd-dub-s60</loc>
     <lastmod>2026-08-30</lastmod>
     <changefreq>daily</changefreq>
-    <priority>0.8</priority>
+    <priority>0.9</priority>
   </url>
   <url>
     <loc>https://www.eall.ae/products/hmd-dub-p60</loc>
     <lastmod>2026-08-30</lastmod>
     <changefreq>daily</changefreq>
-    <priority>0.8</priority>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.eall.ae/products/hmd-dub-p70-anc</loc>
+    <lastmod>2026-08-30</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
   </url>
   <url>
     <loc>https://www.eall.ae/products/hmd-dub-x50</loc>
     <lastmod>2026-08-30</lastmod>
     <changefreq>daily</changefreq>
-    <priority>0.8</priority>
+    <priority>0.85</priority>
   </url>
+  <url>
+    <loc>https://www.eall.ae/products/hmd-dub-x50-pro-anc</loc>
+    <lastmod>2026-08-30</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  <!-- 📱 NOKIA & HMD PHONES -->
   <url>
     <loc>https://www.eall.ae/products/nokia-150-music</loc>
     <lastmod>2026-08-30</lastmod>
     <changefreq>daily</changefreq>
-    <priority>0.8</priority>
+    <priority>0.9</priority>
   </url>
   <url>
     <loc>https://www.eall.ae/products/nokia-110-4g</loc>
     <lastmod>2026-08-30</lastmod>
     <changefreq>daily</changefreq>
-    <priority>0.8</priority>
+    <priority>0.9</priority>
   </url>
+  <url>
+    <loc>https://www.eall.ae/products/nokia-2660-flip</loc>
+    <lastmod>2026-08-30</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.eall.ae/products/hmd-pulse-pro</loc>
+    <lastmod>2026-08-30</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  <!-- FLAGSHIPS -->
   <url>
     <loc>https://www.eall.ae/products/iphone-16-pro</loc>
     <lastmod>2026-08-30</lastmod>
