@@ -8,6 +8,7 @@ import ProductInfo from "../../components/products/ProductInfo";
 import ProductFeatures from "../../components/products/ProductFeatures";
 import ProductSpecifications from "../../components/products/ProductSpecifications";
 import RelatedProducts from "../../components/products/RelatedProducts";
+import ProductSEO from "../../components/products/ProductSEO";
 
 import { products as fallbackProducts } from "../../data/products/index";
 import { brands } from "../../data/brandsData";
@@ -42,6 +43,9 @@ const ProductDetailPage = () => {
 
   return (
     <Container>
+      {/* 🚀 GOOGLE SEO & PRODUCT SCHEMA.ORG RICH SNIPPETS */}
+      <ProductSEO product={product} />
+
       <div className="pt-24 sm:pt-28 lg:pt-32 pb-16 space-y-6">
 
         {/* 🧭 TOP BREADCRUMB & BACK NAVIGATION */}

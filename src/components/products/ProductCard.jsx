@@ -1,11 +1,65 @@
 import { Link } from "react-router-dom";
 import { FiHeart } from "react-icons/fi";
 import { MdOutlineAddShoppingCart } from "react-icons/md";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { getColorSwatch } from "../../utils/getColorSwatch";
 import { useWishlist } from "../../context/WishlistContext";
 import { useCart } from "../../context/CartContext";
 import { AedSymbol, AedPrice } from "../common/AedSymbol";
+
+// ⚡ Helper: Sanitize & format verbose raw specifications into compact, elegant micro-pills
+const formatShortSpec = (text) => {
+  if (!text || typeof text !== "string") return "";
+  const clean = text.trim();
+
+  // 1. Clean Display (e.g. '6.7-inch Dynamic AMOLED 2X, 3120 x 1440 (QHD+)...' -> '6.7" AMOLED')
+  const screenMatch = clean.match(/(\d+(\.\d+)?)\s*(?:-inch|inch|")/i);
+  const typeMatch = clean.match(/(Super AMOLED|Dynamic AMOLED|AMOLED|OLED|Retina|IPS|QQVGA|QVGA|HD\+|FHD\+)/i);
+  if (screenMatch) {
+    const size = `${screenMatch[1]}"`;
+    const type = typeMatch ? typeMatch[1].replace(/Super |Dynamic /i, "") : "";
+    return type ? `${size} ${type}` : `${size} Screen`;
+  }
+
+  // 2. Clean Processor / Chipset
+  if (/snapdragon\s*8\s*elite/i.test(clean)) return "Snapdragon 8 Elite";
+  if (/snapdragon\s*8\s*gen\s*\d/i.test(clean)) {
+    const m = clean.match(/snapdragon\s*8\s*gen\s*\d/i);
+    return m ? m[0] : "Snapdragon 8";
+  }
+  if (/exynos\s*\d+/i.test(clean)) {
+    const m = clean.match(/exynos\s*\d+/i);
+    return m ? m[0] : "Exynos";
+  }
+  if (/a18\s*pro/i.test(clean)) return "A18 Pro";
+  if (/a18/i.test(clean)) return "A18";
+  if (/a17\s*pro/i.test(clean)) return "A17 Pro";
+  if (/a16/i.test(clean)) return "A16 Bionic";
+  if (/unisoc\s*t?\d+[a-z]?/i.test(clean)) {
+    const m = clean.match(/unisoc\s*t?\d+[a-z]?/i);
+    return m ? m[0] : "Unisoc";
+  }
+  if (/octa-core/i.test(clean)) return "Octa-Core";
+
+  // 3. Clean Battery (e.g. '5,000mAh, up to 51 hours' -> '5000 mAh')
+  const battMatch = clean.match(/(\d+[\d,]*)\s*mAh/i);
+  if (battMatch) {
+    return `${battMatch[1].replace(",", "")} mAh`;
+  }
+
+  // 4. Clean Storage (e.g. '256GB' / '128GB')
+  const storageMatch = clean.match(/^(\d+)\s*(GB|TB|MB)/i);
+  if (storageMatch) {
+    return `${storageMatch[1]}${storageMatch[2]}`;
+  }
+
+  // 5. Shorten any other generic string to max 14 characters
+  if (clean.length > 14) {
+    return clean.slice(0, 13) + "…";
+  }
+
+  return clean;
+};
 
 const ProductCard = ({ product }) => {
   const { isWishlisted, toggleWishlist } = useWishlist();
@@ -37,11 +91,65 @@ const ProductCard = ({ product }) => {
   const visibleVariants = product.variants?.slice(0, 5) || [];
   const extraCount = (product.variants?.length || 0) - 5;
 
+  // ⚡ Extract concise, formatted micro key features (Max 2 on mobile, up to 3 on desktop)
+  const keyFeatures = useMemo(() => {
+    const rawList = [];
+
+    if (product.specifications) {
+      if (product.specifications.display || product.specifications.screenSize) {
+        rawList.push(formatShortSpec(product.specifications.display || product.specifications.screenSize));
+      }
+      if (product.specifications.processor || product.specifications.chipset) {
+        rawList.push(formatShortSpec(product.specifications.processor || product.specifications.chipset));
+      }
+      if (product.specifications.battery) {
+        rawList.push(formatShortSpec(product.specifications.battery));
+      } else if (product.specifications.storage) {
+        rawList.push(formatShortSpec(product.specifications.storage));
+      }
+    }
+
+    if (rawList.length < 2 && Array.isArray(product.features)) {
+      for (const f of product.features) {
+        const fmt = formatShortSpec(f);
+        if (fmt && !rawList.includes(fmt) && rawList.length < 3) {
+          rawList.push(fmt);
+        }
+      }
+    }
+
+    if (rawList.length < 2 && Array.isArray(product.tags)) {
+      for (const t of product.tags) {
+        if (
+          !["Apple", "Nokia", "HMD", "Samsung", "Mobile Devices", product.brand].includes(t) &&
+          rawList.length < 3
+        ) {
+          const fmt = formatShortSpec(t);
+          if (fmt && !rawList.includes(fmt)) {
+            rawList.push(fmt);
+          }
+        }
+      }
+    }
+
+    if (rawList.length < 2 && Array.isArray(product.connectivityOptions)) {
+      for (const c of product.connectivityOptions) {
+        const fmt = formatShortSpec(c);
+        if (fmt && !rawList.includes(fmt) && rawList.length < 3) {
+          rawList.push(fmt);
+        }
+      }
+    }
+
+    // Filter out empties and limit strictly to top 3 compact items
+    return rawList.filter(Boolean).slice(0, 3);
+  }, [product]);
+
   return (
     <Link to={`/products/${product.slug}`} className="block group h-full text-left">
       <article className="group bg-white rounded-2xl border border-slate-200 hover:border-sky-300 hover:shadow-xl transition-all duration-300 h-full flex flex-col overflow-hidden cursor-pointer relative">
 
-        {/* 📸 PURE WHITE IMAGE CONTAINER WITH STRICT BOUNDS (Uniform scale for all products) */}
+        {/* 📸 PURE WHITE IMAGE CONTAINER WITH STRICT BOUNDS */}
         <div className="relative bg-white h-44 sm:h-52 md:h-56 w-full flex items-center justify-center overflow-hidden">
           <div className="w-full h-full flex items-center justify-center p-3 sm:p-4">
             <img
@@ -101,9 +209,25 @@ const ProductCard = ({ product }) => {
               {product.name}
             </h3>
 
+            {/* ⚡ MICRO KEY SPECS / FEATURES (Strictly Max 2 Pills on Mobile, Never Overlaps) */}
+            {keyFeatures.length > 0 && (
+              <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                {keyFeatures.map((feat, idx) => (
+                  <span
+                    key={idx}
+                    className={`inline-flex items-center text-[9.5px] sm:text-[10px] font-semibold text-slate-600 bg-slate-50 border border-slate-200/80 px-2 py-0.5 rounded-md truncate max-w-27.5 sm:max-w-32 leading-none ${idx >= 2 ? "hidden sm:inline-flex" : ""
+                      }`}
+                    title={feat}
+                  >
+                    {feat}
+                  </span>
+                ))}
+              </div>
+            )}
+
             {/* COLOR SWATCHES (Compact Single Row) */}
             {product.variants?.length > 0 && (
-              <div className="mt-3 flex items-center gap-1.5 flex-wrap">
+              <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
                 {visibleVariants.map((variant) => (
                   <button
                     key={variant.colorSlug || variant.color}

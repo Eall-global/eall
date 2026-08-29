@@ -8,27 +8,25 @@ const RelatedBrands = ({ brands, current }) => {
 
   return (
     <section className="p-6 lg:p-10 bg-white">
-      <Container>
-        <h2 className="text-3xl text-slate-900! font-bold mb-8!">
-          Related Brands
-        </h2>
+      <h2 className="text-lg sm:text-xl text-slate-900 font-bold mb-8">
+        Related Brands
+      </h2>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6">
-          {related.map((brand) => (
-            <Link
-              key={brand.slug}
-              to={`/brands/${brand.slug}`}
-              className="bg-white rounded-2xl p-6 flex items-center justify-center hover:shadow-lg transition"
-            >
-              <img
-                src={brand.logo}
-                alt={brand.name}
-                className="h-12 object-contain"
-              />
-            </Link>
-          ))}
-        </div>
-      </Container>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6">
+        {related.map((brand) => (
+          <Link
+            key={brand.slug}
+            to={`/brands/${brand.slug}`}
+            className="bg-white rounded-2xl p-6 flex items-center justify-center hover:shadow-lg transition"
+          >
+            <img
+              src={brand.logo}
+              alt={brand.name}
+              className="h-12 object-contain"
+            />
+          </Link>
+        ))}
+      </div>
     </section>
   );
 };

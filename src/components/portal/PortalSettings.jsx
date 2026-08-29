@@ -13,6 +13,11 @@ import {
   FiUploadCloud,
   FiServer,
   FiSave,
+  FiGlobe,
+  FiDownload,
+  FiShoppingBag,
+  FiCheck,
+  FiExternalLink,
 } from "react-icons/fi";
 import {
   getActiveFirebaseConfig,
@@ -21,6 +26,10 @@ import {
 } from "../../lib/firebaseClient";
 import { useStaffAuth } from "../../context/StaffAuthContext";
 import { syncCatalogToStock } from "../../services/stockService";
+import {
+  downloadGoogleShoppingFeed,
+  downloadSitemap,
+} from "../../services/googleFeedGenerator";
 
 const PortalSettings = ({ onConfigUpdated }) => {
   const currentConfig = getActiveFirebaseConfig();
@@ -58,33 +67,48 @@ const PortalSettings = ({ onConfigUpdated }) => {
         throw new Error("Staff sync failed: " + staffRes.error);
       }
 
-      // 2. Sync Catalog Products
-      const prodRes = await syncCatalogToStock();
+      // 2. Sync Catalog Products to Stock
+      const stockRes = await syncCatalogToStock();
+      if (!stockRes.success) {
+        throw new Error("Stock catalog sync failed: " + stockRes.error);
+      }
 
       setTestResult({
         success: true,
-        message: `🎉 Success! Google Firebase Firestore populated with ${staffRes.count || members.length} staff accounts and ${prodRes.total} catalog products.`,
+        message: `Success! Synced ${staffRes.count} staff members and ${stockRes.synced} inventory products to Firebase Firestore.`,
       });
 
       if (onConfigUpdated) onConfigUpdated();
     } catch (err) {
       setTestResult({
         success: false,
-        message: err.message || "Failed to sync data to Firebase Firestore.",
+        message: "Cloud Sync Error: " + (err.message || String(err)),
       });
     } finally {
       setSyncingAll(false);
     }
   };
 
+  const handleSaveFirebaseConfig = (e) => {
+    e.preventDefault();
+    saveFirebaseConfig({ projectId, apiKey });
+    setTestResult({
+      success: true,
+      message: "Firebase configuration credentials saved to local browser cache.",
+    });
+    if (onConfigUpdated) onConfigUpdated();
+  };
+
   const handleAddSalesperson = async (e) => {
     e.preventDefault();
-    if (!newSalesName.trim() || !newSalesPin.trim()) return;
-    await addMember({
-      name: newSalesName.trim(),
-      role: "sales",
-      pin: newSalesPin.trim(),
-    });
+    if (!newSalesName || !newSalesPin) return;
+
+    if (newSalesPin.length < 4) {
+      alert("PIN must be at least 4 digits");
+      return;
+    }
+
+    await addMember(newSalesName, newSalesPin, "sales");
     setNewSalesName("");
     setNewSalesPin("");
     setShowAddModal(false);
@@ -93,6 +117,7 @@ const PortalSettings = ({ onConfigUpdated }) => {
   const handleSaveMemberEdit = async (e) => {
     e.preventDefault();
     if (!editingMember) return;
+
     await updateMember(editingMember.id, {
       name: editingMember.name,
       pin: editingMember.pin,
@@ -101,51 +126,219 @@ const PortalSettings = ({ onConfigUpdated }) => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 text-left">
+    <div className="space-y-6 max-w-5xl mx-auto text-left">
       
-      {/* 🚀 GOOGLE FIREBASE CLOUD DATABASE STATUS BANNER */}
-      <div className="bg-gradient-to-r from-slate-900 via-sky-950 to-slate-900 text-white p-5 sm:p-7 rounded-3xl border border-sky-900/50 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-xs mb-2 border border-emerald-500/30">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Google Firebase Cloud Firestore Active</span>
+      {/* 🚀 GOOGLE SHOPPING FEED & SEO CENTER CARD */}
+      <div className="bg-gradient-to-br from-slate-900 via-sky-950 to-slate-900 text-white p-5 sm:p-7 rounded-3xl shadow-md space-y-5 border border-sky-900/50">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="p-2 bg-sky-500/20 text-sky-300 rounded-xl border border-sky-400/30 text-lg">
+                <FiShoppingBag />
+              </span>
+              <div>
+                <h3 className="text-base sm:text-lg font-bold text-white">
+                  Google Shopping &amp; SEO Center
+                </h3>
+                <p className="text-xs text-slate-300">
+                  Manage Google Merchant Center XML feed, Google Search Console sitemap, and rich snippets for <strong>www.eall.ae</strong>.
+                </p>
+              </div>
+            </div>
           </div>
-          <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
-            Live Database Sync (Spark Free Plan - 0 Connection Traps)
-          </h3>
-          <p className="text-xs text-slate-300 mt-1 leading-relaxed max-w-xl">
-            Project: <strong className="text-sky-300 font-mono">e-all-store</strong> • Location: <strong className="text-sky-300 font-mono">europe-west3</strong> • 50k free reads / 20k writes per day with unlimited real-time connections.
-          </p>
+
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full text-xs font-bold self-start sm:self-auto">
+            <FiCheckCircle /> Google Ready
+          </span>
         </div>
 
-        <button
-          type="button"
-          onClick={handleSyncAllToFirebase}
-          disabled={syncingAll}
-          className="shrink-0 whitespace-nowrap inline-flex items-center justify-center gap-2 px-5 py-3 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-slate-950 font-bold rounded-xl shadow-md transition cursor-pointer text-xs sm:text-sm"
-        >
-          <FiUploadCloud className="text-base" />
-          <span>{syncingAll ? "Syncing..." : "Sync All 71 Products to Cloud"}</span>
-        </button>
+        {/* Action Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+          {/* Card 1: Google Merchant Feed */}
+          <div className="p-4 bg-white/5 border border-white/10 rounded-2xl space-y-3 flex flex-col justify-between">
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
+                  <FiShoppingBag /> Google Merchant Center Feed
+                </span>
+                <span className="text-[10px] bg-sky-500/20 text-sky-300 px-2 py-0.5 rounded-full font-bold">
+                  XML RSS 2.0
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Connect this feed to your Google Merchant Center account to display E-ALL products in the <strong>Google Shopping carousel</strong> with photos, AED prices, and stock status.
+              </p>
+            </div>
+
+            <div className="pt-2 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => downloadGoogleShoppingFeed()}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+              >
+                <FiDownload /> Download Feed (XML)
+              </button>
+              <a
+                href="https://merchants.google.com/"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-semibold transition"
+              >
+                <span>Merchant Center</span>
+                <FiExternalLink className="text-xs" />
+              </a>
+            </div>
+          </div>
+
+          {/* Card 2: Google Search Console Sitemap */}
+          <div className="p-4 bg-white/5 border border-white/10 rounded-2xl space-y-3 flex flex-col justify-between">
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                  <FiGlobe /> Sitemap.xml for Googlebot
+                </span>
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
+                  Search Console
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Submit your sitemap to <strong>Google Search Console</strong> so Google rapidly indexes all Apple, Samsung, HMD, and Nokia product pages on <strong>www.eall.ae</strong>.
+              </p>
+            </div>
+
+            <div className="pt-2 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => downloadSitemap()}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+              >
+                <FiDownload /> Download Sitemap.xml
+              </button>
+              <a
+                href="https://search.google.com/search-console"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-semibold transition"
+              >
+                <span>Search Console</span>
+                <FiExternalLink className="text-xs" />
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {/* Live SEO Status Badges */}
+        <div className="p-3.5 bg-white/5 border border-white/10 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-1.5 text-emerald-300 font-semibold">
+            <FiCheck /> Schema.org Product Rich Snippets Active
+          </div>
+          <div className="flex items-center gap-1.5 text-emerald-300 font-semibold">
+            <FiCheck /> UAE Dirham (AED) Currency &amp; 5% VAT Configured
+          </div>
+          <div className="flex items-center gap-1.5 text-emerald-300 font-semibold">
+            <FiCheck /> Robots.txt &amp; Canonical URLs Injected
+          </div>
+        </div>
       </div>
 
-      {/* Test Result Message */}
-      {testResult && (
-        <div
-          className={`p-4 rounded-2xl text-xs font-semibold flex items-start gap-3 border ${
-            testResult.success
-              ? "bg-emerald-50 text-emerald-900 border-emerald-200"
-              : "bg-rose-50 text-rose-900 border-rose-200"
-          }`}
-        >
-          {testResult.success ? (
-            <FiCheckCircle className="text-lg text-emerald-600 shrink-0 mt-0.5" />
-          ) : (
-            <FiAlertCircle className="text-lg text-rose-600 shrink-0 mt-0.5" />
-          )}
-          <p className="leading-relaxed">{testResult.message}</p>
+      {/* ☁️ FIREBASE FIRESTORE SYNC & CREDENTIALS */}
+      <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+          <div>
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <FiServer className="text-sky-700 shrink-0" />
+              <span>Firebase Cloud Database Integration</span>
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Connect your Firebase Firestore project to synchronize stock inventory, sales invoices, customer accounts, and staff credentials in real-time.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <span
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
+                isConnected
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  : "bg-amber-50 text-amber-700 border border-amber-200"
+              }`}
+            >
+              {isConnected ? <FiCheckCircle /> : <FiAlertCircle />}
+              <span>{isConnected ? "Cloud Connected" : "Local Fallback"}</span>
+            </span>
+          </div>
         </div>
-      )}
+
+        {testResult && (
+          <div
+            className={`p-4 rounded-2xl text-xs flex items-start gap-2.5 ${
+              testResult.success
+                ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                : "bg-rose-50 text-rose-800 border border-rose-200"
+            }`}
+          >
+            {testResult.success ? (
+              <FiCheckCircle className="text-base shrink-0 text-emerald-600 mt-0.5" />
+            ) : (
+              <FiAlertCircle className="text-base shrink-0 text-rose-600 mt-0.5" />
+            )}
+            <div>
+              <p className="font-bold">{testResult.success ? "Sync Successful" : "Configuration Issue"}</p>
+              <p className="mt-0.5">{testResult.message}</p>
+            </div>
+          </div>
+        )}
+
+        <form onSubmit={handleSaveFirebaseConfig} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                Firebase Project ID
+              </label>
+              <input
+                type="text"
+                required
+                value={projectId}
+                onChange={(e) => setProjectId(e.target.value)}
+                placeholder="e-all-store"
+                className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-900 focus:bg-white focus:border-sky-600 outline-none transition"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                Web API Key
+              </label>
+              <input
+                type="text"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="AIzaSy..."
+                className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-900 focus:bg-white focus:border-sky-600 outline-none transition"
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 pt-2">
+            <button
+              type="submit"
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer"
+            >
+              <FiSave className="text-sm" />
+              <span>Save Configuration</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSyncAllToFirebase}
+              disabled={syncingAll}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-sky-700 hover:bg-sky-800 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer"
+            >
+              <FiUploadCloud className="text-sm" />
+              <span>{syncingAll ? "Syncing Database..." : "1-Click Full Cloud Sync"}</span>
+            </button>
+          </div>
+        </form>
+      </div>
 
       {/* 👥 STAFF TEAM MANAGEMENT CARD */}
       <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-5">

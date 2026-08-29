@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /portal
+Disallow: /checkout
+Disallow: /admin
+
+Sitemap: https://www.eall.ae/sitemap.xml

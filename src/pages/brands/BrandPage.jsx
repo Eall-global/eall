@@ -229,7 +229,7 @@ const BrandPage = () => {
       {brand.videos?.length > 0 && <BrandVideoGallery videos={brand.videos} />}
 
       <div className="text-left bg-white py-4 px-6 lg:px-10 lg:py-6">
-        <h2 className="text-3xl font-bold text-slate-900!">Explore Products</h2>
+        <h2 className="text-lg sm:text-xl font-bold text-slate-900">Explore Products</h2>
 
         <p className="text-slate-500 mt-2!">
           Browse the complete range of {brand.name} products available through

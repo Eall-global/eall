@@ -474,11 +474,10 @@ const CheckoutPage = () => {
                         <div
                           key={addr.id}
                           onClick={() => setSelectedAddressId(addr.id)}
-                          className={`min-w-[260px] sm:min-w-[280px] max-w-[320px] p-4 rounded-2xl border-2 transition cursor-pointer flex flex-col justify-between shrink-0 snap-start ${
-                            isSelected
+                          className={`min-w-[260px] sm:min-w-[280px] max-w-[320px] p-4 rounded-2xl border-2 transition cursor-pointer flex flex-col justify-between shrink-0 snap-start ${isSelected
                               ? "bg-sky-50/70 border-sky-600 shadow-xs ring-1 ring-sky-500/20"
                               : "bg-white border-slate-200 hover:border-slate-300"
-                          }`}
+                            }`}
                         >
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
@@ -498,9 +497,8 @@ const CheckoutPage = () => {
                                 )}
                               </div>
 
-                              <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                                isSelected ? "border-sky-600 bg-sky-600 text-white" : "border-slate-300 bg-white"
-                              }`}>
+                              <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${isSelected ? "border-sky-600 bg-sky-600 text-white" : "border-slate-300 bg-white"
+                                }`}>
                                 {isSelected && <FiCheck className="text-[10px]" />}
                               </div>
                             </div>
@@ -597,11 +595,10 @@ const CheckoutPage = () => {
                             key={lbl}
                             type="button"
                             onClick={() => setAddressFormData({ ...addressFormData, label: lbl })}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                              addressFormData.label === lbl
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${addressFormData.label === lbl
                                 ? "bg-slate-900 text-white"
                                 : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
-                            }`}
+                              }`}
                           >
                             {lbl}
                           </button>
@@ -733,11 +730,10 @@ const CheckoutPage = () => {
                 {isApple && (
                   <div
                     onClick={() => setSelectedPayment("apple_pay")}
-                    className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-3 ${
-                      selectedPayment === "apple_pay"
+                    className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-3 ${selectedPayment === "apple_pay"
                         ? "bg-sky-50/80 border-sky-600 shadow-2xs ring-1 ring-sky-600/20"
                         : "bg-white border-slate-200/90 hover:border-slate-300"
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-3">
                       <div className="px-2.5 py-1 rounded-lg bg-black text-white font-black text-xs flex items-center gap-1">
@@ -746,9 +742,8 @@ const CheckoutPage = () => {
                       <span className="font-bold text-slate-900 text-xs sm:text-sm">Apple Pay</span>
                     </div>
 
-                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                      selectedPayment === "apple_pay" ? "border-sky-600 bg-sky-600 text-white" : "border-slate-300 bg-white"
-                    }`}>
+                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedPayment === "apple_pay" ? "border-sky-600 bg-sky-600 text-white" : "border-slate-300 bg-white"
+                      }`}>
                       {selectedPayment === "apple_pay" && <FiCheck className="text-[10px]" />}
                     </div>
                   </div>
@@ -757,11 +752,10 @@ const CheckoutPage = () => {
                 {/* 💳 2. DEBIT / CREDIT CARD */}
                 <div
                   onClick={() => setSelectedPayment("card")}
-                  className={`p-3.5 rounded-2xl border transition cursor-pointer flex flex-col gap-2.5 ${
-                    selectedPayment === "card"
+                  className={`p-3.5 rounded-2xl border transition cursor-pointer flex flex-col gap-2.5 ${selectedPayment === "card"
                       ? "bg-sky-50/80 border-sky-600 shadow-2xs ring-1 ring-sky-600/20"
                       : "bg-white border-slate-200/90 hover:border-slate-300"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -774,9 +768,8 @@ const CheckoutPage = () => {
 
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] font-bold text-sky-700 hover:underline">+ Add New</span>
-                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                        selectedPayment === "card" ? "border-sky-600 bg-sky-600 text-white" : "border-slate-300 bg-white"
-                      }`}>
+                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedPayment === "card" ? "border-sky-600 bg-sky-600 text-white" : "border-slate-300 bg-white"
+                        }`}>
                         {selectedPayment === "card" && <FiCheck className="text-[10px]" />}
                       </div>
                     </div>
@@ -815,11 +808,10 @@ const CheckoutPage = () => {
                 {/* 🌊 3. WAVE MONEY TRANSFER (AFRICAN MARKETS) */}
                 <div
                   onClick={() => setSelectedPayment("wave")}
-                  className={`p-3.5 rounded-2xl border transition cursor-pointer flex flex-col gap-2.5 ${
-                    selectedPayment === "wave"
+                  className={`p-3.5 rounded-2xl border transition cursor-pointer flex flex-col gap-2.5 ${selectedPayment === "wave"
                       ? "bg-sky-50/80 border-sky-600 shadow-2xs ring-1 ring-sky-600/20"
                       : "bg-white border-slate-200/90 hover:border-slate-300"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -837,15 +829,14 @@ const CheckoutPage = () => {
                       </div>
                     </div>
 
-                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
-                      selectedPayment === "wave" ? "border-sky-600 bg-sky-600 text-white" : "border-slate-300 bg-white"
-                    }`}>
+                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${selectedPayment === "wave" ? "border-sky-600 bg-sky-600 text-white" : "border-slate-300 bg-white"
+                      }`}>
                       {selectedPayment === "wave" && <FiCheck className="text-[10px]" />}
                     </div>
                   </div>
 
                   {selectedPayment === "wave" && (
-                    <div className="pt-2 border-t border-sky-200/60 p-3 bg-gradient-to-br from-sky-950 to-slate-900 text-white rounded-xl space-y-2.5">
+                    <div className="pt-2 border-t border-sky-200/60 p-3 bg-linear-to-br from-sky-950 to-slate-900 text-white rounded-xl space-y-2.5">
                       <div className="flex items-center justify-between text-xs">
                         <div>
                           <span className="text-[9.5px] text-sky-200 uppercase font-bold block">Merchant Wave Phone</span>
@@ -879,11 +870,10 @@ const CheckoutPage = () => {
                 {/* 💳 4. TABBY (PAY IN 4) */}
                 <div
                   onClick={() => setSelectedPayment("tabby")}
-                  className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-3 ${
-                    selectedPayment === "tabby"
+                  className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-3 ${selectedPayment === "tabby"
                       ? "bg-sky-50/80 border-sky-600 shadow-2xs ring-1 ring-sky-600/20"
                       : "bg-white border-slate-200/90 hover:border-slate-300"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center gap-3">
                     <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 font-black text-[10.5px]">
@@ -897,9 +887,8 @@ const CheckoutPage = () => {
                     </div>
                   </div>
 
-                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                    selectedPayment === "tabby" ? "border-sky-600 bg-sky-600 text-white" : "border-slate-300 bg-white"
-                  }`}>
+                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedPayment === "tabby" ? "border-sky-600 bg-sky-600 text-white" : "border-slate-300 bg-white"
+                    }`}>
                     {selectedPayment === "tabby" && <FiCheck className="text-[10px]" />}
                   </div>
                 </div>
@@ -907,11 +896,10 @@ const CheckoutPage = () => {
                 {/* 💳 5. TAMARA (PAY IN 6) */}
                 <div
                   onClick={() => setSelectedPayment("tamara")}
-                  className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-3 ${
-                    selectedPayment === "tamara"
+                  className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-3 ${selectedPayment === "tamara"
                       ? "bg-sky-50/80 border-sky-600 shadow-2xs ring-1 ring-sky-600/20"
                       : "bg-white border-slate-200/90 hover:border-slate-300"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center gap-3">
                     <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-900 font-black text-[10.5px]">
@@ -925,9 +913,8 @@ const CheckoutPage = () => {
                     </div>
                   </div>
 
-                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                    selectedPayment === "tamara" ? "border-sky-600 bg-sky-600 text-white" : "border-slate-300 bg-white"
-                  }`}>
+                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedPayment === "tamara" ? "border-sky-600 bg-sky-600 text-white" : "border-slate-300 bg-white"
+                    }`}>
                     {selectedPayment === "tamara" && <FiCheck className="text-[10px]" />}
                   </div>
                 </div>
@@ -935,11 +922,10 @@ const CheckoutPage = () => {
                 {/* 💵 6. CASH ON DELIVERY */}
                 <div
                   onClick={() => setSelectedPayment("cod")}
-                  className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-3 ${
-                    selectedPayment === "cod"
+                  className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-3 ${selectedPayment === "cod"
                       ? "bg-sky-50/80 border-sky-600 shadow-2xs ring-1 ring-sky-600/20"
                       : "bg-white border-slate-200/90 hover:border-slate-300"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center gap-3">
                     <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-mono font-bold text-[10.5px]">
@@ -951,9 +937,8 @@ const CheckoutPage = () => {
                     </div>
                   </div>
 
-                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                    selectedPayment === "cod" ? "border-sky-600 bg-sky-600 text-white" : "border-slate-300 bg-white"
-                  }`}>
+                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedPayment === "cod" ? "border-sky-600 bg-sky-600 text-white" : "border-slate-300 bg-white"
+                    }`}>
                     {selectedPayment === "cod" && <FiCheck className="text-[10px]" />}
                   </div>
                 </div>
@@ -961,11 +946,10 @@ const CheckoutPage = () => {
                 {/* 🏦 7. DIRECT WIRE / BANK TRANSFER */}
                 <div
                   onClick={() => setSelectedPayment("wire")}
-                  className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-3 ${
-                    selectedPayment === "wire"
+                  className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-3 ${selectedPayment === "wire"
                       ? "bg-sky-50/80 border-sky-600 shadow-2xs ring-1 ring-sky-600/20"
                       : "bg-white border-slate-200/90 hover:border-slate-300"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center gap-3">
                     <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-mono font-bold text-[10.5px]">
@@ -977,9 +961,8 @@ const CheckoutPage = () => {
                     </div>
                   </div>
 
-                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                    selectedPayment === "wire" ? "border-sky-600 bg-sky-600 text-white" : "border-slate-300 bg-white"
-                  }`}>
+                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedPayment === "wire" ? "border-sky-600 bg-sky-600 text-white" : "border-slate-300 bg-white"
+                    }`}>
                     {selectedPayment === "wire" && <FiCheck className="text-[10px]" />}
                   </div>
                 </div>
@@ -1031,13 +1014,12 @@ const CheckoutPage = () => {
 
               {/* Coupon Validation Feedback Banner */}
               {couponMessage.text && (
-                <div className={`p-2.5 rounded-xl font-medium text-xs flex items-center gap-2 ${
-                  couponMessage.type === "success"
+                <div className={`p-2.5 rounded-xl font-medium text-xs flex items-center gap-2 ${couponMessage.type === "success"
                     ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
                     : couponMessage.type === "error"
-                    ? "bg-rose-50 text-rose-800 border border-rose-200"
-                    : "bg-sky-50 text-sky-800 border border-sky-200"
-                }`}>
+                      ? "bg-rose-50 text-rose-800 border border-rose-200"
+                      : "bg-sky-50 text-sky-800 border border-sky-200"
+                  }`}>
                   {couponMessage.type === "success" ? <FiCheckCircle className="shrink-0 text-emerald-600" /> : <FiTag className="shrink-0" />}
                   <span>{couponMessage.text}</span>
                 </div>
@@ -1080,11 +1062,10 @@ const CheckoutPage = () => {
                           <button
                             type="button"
                             onClick={() => (isThisApplied ? handleRemoveCoupon() : handleApplyCoupon(c.code))}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${
-                              isThisApplied
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${isThisApplied
                                 ? "bg-rose-50 text-rose-700"
                                 : "bg-sky-700 text-white hover:bg-sky-800"
-                            }`}
+                              }`}
                           >
                             {isThisApplied ? "Remove" : "Apply"}
                           </button>

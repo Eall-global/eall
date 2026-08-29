@@ -1,4 +1,5 @@
 import { HiOutlineArrowRight } from "react-icons/hi";
+import { FiBriefcase } from "react-icons/fi";
 import Button from "../common/Button";
 
 const QuoteButton = ({ onClick }) => {
@@ -7,9 +8,11 @@ const QuoteButton = ({ onClick }) => {
       onClick={onClick}
       variant="primary"
       size="sm"
-      iconRight={<HiOutlineArrowRight />}
+      iconLeft={<FiBriefcase className="text-sm" />}
+      iconRight={<HiOutlineArrowRight className="text-xs" />}
+      className="text-xs font-bold tracking-tight rounded-xl shadow-xs"
     >
-      Get a Quote
+      B2B Wholesale
     </Button>
   );
 };

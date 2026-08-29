@@ -10,7 +10,7 @@ const FeaturedProducts = ({ products }) => {
             Featured Collection
           </p>
 
-          <h2 className="text-lg lg:text-xl! font-bold text-slate-900! mt-2!">
+          <h2 className="text-lg lg:text-xl font-bold text-slate-900 mt-2">
             Top Products
           </h2>
         </div>

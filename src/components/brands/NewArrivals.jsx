@@ -4,7 +4,7 @@ import ProductCard from "../products/ProductCard";
 const NewArrivals = ({ products }) => {
   return (
     <section className="p-6 lg:p-10 bg-white">
-      <h2 className="text-3xl text-slate-900! text-left font-bold mb-6!">
+      <h2 className="text-lg sm:text-xl text-slate-900 text-left font-bold mb-6">
         New Arrivals
       </h2>
 

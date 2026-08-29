@@ -7,7 +7,7 @@ const RecentlyViewedProducts = ({ products }) => {
   return (
     <section className="py-16">
       <Container>
-        <h2 className="text-3xl font-bold mb-8">Recently Viewed</h2>
+        <h2 className="text-lg sm:text-xl font-bold mb-8">Recently Viewed</h2>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
           {products.map((product) => (

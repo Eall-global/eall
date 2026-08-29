@@ -10,6 +10,7 @@ import { brands } from "../../data/brandsData";
 import { useSearchParams } from "react-router-dom";
 import ProductToolbar from "../../components/products/toolbar/ProductToolbar";
 import { useCatalog } from "../../context/CatalogContext";
+import { slugify } from "../../utils/slugify";
 
 const shuffleArray = (array) => {
   const shuffled = [...array];
@@ -63,7 +64,11 @@ const AllProductsPage = () => {
   }, [brand, availability, search, sort, selectedFamily]);
 
   const activeCategory = useMemo(() => {
-    return categories.find((item) => item.slug === category);
+    if (category === "All") return null;
+    const catSlug = slugify(category);
+    return categories.find(
+      (item) => slugify(item.slug) === catSlug || slugify(item.name) === catSlug
+    );
   }, [category]);
 
   const activeSubCategory = useMemo(() => {
@@ -71,8 +76,9 @@ const AllProductsPage = () => {
       return null;
     }
 
+    const subSlug = slugify(urlSubCategory);
     return activeCategory.subCategories.find(
-      (item) => item.slug === urlSubCategory,
+      (item) => slugify(item.slug) === subSlug || slugify(item.name) === subSlug
     );
   }, [activeCategory, urlSubCategory]);
 
@@ -80,40 +86,58 @@ const AllProductsPage = () => {
 
   const filteredProducts = useMemo(() => {
     let result = products.filter((product) => {
-      // CATEGORY FILTER
-      if (category !== "All" && product.category !== category) {
-        return false;
+      // 1. CATEGORY FILTER (Normalized with slugify)
+      if (category !== "All") {
+        const catSlug = slugify(category);
+        const prodCat = slugify(product.category);
+        const prodCatName = slugify(product.categoryName);
+        if (prodCat !== catSlug && prodCatName !== catSlug) {
+          return false;
+        }
       }
 
-      // SUB CATEGORY FILTER
-      if (
-        urlSubCategory !== "All" &&
-        product.subCategory?.toLowerCase() !== urlSubCategory.toLowerCase()
-      ) {
-        return false;
+      // 2. SUB CATEGORY FILTER (Normalized with slugify e.g. "feature-phones" === "Feature Phones")
+      if (urlSubCategory !== "All") {
+        const subSlug = slugify(urlSubCategory);
+        const prodSub = slugify(product.subCategory);
+        const prodSubName = slugify(product.subCategoryName);
+        if (prodSub !== subSlug && prodSubName !== subSlug) {
+          return false;
+        }
       }
 
-      // FAMILY FILTER
-      if (selectedFamily !== "All" && product.family !== selectedFamily) {
-        return false;
+      // 3. FAMILY FILTER (Normalized with slugify)
+      if (selectedFamily !== "All") {
+        const famSlug = slugify(selectedFamily);
+        const prodFam = slugify(product.family);
+        const prodFamName = slugify(product.familyName);
+        if (prodFam !== famSlug && prodFamName !== famSlug) {
+          return false;
+        }
       }
 
-      // BRAND FILTER
-      if (brand !== "All" && product.brandSlug !== brand) {
-        return false;
+      // 4. BRAND FILTER
+      if (brand !== "All") {
+        const brandTarget = slugify(brand);
+        const prodBrand = slugify(product.brandSlug || product.brand);
+        if (prodBrand !== brandTarget) {
+          return false;
+        }
       }
 
-      // AVAILABILITY
+      // 5. AVAILABILITY FILTER
       if (availability !== "All" && product.availability !== availability) {
         return false;
       }
 
-      // SEARCH
+      // 6. SEARCH QUERY
       if (search) {
         const q = search.toLowerCase();
         const matchesName = product.name?.toLowerCase().includes(q);
         const matchesBrand = product.brand?.toLowerCase().includes(q);
-        const matchesCategory = product.categoryName?.toLowerCase().includes(q) || product.category?.toLowerCase().includes(q);
+        const matchesCategory =
+          product.categoryName?.toLowerCase().includes(q) ||
+          product.category?.toLowerCase().includes(q);
         const matchesSubCategory = product.subCategory?.toLowerCase().includes(q);
         const matchesTag = product.tags?.some((t) => t.toLowerCase().includes(q));
 
@@ -135,11 +159,11 @@ const AllProductsPage = () => {
         break;
 
       case "price-low":
-        result.sort((a, b) => a.price - b.price);
+        result.sort((a, b) => (a.price || 0) - (b.price || 0));
         break;
 
       case "price-high":
-        result.sort((a, b) => b.price - a.price);
+        result.sort((a, b) => (b.price || 0) - (a.price || 0));
         break;
 
       default:
@@ -158,85 +182,85 @@ const AllProductsPage = () => {
     products,
   ]);
 
-  // Compute pagination
+  // Derived pagination calculations
   const totalProducts = filteredProducts.length;
-  const totalPages = Math.ceil(totalProducts / pageSize) || 1;
+  const totalPages = Math.ceil(totalProducts / pageSize);
+  const paginatedProducts = filteredProducts.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  );
 
-  const paginatedProducts = useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize;
-    return filteredProducts.slice(startIndex, startIndex + pageSize);
-  }, [filteredProducts, currentPage, pageSize]);
-
-  const handlePageChange = (newPage) => {
-    if (newPage < 1 || newPage > totalPages) return;
-    setCurrentPage(newPage);
-
-    // Smooth auto-scroll back up to catalog header/toolbar
-    if (catalogTopRef.current) {
-      const yOffset = -90; // account for sticky header height
-      const y = catalogTopRef.current.getBoundingClientRect().top + window.pageYOffset + yOffset;
-      window.scrollTo({ top: y, behavior: "smooth" });
-    }
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    catalogTopRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
   };
 
   return (
-    <div ref={catalogTopRef} className="bg-white lg:pt-32 pt-24 min-h-screen flex flex-col justify-between">
-      <div>
-        {/* Filter Toolbar */}
-        <ProductToolbar
-          search={search}
-          onSearch={setSearch}
-          brand={brand}
-          onBrandChange={setBrand}
-          brands={brands}
-          availability={availability}
-          onAvailabilityChange={setAvailability}
-          sort={sort}
-          onSort={setSort}
+    <div className="bg-white min-h-screen pt-24 sm:pt-28 lg:pt-32 pb-16">
+      {/* Scroll-anchor for smooth pagination jumping */}
+      <div ref={catalogTopRef} className="scroll-mt-24" />
+
+      {/* FILTER TOOLBAR */}
+      <ProductToolbar
+        brand={brand}
+        setBrand={setBrand}
+        availability={availability}
+        setAvailability={setAvailability}
+        search={search}
+        setSearch={setSearch}
+        sort={sort}
+        setSort={setSort}
+        brands={brands}
+      />
+
+      {/* SUB-CATEGORY FAMILY PILLS */}
+      {showFamilies && activeSubCategory.families && (
+        <ProductSubCategories
+          subCategories={activeSubCategory.families}
+          selected={selectedFamily}
+          onChange={setSelectedFamily}
         />
+      )}
 
-        {showFamilies && (
-          <ProductSubCategories
-            subCategories={activeSubCategory.families}
-            selected={selectedFamily}
-            onChange={setSelectedFamily}
-          />
-        )}
+      {/* PRODUCT COUNT STRIP */}
+      <div className="mx-auto w-full px-6 sm:px-8 lg:px-12 py-3 text-xs sm:text-sm text-slate-500 font-medium border-b border-slate-100 flex items-center justify-between text-left">
+        <span>
+          Showing{" "}
+          <strong className="text-slate-900 font-bold">
+            {totalProducts === 0 ? 0 : (currentPage - 1) * pageSize + 1}–
+            {Math.min(currentPage * pageSize, totalProducts)}
+          </strong>{" "}
+          of <strong className="text-slate-900 font-bold">{totalProducts}</strong> products
+        </span>
 
-        {/* Count Indicator */}
-        <div className="py-3 px-6 md:px-10 text-xs sm:text-sm text-slate-500 bg-white border-b border-slate-100 flex items-center justify-between">
-          <div>
-            Showing <span className="font-bold text-sky-700">{paginatedProducts.length}</span> of{" "}
-            <span className="font-bold text-slate-900">{totalProducts}</span> products
-            {totalPages > 1 && (
-              <span className="text-xs text-slate-400 ml-2">
-                (Page {currentPage} of {totalPages})
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Products Grid */}
-        {filteredProducts.length > 0 ? (
-          <ProductGrid
-            key={`${category}-${urlSubCategory}-${selectedFamily}-${currentPage}`}
-            products={paginatedProducts}
-            showBreaker={true}
-          />
-        ) : (
-          <ProductEmptyState />
+        {selectedFamily !== "All" && (
+          <span className="text-xs text-sky-700 bg-sky-50 px-2.5 py-0.5 rounded-full font-semibold">
+            Filtered by Family: {selectedFamily}
+          </span>
         )}
       </div>
 
-      {/* Pagination Controls with Auto-scroll */}
-      {filteredProducts.length > 0 && totalPages > 1 && (
-        <ProductPagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          totalProducts={totalProducts}
-          pageSize={pageSize}
-          onPageChange={handlePageChange}
-        />
+      {/* PRODUCT GRID */}
+      {totalProducts > 0 ? (
+        <>
+          <ProductGrid
+            products={paginatedProducts}
+            key={`${category}-${urlSubCategory}-${selectedFamily}-${currentPage}`}
+          />
+
+          <ProductPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalProducts={totalProducts}
+            pageSize={pageSize}
+            onPageChange={handlePageChange}
+          />
+        </>
+      ) : (
+        <ProductEmptyState />
       )}
     </div>
   );

@@ -1,16 +1,17 @@
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 
 const ProductPagination = ({
-  currentPage,
-  totalPages,
-  totalProducts,
+  currentPage = 1,
+  totalPages = 1,
+  totalProducts = 0,
   pageSize = 16,
   onPageChange,
 }) => {
   if (totalPages <= 1) return null;
 
-  const startIdx = (currentPage - 1) * pageSize + 1;
-  const endIdx = Math.min(currentPage * pageSize, totalProducts);
+  const validTotal = Number(totalProducts) || 0;
+  const startIdx = validTotal > 0 ? (currentPage - 1) * pageSize + 1 : 0;
+  const endIdx = validTotal > 0 ? Math.min(currentPage * pageSize, validTotal) : 0;
 
   // Generate page numbers to show (e.g. [1, 2, 3, 4, 5])
   const getPageNumbers = () => {
@@ -42,7 +43,7 @@ const ProductPagination = ({
       {/* Products Counter Range */}
       <div className="text-xs text-slate-500 font-medium order-2 sm:order-1">
         Showing <span className="font-bold text-slate-900">{startIdx}–{endIdx}</span> of{" "}
-        <span className="font-bold text-sky-800">{totalProducts}</span> products
+        <span className="font-bold text-sky-800">{validTotal}</span> products
       </div>
 
       {/* Pagination Stepper */}
