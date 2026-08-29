@@ -1,5 +1,4 @@
 import React from "react";
-import Container from "../common/Container";
 import { FaArrowRight } from "react-icons/fa";
 import { FiPhone } from "react-icons/fi";
 import { MdOutlineEmail } from "react-icons/md";
@@ -7,60 +6,65 @@ import { BsWhatsapp } from "react-icons/bs";
 
 const ContactLinks = () => {
   return (
-    <section className=" py-20">
-      <div className="mx-auto text-left">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <section className="py-8 sm:py-12 w-full">
+      <div className="w-full text-left">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           <a
-            href="https://wa.me/+971526073267?text=Hi%20E-ALL%2C%20I%20would%20like%20to%20request%20a%20quote."
+            href="https://wa.me/971561110147?text=Hi%20E-ALL%20Team%2C%20I%20would%20like%20to%20request%20a%20wholesale%20quotation."
             target="_blank"
             rel="noopener noreferrer"
-            style={{ opacity: 1, transform: "none" }}
-            className="group relative p-8 rounded-2xl transition-all duration-500 bg-[#25D366]/5 border-2 border-[#25D366]/20 hover:border-[#25D366]/40 hover:shadow-xl hover:shadow-green-500/10"
+            className="group p-6 sm:p-7 rounded-3xl transition-all duration-300 bg-[#25D366]/5 border border-[#25D366]/20 hover:border-[#25D366]/50 hover:shadow-lg hover:shadow-green-500/10 flex flex-col justify-between"
           >
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-5 bg-[#25D366]/10 text-[#25D366]">
-              <BsWhatsapp />
+            <div>
+              <div className="w-11 h-11 rounded-2xl flex items-center justify-center mb-4 bg-[#25D366]/10 text-[#25D366] text-xl">
+                <BsWhatsapp />
+              </div>
+              <h3 className="text-base sm:text-lg font-bold text-slate-900">Direct WhatsApp</h3>
+              <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">
+                Fastest response — direct line to our Dubai wholesale sales team.
+              </p>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900">WhatsApp</h3>
-            <p className="mt-2 text-sm leading-relaxed text-gray-500">
-              Fastest response — direct line to our sales team.
-            </p>
-            <div className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-[#25D366]">
-              Start Chat
-              <FaArrowRight />
+            <div className="mt-4 inline-flex items-center gap-2 text-xs font-bold text-[#25D366] group-hover:translate-x-1 transition-transform">
+              <span>Start WhatsApp Chat</span>
+              <FaArrowRight className="text-[10px]" />
             </div>
           </a>
+
           <a
-            href="mailto:sales@e-all.com"
-            className="group relative p-8 rounded-2xl transition-all duration-500 bg-sky-700/10 border-2 border-sky-700/20 hover:border-sky-700/40 hover:shadow-xl hover:shadow-black/5"
-            style={{ opacity: 1, transform: "none" }}
+            href="mailto:info@eall.ae"
+            className="group p-6 sm:p-7 rounded-3xl transition-all duration-300 bg-sky-50/70 border border-sky-200/80 hover:border-sky-400 hover:shadow-lg hover:shadow-sky-500/10 flex flex-col justify-between"
           >
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-5 bg-[#0047D5]/10 text-sky-700">
-              <MdOutlineEmail />
+            <div>
+              <div className="w-11 h-11 rounded-2xl flex items-center justify-center mb-4 bg-sky-100 text-sky-700 text-xl">
+                <MdOutlineEmail />
+              </div>
+              <h3 className="text-base sm:text-lg font-bold text-slate-900">Official Email</h3>
+              <p className="mt-1.5 text-xs text-slate-500 leading-relaxed font-mono">
+                info@eall.ae • RFQs &amp; formal tenders.
+              </p>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900">Email</h3>
-            <p className="mt-2 text-sm leading-relaxed text-gray-500">
-              Send detailed enquiries and RFQs to our team.
-            </p>
-            <div className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-sky-700">
-              Send Email
-              <FaArrowRight />
+            <div className="mt-4 inline-flex items-center gap-2 text-xs font-bold text-sky-700 group-hover:translate-x-1 transition-transform">
+              <span>Send Inquiries</span>
+              <FaArrowRight className="text-[10px]" />
             </div>
           </a>
+
           <a
             href="tel:+971561110147"
-            className="group relative p-8 rounded-2xl transition-all duration-500 bg-white border-2 border-gray-200 hover:border-gray-300 hover:shadow-xl hover:shadow-black/5"
-            style={{ opacity: 1, transform: "none" }}
+            className="group p-6 sm:p-7 rounded-3xl transition-all duration-300 bg-white border border-slate-200 hover:border-slate-300 hover:shadow-lg hover:shadow-black/5 flex flex-col justify-between"
           >
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-5 bg-[#0047D5]/10 text-sky-700">
-              <FiPhone />
+            <div>
+              <div className="w-11 h-11 rounded-2xl flex items-center justify-center mb-4 bg-slate-100 text-slate-700 text-xl">
+                <FiPhone />
+              </div>
+              <h3 className="text-base sm:text-lg font-bold text-slate-900">Direct Phone</h3>
+              <p className="mt-1.5 text-xs text-slate-500 leading-relaxed font-mono">
+                +971 56 111 0147 • Speak directly with an account manager.
+              </p>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900">Phone</h3>
-            <p className="mt-2 text-sm leading-relaxed text-gray-500">
-              Speak directly with an account manager.
-            </p>
-            <div className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-sky-700">
-              Call Now
-              <FaArrowRight />
+            <div className="mt-4 inline-flex items-center gap-2 text-xs font-bold text-slate-800 group-hover:translate-x-1 transition-transform">
+              <span>Call Sales Desk</span>
+              <FaArrowRight className="text-[10px]" />
             </div>
           </a>
         </div>

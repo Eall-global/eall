@@ -13,6 +13,7 @@ import {
 } from "react-icons/fi";
 import { useCart } from "../../context/CartContext";
 import { useCustomerAuth } from "../../context/CustomerAuthContext";
+import { AedSymbol, AedPrice } from "../../components/common/AedSymbol";
 
 const CartPage = () => {
   const {
@@ -110,8 +111,11 @@ const CartPage = () => {
                         You unlocked FREE Delivery across Africa &amp; UAE!
                       </p>
                     ) : (
-                      <p className="text-slate-700 font-medium text-xs">
-                        Add <strong className="font-mono text-sky-800">د.إ {amountToFreeShipping.toFixed(2)}</strong> for <strong className="text-emerald-700 font-bold">FREE Delivery</strong>
+                      <p className="text-slate-700 font-medium text-xs flex items-center gap-1 flex-wrap">
+                        <span>Add</span>
+                        <AedPrice amount={amountToFreeShipping} className="font-mono text-sky-800 font-bold" />
+                        <span>for</span>
+                        <strong className="text-emerald-700 font-bold">FREE Delivery</strong>
                       </p>
                     )}
                   </div>
@@ -145,9 +149,12 @@ const CartPage = () => {
                               {[item.color, item.storage].filter(Boolean).join(" | ")}
                             </p>
                           ) : null}
-                          <p className="text-xs font-mono font-semibold text-slate-700 mt-0.5">
-                            د.إ {item.price.toFixed(2)} ea
-                          </p>
+                          <div className="mt-0.5">
+                            <span className="text-xs font-mono font-semibold text-slate-700 inline-flex items-center gap-1">
+                              <AedPrice amount={item.price} className="font-semibold text-slate-700" />
+                              <span className="text-slate-400">ea</span>
+                            </span>
+                          </div>
                         </div>
                       </div>
 
@@ -175,9 +182,12 @@ const CartPage = () => {
                         </div>
 
                         {/* Subtotal */}
-                        <span className="font-mono font-bold text-xs sm:text-sm text-slate-900 min-w-17.5 text-right">
-                          د.إ {(item.price * item.quantity).toFixed(2)}
-                        </span>
+                        <div className="min-w-17.5 text-right">
+                          <AedPrice
+                            amount={item.price * item.quantity}
+                            className="font-bold text-xs sm:text-sm text-slate-900 justify-end"
+                          />
+                        </div>
 
                         {/* Remove */}
                         <button
@@ -204,31 +214,29 @@ const CartPage = () => {
                 </h2>
 
                 <div className="space-y-2 text-xs text-slate-600">
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center">
                     <span>Subtotal</span>
-                    <span className="font-mono font-bold text-slate-900">
-                      د.إ {cartSubtotal.toFixed(2)}
-                    </span>
+                    <AedPrice amount={cartSubtotal} className="font-bold text-slate-900" />
                   </div>
 
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center">
                     <span>Delivery</span>
-                    <span className="font-mono font-bold text-slate-900">
-                      {shippingFee === 0 ? (
-                        <span className="text-emerald-700 font-extrabold text-[10px] uppercase">FREE</span>
-                      ) : (
-                        `د.إ ${shippingFee.toFixed(2)}`
-                      )}
-                    </span>
+                    {shippingFee === 0 ? (
+                      <span className="text-emerald-700 font-extrabold text-[10px] uppercase">FREE</span>
+                    ) : (
+                      <AedPrice amount={shippingFee} className="font-bold text-slate-900" />
+                    )}
                   </div>
 
                   <div className="pt-2.5 border-t border-slate-200 flex justify-between items-baseline">
                     <span className="font-bold text-slate-900 text-xs sm:text-sm">Total</span>
                     <div className="text-right">
-                      <span className="font-mono font-black text-lg sm:text-xl text-sky-800">
-                        د.إ {cartTotal.toFixed(2)}
-                      </span>
-                      <span className="text-[10px] font-mono text-slate-400 block">
+                      <AedPrice
+                        amount={cartTotal}
+                        className="font-black text-lg sm:text-xl text-sky-800 justify-end"
+                        symbolClassName="text-sky-700"
+                      />
+                      <span className="text-[10px] font-mono text-slate-400 block mt-0.5">
                         ≈ USD {(cartTotal / 3.6725).toFixed(2)}
                       </span>
                     </div>
