@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
+  <channel>
+    <title>E-ALL UAE - Official Google Shopping Feed</title>
+    <link>https://www.eall.ae</link>
+    <description>E-ALL official Google Merchant Center Product Feed for Genuine Electronics, Smartphones, Feature Phones, and Accessories in UAE</description>
+    
+    <!-- HMD DUB S60 -->
+    <item>
+      <g:id>HMD-DUB-S60</g:id>
+      <g:title>HMD DUB S60 True Wireless Earbuds</g:title>
+      <g:description>Genuine HMD DUB S60 True Wireless Earbuds with ENC noise reduction, long battery life, and crystal clear acoustics. Available at E-ALL UAE with official warranty.</g:description>
+      <g:link>https://www.eall.ae/products/hmd-dub-s60</g:link>
+      <g:image_link>https://www.eall.ae/products/hmd_accessories/hmd_dub_s60/main.png</g:image_link>
+      <g:condition>new</g:condition>
+      <g:availability>in_stock</g:availability>
+      <g:price>129.00 AED</g:price>
+      <g:brand>HMD</g:brand>
+      <g:google_product_category>Electronics &gt; Audio &gt; Audio Components &gt; Headphones &amp; Headsets</g:google_product_category>
+      <g:mpn>HMD-DUB-S60</g:mpn>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:shipping>
+        <g:country>AE</g:country>
+        <g:service>Standard Courier</g:service>
+        <g:price>0.00 AED</g:price>
+      </g:shipping>
+    </item>
+
+    <!-- HMD DUB P60 -->
+    <item>
+      <g:id>HMD-DUB-P60</g:id>
+      <g:title>HMD DUB P60 True Wireless Earbuds</g:title>
+      <g:description>Genuine HMD DUB P60 True Wireless Earbuds with deep bass and ergonomic fit. Available at E-ALL UAE with official warranty.</g:description>
+      <g:link>https://www.eall.ae/products/hmd-dub-p60</g:link>
+      <g:image_link>https://www.eall.ae/products/hmd_accessories/hmd_dub_p60/main.png</g:image_link>
+      <g:condition>new</g:condition>
+      <g:availability>in_stock</g:availability>
+      <g:price>128.90 AED</g:price>
+      <g:brand>HMD</g:brand>
+      <g:google_product_category>Electronics &gt; Audio &gt; Audio Components &gt; Headphones &amp; Headsets</g:google_product_category>
+      <g:mpn>HMD-DUB-P60</g:mpn>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:shipping>
+        <g:country>AE</g:country>
+        <g:service>Standard Courier</g:service>
+        <g:price>0.00 AED</g:price>
+      </g:shipping>
+    </item>
+
+    <!-- HMD DUB X50 -->
+    <item>
+      <g:id>HMD-DUB-X50</g:id>
+      <g:title>HMD DUB X50 Wireless Earbuds</g:title>
+      <g:description>Genuine HMD DUB X50 Wireless Earbuds with high fidelity audio. Available at E-ALL UAE with official warranty.</g:description>
+      <g:link>https://www.eall.ae/products/hmd-dub-x50</g:link>
+      <g:image_link>https://www.eall.ae/products/hmd_accessories/hmd_dub_x50/main.png</g:image_link>
+      <g:condition>new</g:condition>
+      <g:availability>in_stock</g:availability>
+      <g:price>159.00 AED</g:price>
+      <g:brand>HMD</g:brand>
+      <g:google_product_category>Electronics &gt; Audio &gt; Audio Components &gt; Headphones &amp; Headsets</g:google_product_category>
+      <g:mpn>HMD-DUB-X50</g:mpn>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:shipping>
+        <g:country>AE</g:country>
+        <g:service>Standard Courier</g:service>
+        <g:price>0.00 AED</g:price>
+      </g:shipping>
+    </item>
+
+    <!-- NOKIA 150 MUSIC -->
+    <item>
+      <g:id>NOKIA-150-MUSIC</g:id>
+      <g:title>Nokia 150 Music Feature Phone</g:title>
+      <g:description>Original Nokia 150 Music feature phone with MP3 player, wireless FM radio, and mega battery life. Available at E-ALL UAE with official warranty.</g:description>
+      <g:link>https://www.eall.ae/products/nokia-150-music</g:link>
+      <g:image_link>https://www.eall.ae/products/nokia/nokia_150_music/black.png</g:image_link>
+      <g:condition>new</g:condition>
+      <g:availability>in_stock</g:availability>
+      <g:price>159.00 AED</g:price>
+      <g:brand>Nokia</g:brand>
+      <g:google_product_category>Electronics &gt; Communications &gt; Telephony &gt; Mobile Phones</g:google_product_category>
+      <g:mpn>NOKIA-150-MUSIC</g:mpn>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:shipping>
+        <g:country>AE</g:country>
+        <g:service>Standard Courier</g:service>
+        <g:price>0.00 AED</g:price>
+      </g:shipping>
+    </item>
+
+    <!-- NOKIA 110 4G -->
+    <item>
+      <g:id>NOKIA-110-4G</g:id>
+      <g:title>Nokia 110 4G Feature Phone</g:title>
+      <g:description>Original Nokia 110 4G with VoLTE HD voice calls, camera, and durable construction. Available at E-ALL UAE with official warranty.</g:description>
+      <g:link>https://www.eall.ae/products/nokia-110-4g</g:link>
+      <g:image_link>https://www.eall.ae/products/nokia/nokia_110_4g/blue.png</g:image_link>
+      <g:condition>new</g:condition>
+      <g:availability>in_stock</g:availability>
+      <g:price>139.00 AED</g:price>
+      <g:brand>Nokia</g:brand>
+      <g:google_product_category>Electronics &gt; Communications &gt; Telephony &gt; Mobile Phones</g:google_product_category>
+      <g:mpn>NOKIA-110-4G</g:mpn>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:shipping>
+        <g:country>AE</g:country>
+        <g:service>Standard Courier</g:service>
+        <g:price>0.00 AED</g:price>
+      </g:shipping>
+    </item>
+
+    <!-- IPHONE 16 PRO -->
+    <item>
+      <g:id>IPHONE-16-PRO</g:id>
+      <g:title>Apple iPhone 16 Pro (128GB / 256GB / 512GB / 1TB)</g:title>
+      <g:description>Authentic Apple iPhone 16 Pro with Grade 5 Titanium, A18 Pro Bionic, and 48MP Pro camera. Available at E-ALL UAE with official Apple Warranty.</g:description>
+      <g:link>https://www.eall.ae/products/iphone-16-pro</g:link>
+      <g:image_link>https://www.eall.ae/products/apple/iphone_16_pro/natural_titanium.png</g:image_link>
+      <g:condition>new</g:condition>
+      <g:availability>in_stock</g:availability>
+      <g:price>4299.00 AED</g:price>
+      <g:brand>Apple</g:brand>
+      <g:google_product_category>Electronics &gt; Communications &gt; Telephony &gt; Mobile Phones</g:google_product_category>
+      <g:mpn>IPHONE-16-PRO</g:mpn>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:shipping>
+        <g:country>AE</g:country>
+        <g:service>Standard Courier</g:service>
+        <g:price>0.00 AED</g:price>
+      </g:shipping>
+    </item>
+
+    <!-- SAMSUNG GALAXY S25 ULTRA -->
+    <item>
+      <g:id>GALAXY-S25-ULTRA</g:id>
+      <g:title>Samsung Galaxy S25 Ultra 5G</g:title>
+      <g:description>Genuine Samsung Galaxy S25 Ultra 5G with Snapdragon 8 Elite, 200MP camera, S-Pen, and Titanium frame. Available at E-ALL UAE with official Samsung Warranty.</g:description>
+      <g:link>https://www.eall.ae/products/galaxy-s25-ultra</g:link>
+      <g:image_link>https://www.eall.ae/products/samsung_mobiles/galaxy_s25_ultra/titanium_gray.png</g:image_link>
+      <g:condition>new</g:condition>
+      <g:availability>in_stock</g:availability>
+      <g:price>4699.00 AED</g:price>
+      <g:brand>Samsung</g:brand>
+      <g:google_product_category>Electronics &gt; Communications &gt; Telephony &gt; Mobile Phones</g:google_product_category>
+      <g:mpn>GALAXY-S25-ULTRA</g:mpn>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:shipping>
+        <g:country>AE</g:country>
+        <g:service>Standard Courier</g:service>
+        <g:price>0.00 AED</g:price>
+      </g:shipping>
+    </item>
+
+  </channel>
+</rss>

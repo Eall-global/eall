@@ -1,4 +1,4 @@
-import { products as staticProducts } from "../data/products/index";
+import { products as staticProducts } from "../data/products/index.js";
 
 const SITE_URL = "https://www.eall.ae";
 
