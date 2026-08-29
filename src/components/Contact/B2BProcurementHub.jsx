@@ -21,6 +21,7 @@ import {
 } from "react-icons/fi";
 import { BsWhatsapp } from "react-icons/bs";
 import { submitRFQ } from "../../services/b2bService";
+import SectionTitle from "../common/SectionTitle";
 
 const B2B_DESTINATIONS = [
   "United Arab Emirates (Dubai / JAFZA)",
@@ -123,19 +124,14 @@ Looking for official wholesale pricing, pallet availability, and freight timelin
     <section className="pt-6 sm:pt-10 pb-16 w-full text-left">
       <div className="w-full space-y-8 sm:space-y-10">
 
-        {/* 🏢 ENTERPRISE TITLE & BADGE */}
-        <div className="text-center w-full space-y-3">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-sky-50 text-sky-800 border border-sky-200/80 text-xs font-bold uppercase tracking-wider">
-            <FiBriefcase className="text-sky-700" />
-            <span>B2B &amp; Enterprise Procurement Hub</span>
-          </div>
-          <h2 className="text-lg sm:text-2xl lg:text-3xl font-bold text-slate-900 tracking-tight">
-            Direct Wholesale &amp; Bulk Distribution
-          </h2>
-          <p className="text-xs sm:text-sm md:text-base text-slate-600 max-w-4xl mx-auto leading-relaxed">
-            Supplying certified electronics, smartphones, and accessories to regional distributors, retail chains, and corporate buyers across the UAE, West Africa (Senegal, Côte d'Ivoire, Mali, Guinea) &amp; international markets.
-          </p>
-        </div>
+        <SectionTitle
+          className="text-left"
+          variant="blue"
+          label="B2B & Enterprise Procurement Hub"
+          title="Direct Wholesale & Bulk Distribution"
+          description="Supplying certified electronics, smartphones, and accessories to regional distributors, retail chains, and corporate buyers across the UAE, West Africa (Senegal, Côte d'Ivoire, Mali, Guinea) & international markets."
+        />
+
 
         {/* 💎 4 CORE B2B ADVANTAGES GRID (FULL WIDTH) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 w-full">
@@ -187,8 +183,8 @@ Looking for official wholesale pricing, pallet availability, and freight timelin
               type="button"
               onClick={() => setActiveTab("rfq")}
               className={`w-full sm:flex-1 py-3.5 px-5 rounded-2xl text-xs sm:text-sm font-bold transition flex items-center justify-center gap-2 cursor-pointer ${activeTab === "rfq"
-                  ? "bg-white text-sky-800 shadow-xs border border-slate-200"
-                  : "text-slate-500 hover:text-slate-900"
+                ? "bg-white text-sky-800 shadow-xs border border-slate-200"
+                : "text-slate-500 hover:text-slate-900"
                 }`}
             >
               <FiFileText className="text-base" />
@@ -199,8 +195,8 @@ Looking for official wholesale pricing, pallet availability, and freight timelin
               type="button"
               onClick={() => setActiveTab("whatsapp")}
               className={`w-full sm:flex-1 py-3.5 px-5 rounded-2xl text-xs sm:text-sm font-bold transition flex items-center justify-center gap-2 cursor-pointer ${activeTab === "whatsapp"
-                  ? "bg-white text-emerald-800 shadow-xs border border-slate-200"
-                  : "text-slate-500 hover:text-slate-900"
+                ? "bg-white text-emerald-800 shadow-xs border border-slate-200"
+                : "text-slate-500 hover:text-slate-900"
                 }`}
             >
               <BsWhatsapp className="text-base text-emerald-600" />

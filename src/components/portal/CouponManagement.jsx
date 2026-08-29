@@ -9,6 +9,11 @@ import {
   FiPercent,
   FiCalendar,
   FiX,
+  FiDollarSign,
+  FiClock,
+  FiGrid,
+  FiList,
+  FiSearch,
 } from "react-icons/fi";
 import {
   fetchCoupons,
@@ -22,6 +27,8 @@ const CouponManagement = () => {
   const [coupons, setCoupons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [viewMode, setViewMode] = useState("grid"); // 'grid' | 'table'
+  const [search, setSearch] = useState("");
 
   // New Coupon Form State
   const [code, setCode] = useState("");
@@ -95,20 +102,57 @@ const CouponManagement = () => {
     }
   };
 
+  const filteredCoupons = coupons.filter(
+    (c) =>
+      (c.code || "").toLowerCase().includes(search.toLowerCase()) ||
+      (c.description || "").toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
-    <div className="space-y-6 text-left">
+    <div className="space-y-4 sm:space-y-6 text-left">
       {/* 🏷️ HEADER & ACTIONS */}
-      <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className="p-4 sm:p-5 bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-2xs flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
         <div>
           <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
             <FiTag className="text-sky-700" /> Coupons &amp; Promotional Vouchers
           </h2>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
             Create discount codes, set first-order rules, minimum spend thresholds, and manage active offers.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto justify-start sm:justify-end">
+          
+          {/* 🔲 VIEW MODE SWITCHER (GRID vs TABLE) */}
+          <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+            <button
+              type="button"
+              onClick={() => setViewMode("grid")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                viewMode === "grid"
+                  ? "bg-white text-sky-800 shadow-2xs"
+                  : "text-slate-500 hover:text-slate-900"
+              }`}
+              title="Card / Grid View"
+            >
+              <FiGrid className="text-sm" />
+              <span>Grid</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("table")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                viewMode === "table"
+                  ? "bg-white text-sky-800 shadow-2xs"
+                  : "text-slate-500 hover:text-slate-900"
+              }`}
+              title="Table View"
+            >
+              <FiList className="text-sm" />
+              <span>Table</span>
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={loadCoupons}
@@ -118,10 +162,11 @@ const CouponManagement = () => {
           >
             <FiRefreshCw className={`text-sm ${loading ? "animate-spin" : ""}`} />
           </button>
+
           <button
             type="button"
             onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold rounded-xl transition shadow-xs cursor-pointer"
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold rounded-xl transition shadow-xs cursor-pointer"
           >
             <FiPlus className="text-base" />
             <span>Create Coupon</span>
@@ -129,115 +174,268 @@ const CouponManagement = () => {
         </div>
       </div>
 
-      {/* 📦 COUPONS LIST TABLE */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs sm:text-sm">
-            <thead>
-              <tr className="bg-slate-900 text-white text-[11px] font-bold uppercase tracking-wider">
-                <th className="py-3.5 px-4">Coupon Code</th>
-                <th className="py-3.5 px-4">Discount Value</th>
-                <th className="py-3.5 px-4">Min. Spend (<AedSymbol />)</th>
-                <th className="py-3.5 px-4 text-center">First Order Only</th>
-                <th className="py-3.5 px-4">Expires</th>
-                <th className="py-3.5 px-4 text-center">Status</th>
-                <th className="py-3.5 px-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-              {coupons.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
-                    <FiTag className="text-3xl mx-auto mb-2 text-slate-300" />
-                    <p className="text-sm font-semibold">No coupons found. Create your first coupon above.</p>
-                  </td>
-                </tr>
-              ) : (
-                coupons.map((c) => (
-                  <tr key={c.id || c.code} className="hover:bg-slate-50/80 transition">
-                    <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-black text-slate-900 text-xs sm:text-sm px-2.5 py-1 rounded-lg bg-sky-50 text-sky-900 border border-sky-200">
-                          {c.code}
-                        </span>
-                        {c.description && (
-                          <p className="text-[11px] text-slate-500 truncate max-w-xs">{c.description}</p>
-                        )}
-                      </div>
-                    </td>
+      {/* 🔍 SEARCH BAR */}
+      <div className="p-3.5 sm:p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs flex items-center gap-2">
+        <FiSearch className="text-slate-400 text-base shrink-0 ml-1" />
+        <input
+          type="text"
+          placeholder="Search coupons by code or description..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full bg-transparent text-xs sm:text-sm font-medium text-slate-800 outline-none"
+        />
+        {search && (
+          <button
+            type="button"
+            onClick={() => setSearch("")}
+            className="p-1 text-slate-400 hover:text-slate-600 rounded-lg text-xs"
+          >
+            <FiX />
+          </button>
+        )}
+      </div>
 
-                    <td className="py-3.5 px-4">
+      {/* 🔲 VIEW MODE 1: GRID / CARDS VIEW (SUPPORTED ON BOTH MOBILE & WEB) */}
+      {viewMode === "grid" && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filteredCoupons.length === 0 ? (
+            <div className="col-span-full p-12 bg-white rounded-3xl border border-slate-200 text-center text-slate-400 space-y-2">
+              <FiTag className="text-4xl mx-auto text-slate-300" />
+              <p className="text-sm font-semibold">No coupons matching your criteria.</p>
+            </div>
+          ) : (
+            filteredCoupons.map((c) => (
+              <div
+                key={c.id || c.code}
+                className={`p-5 bg-white rounded-3xl border transition-all duration-300 space-y-3.5 shadow-2xs hover:shadow-md flex flex-col justify-between ${
+                  c.isActive
+                    ? "border-slate-200 hover:border-sky-300"
+                    : "border-slate-200/60 opacity-75 bg-slate-50/50"
+                }`}
+              >
+                <div className="space-y-3">
+                  {/* Card Header: Code & Active Pill */}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono font-black text-slate-900 text-sm px-3 py-1 rounded-xl bg-sky-50 text-sky-900 border border-sky-200 truncate">
+                      {c.code}
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => handleToggleActive(c)}
+                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold transition cursor-pointer shrink-0 ${
+                        c.isActive
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          : "bg-slate-100 text-slate-500 border border-slate-200"
+                      }`}
+                    >
+                      {c.isActive ? (
+                        <>
+                          <FiCheckCircle className="text-xs text-emerald-600" /> Active
+                        </>
+                      ) : (
+                        <>
+                          <FiXCircle className="text-xs text-slate-400" /> Inactive
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Description */}
+                  {c.description && (
+                    <p className="text-xs text-slate-600 font-medium leading-relaxed line-clamp-2">
+                      {c.description}
+                    </p>
+                  )}
+
+                  {/* Metrics 2x2 Grid */}
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-xs">
+                    <div className="p-2.5 bg-slate-50 rounded-2xl space-y-0.5">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                        Discount Value
+                      </span>
                       {c.discountPercent > 0 ? (
-                        <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md font-mono text-xs">
+                        <span className="font-mono font-black text-emerald-700 text-xs">
                           {c.discountPercent}% OFF
                         </span>
                       ) : (
-                        <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md font-mono text-xs">
+                        <span className="font-mono font-black text-emerald-700 text-xs">
                           <AedPrice amount={c.discountFlat} /> OFF
                         </span>
                       )}
-                    </td>
+                    </div>
 
-                    <td className="py-3.5 px-4 font-mono">
+                    <div className="p-2.5 bg-slate-50 rounded-2xl space-y-0.5">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                        Min. Spend
+                      </span>
                       {c.minOrderAmount > 0 ? (
-                        <AedPrice amount={c.minOrderAmount} />
+                        <AedPrice amount={c.minOrderAmount} className="font-mono font-bold text-slate-800 text-xs" />
                       ) : (
-                        <span className="text-slate-400">No minimum</span>
+                        <span className="text-slate-500 font-medium text-xs">No Minimum</span>
                       )}
-                    </td>
+                    </div>
 
-                    <td className="py-3.5 px-4 text-center">
+                    <div className="p-2.5 bg-slate-50 rounded-2xl space-y-0.5">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                        Audience
+                      </span>
                       {c.firstOrderOnly ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 text-[10.5px] font-bold border border-amber-200">
+                        <span className="text-[10.5px] font-bold text-amber-800">
                           1st Order Only (1x)
                         </span>
                       ) : (
-                        <span className="text-slate-400 text-xs">All Customers</span>
+                        <span className="text-[10.5px] font-bold text-slate-700">
+                          All Customers
+                        </span>
                       )}
-                    </td>
+                    </div>
 
-                    <td className="py-3.5 px-4 text-slate-500 font-mono text-xs">
-                      {c.expiresAt || "Never"}
-                    </td>
+                    <div className="p-2.5 bg-slate-50 rounded-2xl space-y-0.5">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                        Expires
+                      </span>
+                      <span className="font-mono text-slate-600 text-[11px] truncate block">
+                        {c.expiresAt || "Never"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
 
-                    <td className="py-3.5 px-4 text-center">
-                      <button
-                        type="button"
-                        onClick={() => handleToggleActive(c)}
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold transition cursor-pointer ${c.isActive
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            : "bg-slate-100 text-slate-500"
-                          }`}
-                      >
-                        {c.isActive ? (
-                          <>
-                            <FiCheckCircle className="text-xs" /> Active
-                          </>
-                        ) : (
-                          <>
-                            <FiXCircle className="text-xs" /> Inactive
-                          </>
-                        )}
-                      </button>
-                    </td>
+                {/* Card Actions */}
+                <div className="flex items-center justify-between pt-2.5 border-t border-slate-100 text-xs">
+                  <span className="text-[10.5px] text-slate-400">
+                    {c.firstOrderOnly ? "First-time buyer rule" : "Storewide offer"}
+                  </span>
 
-                    <td className="py-3.5 px-4 text-right">
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(c.id || c.code)}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition cursor-pointer"
-                        title="Delete coupon"
-                      >
-                        <FiTrash2 className="text-sm" />
-                      </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(c.id || c.code)}
+                    className="inline-flex items-center gap-1 text-xs text-rose-500 hover:text-rose-700 font-semibold p-1 cursor-pointer"
+                    title="Delete coupon"
+                  >
+                    <FiTrash2 className="text-sm" />
+                    <span>Delete</span>
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* 📄 VIEW MODE 2: TABLE VIEW */}
+      {viewMode === "table" && (
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-2xs overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs sm:text-sm">
+              <thead>
+                <tr className="bg-slate-900 text-white text-[11px] font-bold uppercase tracking-wider">
+                  <th className="py-3.5 px-4">Coupon Code</th>
+                  <th className="py-3.5 px-4">Discount Value</th>
+                  <th className="py-3.5 px-4">Min. Spend (<AedSymbol />)</th>
+                  <th className="py-3.5 px-4 text-center">Audience</th>
+                  <th className="py-3.5 px-4">Expires</th>
+                  <th className="py-3.5 px-4 text-center">Status</th>
+                  <th className="py-3.5 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                {filteredCoupons.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-12 text-center text-slate-400">
+                      <FiTag className="text-3xl mx-auto mb-2 text-slate-300" />
+                      <p className="text-sm font-semibold">No coupons found.</p>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  filteredCoupons.map((c) => (
+                    <tr key={c.id || c.code} className="hover:bg-slate-50/80 transition">
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-black text-slate-900 text-xs sm:text-sm px-2.5 py-1 rounded-lg bg-sky-50 text-sky-900 border border-sky-200">
+                            {c.code}
+                          </span>
+                          {c.description && (
+                            <p className="text-[11px] text-slate-500 truncate max-w-xs">{c.description}</p>
+                          )}
+                        </div>
+                      </td>
+
+                      <td className="py-3.5 px-4">
+                        {c.discountPercent > 0 ? (
+                          <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md font-mono text-xs">
+                            {c.discountPercent}% OFF
+                          </span>
+                        ) : (
+                          <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md font-mono text-xs">
+                            <AedPrice amount={c.discountFlat} /> OFF
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="py-3.5 px-4 font-mono">
+                        {c.minOrderAmount > 0 ? (
+                          <AedPrice amount={c.minOrderAmount} />
+                        ) : (
+                          <span className="text-slate-400">No minimum</span>
+                        )}
+                      </td>
+
+                      <td className="py-3.5 px-4 text-center">
+                        {c.firstOrderOnly ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 text-[10.5px] font-bold border border-amber-200">
+                            1st Order Only (1x)
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 text-xs">All Customers</span>
+                        )}
+                      </td>
+
+                      <td className="py-3.5 px-4 text-slate-500 font-mono text-xs">
+                        {c.expiresAt || "Never"}
+                      </td>
+
+                      <td className="py-3.5 px-4 text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleActive(c)}
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold transition cursor-pointer ${
+                            c.isActive
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              : "bg-slate-100 text-slate-500"
+                          }`}
+                        >
+                          {c.isActive ? (
+                            <>
+                              <FiCheckCircle className="text-xs" /> Active
+                            </>
+                          ) : (
+                            <>
+                              <FiXCircle className="text-xs" /> Inactive
+                            </>
+                          )}
+                        </button>
+                      </td>
+
+                      <td className="py-3.5 px-4 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(c.id || c.code)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition cursor-pointer"
+                          title="Delete coupon"
+                        >
+                          <FiTrash2 className="text-sm" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ✏️ CREATE COUPON MODAL */}
       {showAddModal && (
@@ -250,7 +448,7 @@ const CouponManagement = () => {
               <button
                 type="button"
                 onClick={() => setShowAddModal(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-xl"
+                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-xl cursor-pointer"
               >
                 <FiX className="text-lg" />
               </button>
@@ -350,14 +548,14 @@ const CouponManagement = () => {
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-semibold"
+                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-semibold cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="px-5 py-2.5 bg-sky-700 hover:bg-sky-800 text-white rounded-xl font-bold transition shadow-xs disabled:opacity-50"
+                  className="px-5 py-2.5 bg-sky-700 hover:bg-sky-800 text-white rounded-xl font-bold transition shadow-xs disabled:opacity-50 cursor-pointer"
                 >
                   {isSaving ? "Saving..." : "Save Coupon"}
                 </button>
