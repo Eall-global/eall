@@ -54,7 +54,7 @@ const InvoiceDocument = ({ invoice: rawInvoice, onClose }) => {
     }),
   };
 
-  // 1. Direct 1-Click Vector PDF Download
+  // 1. Direct 1-Click Vector PDF Download (No screen capturing, No browser print dialogs)
   const handleDownload = () => {
     setDownloading(true);
     try {
@@ -129,7 +129,7 @@ const InvoiceDocument = ({ invoice: rawInvoice, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/90 backdrop-blur-md flex flex-col items-center p-2 sm:p-4 md:p-6 print:p-0 print:bg-white print:static">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/90 backdrop-blur-md flex flex-col items-center p-2 sm:p-4 md:p-6 print:p-0 print:bg-white print:static text-left">
 
       {/* 🛠️ CUSTOM DOCUMENT VIEWER TOOLBAR */}
       <div className="sticky top-2 z-20 w-full max-w-4xl bg-slate-900/95 backdrop-blur-lg text-white rounded-2xl shadow-2xl border border-slate-700/80 px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3 mb-4 print:hidden">
@@ -152,132 +152,132 @@ const InvoiceDocument = ({ invoice: rawInvoice, onClose }) => {
           </div>
         </div>
 
-        {/* Right: Quick Action Buttons */}
-        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-          {/* Download PDF */}
+        {/* Right: Actions (1-Click Download, Share, Print, Close) */}
+        <div className="flex items-center gap-2">
+
+          {/* 1-Click Download PDF */}
           <button
             type="button"
             onClick={handleDownload}
             disabled={downloading}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition shadow-md cursor-pointer disabled:opacity-50"
-            title="Download Vector A4 PDF directly"
+            className="flex items-center gap-1.5 px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+            title="Download true A4 Vector PDF on 1 click"
           >
-            <FiDownload className="text-sm" />
-            <span>{downloading ? "Generating..." : "Download PDF"}</span>
+            <FiDownload />
+            <span>{downloading ? "Downloading..." : "Download PDF"}</span>
           </button>
 
-          {/* Print PDF */}
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition cursor-pointer"
-            title="Print Official A4 Invoice"
-          >
-            <FiPrinter className="text-sm" />
-            <span>Print</span>
-          </button>
-
-          {/* Share */}
+          {/* Share PDF */}
           <button
             type="button"
             onClick={handleShare}
             disabled={sharing}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
-            title="Share via WhatsApp or Device Share"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+            title="Share PDF via WhatsApp or Device"
           >
-            <FiShare2 className="text-sm" />
-            <span>{sharing ? "Sharing..." : "Share"}</span>
+            <FiShare2 />
+            <span className="hidden sm:inline">Share</span>
+          </button>
+
+          {/* Print Isolated 1-Page */}
+          <button
+            type="button"
+            onClick={handlePrint}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition border border-slate-700 cursor-pointer"
+            title="Print isolated 1-sheet A4 page"
+          >
+            <FiPrinter />
+            <span className="hidden sm:inline">Print</span>
           </button>
 
           {/* Close */}
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-xl bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white transition cursor-pointer ml-1"
+            className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition text-lg cursor-pointer ml-1"
             title="Close Viewer"
           >
-            <FiX className="text-lg" />
+            <FiX />
           </button>
         </div>
       </div>
 
       {/* 📄 CRISP A4 SHEET PREVIEW (Zoom-out auto-scaled for mobile) */}
-      <div className="w-full flex justify-center overflow-x-auto pb-12 print:pb-0">
+      <div className="w-full overflow-x-auto flex justify-center py-2 sm:py-6 px-1 sm:px-4">
         <div
-          id="printable-invoice"
-          className="bg-white text-slate-900 shadow-2xl p-6 sm:p-10 md:p-12 transition-all duration-300 text-left border border-slate-200
-                     w-full max-w-[210mm] min-h-[297mm] flex flex-col justify-between
-                     rounded-2xl sm:rounded-3xl print:rounded-none print:shadow-none print:border-none print:m-0 print:p-8"
-          style={{ boxSizing: "border-box" }}
+          style={{
+            width: "794px",
+            minWidth: "794px",
+            minHeight: "1123px",
+          }}
+          className="
+            bg-white text-slate-900 font-sans p-8 sm:p-12
+            shadow-2xl rounded-2xl border border-slate-200
+            flex flex-col justify-between text-left
+            shrink-0 origin-top
+            scale-[0.45] min-[400px]:scale-[0.52] min-[500px]:scale-[0.65] sm:scale-[0.8] md:scale-[0.9] lg:scale-100
+            -mb-[610px] min-[400px]:-mb-[520px] min-[500px]:-mb-[380px] sm:-mb-[220px] md:-mb-[110px] lg:mb-0
+            transition-transform duration-200
+          "
         >
+          {/* TOP HALF */}
           <div>
-            {/* 1. HEADER SECTION (LOGO ON TOP, DETAILS BELOW) */}
-            <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-4 border-b-2 border-slate-900">
-              
-              {/* Left: Brand Identity & Legal Details */}
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2.5">
-                  <img
-                    src="/logo.png"
-                    alt="E-ALL Logo"
-                    className="h-10 w-auto object-contain"
-                    onError={(e) => {
-                      e.target.style.display = "none";
-                    }}
-                  />
-                  <div>
-                    <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-950">
-                      E-ALL
-                    </h1>
-                    <p className="text-[11px] font-bold text-sky-800 tracking-wider uppercase">
-                      Electronics ALL FZCO
-                    </p>
-                  </div>
-                </div>
 
-                <div className="text-[11.5px] text-slate-500 space-y-0.5 pt-1 leading-relaxed">
-                  <p className="font-medium text-slate-700 flex items-center gap-1.5">
-                    <FiMapPin className="text-sky-700 shrink-0 text-xs" />
-                    <span>Dubai Silicon Oasis, DDP, Building A2, Dubai, United Arab Emirates</span>
+            {/* 1. BRAND HEADER & TAX INVOICE BADGE */}
+            <div className="flex flex-row justify-between items-start gap-6 pb-4 border-b border-slate-300 text-left">
+
+              {/* Top Left: Logo & Company Identification */}
+              <div className="flex-1 text-left">
+                <img
+                  src="/logo.png"
+                  alt="E-ALL Logo"
+                  className="h-14 sm:h-16 w-auto object-contain shrink-0 mb-2"
+                  onError={(e) => {
+                    e.target.style.display = "none";
+                  }}
+                />
+
+                <h1 className="text-base font-black text-slate-900 tracking-tight">
+                  E-ALL (ELECTRONICS ALL FZCO)
+                </h1>
+
+                <p className="text-[11px] text-slate-500 font-medium">
+                  Premium Consumer Electronics Distribution &amp; Solutions
+                </p>
+
+                <div className="text-[11px] text-slate-600 mt-1.5 space-y-0.5 leading-relaxed">
+                  <p className="flex items-center gap-1.5">
+                    <FiMapPin className="text-slate-400 shrink-0" />
+                    Dubai Silicon Oasis, DDP, Building A2, Dubai, UAE
                   </p>
-                  <p className="flex items-center gap-3">
-                    <span className="font-mono font-bold text-slate-800">TRN (VAT): 100482910400003</span>
-                    <span>•</span>
-                    <span className="flex items-center gap-1">
-                      <FiMail className="text-slate-400 text-xs" /> contact@eall.ae
-                    </span>
+                  <p className="flex items-center gap-1.5 font-mono">
+                    <span className="font-semibold text-slate-700">TRN (VAT):</span>
+                    <strong className="text-slate-900 font-bold bg-slate-100 px-1.5 py-0.5 rounded">
+                      100482910400003
+                    </strong>
+                  </p>
+                  <p className="flex items-center gap-1.5">
+                    <FiMail className="text-slate-400 shrink-0" />
+                    contact@eall.ae • <FiGlobe className="text-slate-400 shrink-0 ml-1" /> www.eall.ae
                   </p>
                 </div>
               </div>
 
-              {/* Right: Tax Invoice Identifier & Date Meta */}
-              <div className="sm:text-right space-y-1 self-stretch sm:self-auto flex flex-col justify-between">
-                <div>
-                  <span className="inline-block px-3 py-1 bg-slate-950 text-white font-black text-xs uppercase tracking-widest rounded-lg mb-1 shadow-xs">
-                    TAX INVOICE
-                  </span>
-                  <h2 className="text-base sm:text-lg font-mono font-bold text-slate-900 tracking-tight">
-                    {invoice.invoiceNo}
-                  </h2>
+              {/* Top Right: Tax Invoice Details */}
+              <div className="text-right shrink-0 flex flex-col justify-between items-end">
+                <div className="inline-block bg-slate-900 text-white px-3.5 py-1 rounded-md font-bold text-[11px] uppercase tracking-wider mb-2">
+                  TAX INVOICE
                 </div>
 
-                <div className="text-[11px] text-slate-500 space-y-0.5 font-medium">
-                  <p>
-                    Date: <strong className="text-slate-800">{new Date(invoice.createdAt).toLocaleDateString("en-GB")}</strong>{" "}
-                    Time:{" "}
-                    <span className="text-slate-700 font-mono">
-                      {new Date(invoice.createdAt).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                  </p>
-                  <p className="flex justify-end gap-1.5">
-                    <span className="text-slate-400">Issued By:</span>
-                    <strong className="text-slate-800 font-medium">{invoice.createdBy}</strong>
-                    <span className="text-slate-400 ml-1">Payment:</span>
-                    <span className="font-semibold text-slate-800">{invoice.paymentMethod}</span>
-                  </p>
+                <div className="font-mono text-sm font-bold text-slate-900">
+                  {invoice.invoiceNo}
+                </div>
+
+                <div className="text-xs text-slate-500 mt-1 space-y-0.5">
+                  <p>Date: <strong className="text-slate-800">{new Date(invoice.createdAt).toLocaleDateString("en-GB")}</strong></p>
+                  <p>Time: <span className="text-slate-700 font-mono">{new Date(invoice.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></p>
+                  <p>Issued By: <strong className="text-slate-800">{invoice.createdBy}</strong></p>
+                  <p>Payment: <span className="font-semibold text-slate-800">{invoice.paymentMethod}</span></p>
                 </div>
               </div>
             </div>
