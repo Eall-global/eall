@@ -13,6 +13,7 @@ import {
 } from "react-icons/fi";
 import { useCart } from "../../context/CartContext";
 import { useWishlist } from "../../context/WishlistContext";
+import { AedSymbol, AedPrice } from "../common/AedSymbol";
 
 const availabilityStyles = {
   "In Stock": {
@@ -137,16 +138,32 @@ const ProductInfo = ({ product, selectedVariant, onVariantChange }) => {
 
       {/* SLEEK PRICING & ADD TO CART CARD */}
       <div className="p-5 bg-white border border-slate-200 rounded-2xl shadow-2xs space-y-4 pt-4 border-t-2 border-t-sky-700">
-        <div className="flex justify-between items-baseline">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-baseline gap-2">
           <div>
             <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
               Unit Price
             </span>
-            <div className="flex items-baseline gap-2 mt-0.5">
-              <span className="text-2xl sm:text-3xl font-black font-mono text-sky-900">
-                AED {displayPrice.toFixed(2)}
-              </span>
-              <span className="text-xs font-mono text-slate-400">
+            <div className="flex items-baseline gap-2 mt-0.5 flex-wrap">
+              <AedPrice
+                amount={displayPrice}
+                className="text-2xl sm:text-3xl font-black text-sky-950"
+                symbolClassName="text-sky-700"
+              />
+
+              {product.hasDiscount && product.originalPrice > displayPrice && (
+                <>
+                  <AedPrice
+                    amount={product.originalPrice}
+                    className="text-sm sm:text-base font-normal text-slate-400 line-through"
+                    symbolClassName="text-slate-400"
+                  />
+                  <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
+                    Save {product.discountPercentage}%
+                  </span>
+                </>
+              )}
+
+              <span className="text-xs font-mono text-slate-400 ml-auto sm:ml-0">
                 ≈ USD {(displayPrice / 3.6725).toFixed(2)}
               </span>
             </div>

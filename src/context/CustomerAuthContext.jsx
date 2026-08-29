@@ -336,7 +336,8 @@ export const CustomerAuthProvider = ({ children }) => {
 
   // 5️⃣ UPDATE PROFILE
   const updateProfile = async (updatedData) => {
-    if (!user?.id) return;
+    if (!user?.id && !user?.uid) return;
+    const uid = user.id || user.uid;
     const updatedUser = { ...user, ...updatedData, updatedAt: new Date().toISOString() };
     setUser(updatedUser);
     localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updatedUser));
@@ -344,11 +345,89 @@ export const CustomerAuthProvider = ({ children }) => {
     const db = getFirebaseDb();
     if (db && isFirebaseConfigured()) {
       try {
-        await setDoc(doc(db, "customers", user.id), updatedUser, { merge: true });
+        await setDoc(doc(db, "customers", uid), updatedUser, { merge: true });
       } catch (e) {
         console.warn("Could not update customer profile in Firestore:", e);
       }
     }
+  };
+
+  // 🏠 ADDRESS MANAGEMENT (Max 5 Saved Addresses per Customer)
+  const saveAddress = async (addressData) => {
+    if (!user) return null;
+    const currentAddresses = Array.isArray(user.addresses) ? [...user.addresses] : [];
+
+    const isNew = !addressData.id || addressData.id === "new";
+    const addressId = isNew ? `addr_${Date.now()}` : addressData.id;
+
+    const formattedAddress = {
+      id: addressId,
+      label: addressData.label || "Home",
+      fullName: addressData.fullName || user.fullName || "",
+      phone: addressData.phone || user.phone || "",
+      country: addressData.country || "United Arab Emirates",
+      city: addressData.city || "Dubai",
+      streetAddress: addressData.streetAddress || addressData.shippingAddress || "",
+      isDefault: Boolean(addressData.isDefault || currentAddresses.length === 0),
+      updatedAt: new Date().toISOString(),
+    };
+
+    let updatedList;
+    if (isNew) {
+      // Limit to max 5 addresses
+      if (currentAddresses.length >= 5) {
+        throw new Error("Maximum 5 saved addresses reached. Please edit or delete an existing address.");
+      }
+      if (formattedAddress.isDefault) {
+        updatedList = [formattedAddress, ...currentAddresses.map((a) => ({ ...a, isDefault: false }))];
+      } else {
+        updatedList = [...currentAddresses, formattedAddress];
+      }
+    } else {
+      updatedList = currentAddresses.map((a) => {
+        if (a.id === addressId) {
+          return formattedAddress;
+        }
+        if (formattedAddress.isDefault) {
+          return { ...a, isDefault: false };
+        }
+        return a;
+      });
+    }
+
+    await updateProfile({
+      addresses: updatedList,
+      shippingAddress: formattedAddress.isDefault ? formattedAddress.streetAddress : (user.shippingAddress || formattedAddress.streetAddress),
+      country: formattedAddress.isDefault ? formattedAddress.country : (user.country || formattedAddress.country),
+      city: formattedAddress.isDefault ? formattedAddress.city : (user.city || formattedAddress.city),
+    });
+
+    return formattedAddress;
+  };
+
+  const deleteAddress = async (addressId) => {
+    if (!user || !user.addresses) return;
+    const filtered = user.addresses.filter((a) => a.id !== addressId);
+    // If deleted address was default and others exist, make first one default
+    if (filtered.length > 0 && !filtered.some((a) => a.isDefault)) {
+      filtered[0].isDefault = true;
+    }
+    await updateProfile({ addresses: filtered });
+  };
+
+  const setDefaultAddress = async (addressId) => {
+    if (!user || !user.addresses) return;
+    const updated = user.addresses.map((a) => ({
+      ...a,
+      isDefault: a.id === addressId,
+    }));
+    const defaultAddr = updated.find((a) => a.id === addressId);
+    await updateProfile({
+      addresses: updated,
+      shippingAddress: defaultAddr ? defaultAddr.streetAddress : user.shippingAddress,
+      country: defaultAddr ? defaultAddr.country : user.country,
+      city: defaultAddr ? defaultAddr.city : user.city,
+    });
   };
 
   // 6️⃣ SAVE ORDER TO HISTORY & FIRESTORE
@@ -401,6 +480,9 @@ export const CustomerAuthProvider = ({ children }) => {
         loginWithGoogle,
         logout,
         updateProfile,
+        saveAddress,
+        deleteAddress,
+        setDefaultAddress,
         addOrderToHistory,
       }}
     >

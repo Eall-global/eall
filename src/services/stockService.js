@@ -32,6 +32,9 @@ export const getInitialCatalogSeed = () => {
 
     const initialPrice = p.price !== undefined && p.price !== null ? Number(p.price) : 0;
     const initialQty = p.quantity !== undefined ? Number(p.quantity) : (p.stock !== undefined ? Number(p.stock) : 0);
+    const initialCost = p.costPrice !== undefined ? Number(p.costPrice) : Math.round(initialPrice * 0.8);
+    const initialMargin = p.margin !== undefined ? Number(p.margin) : Math.max(0, initialPrice - initialCost);
+    const initialOriginalPrice = p.originalPrice !== undefined ? Number(p.originalPrice) : (p.listPrice || (initialPrice > 0 ? Math.round(initialPrice * 1.15) : 0));
 
     items.push({
       sku,
@@ -40,8 +43,10 @@ export const getInitialCatalogSeed = () => {
       category: String(p.categoryName || p.category || "Electronics").trim(),
       image: String(p.image || "/logo.png"),
       quantity: initialQty,
-      price: initialPrice,
-      costPrice: p.costPrice !== undefined ? Number(p.costPrice) : Math.round(initialPrice * 0.8),
+      costPrice: initialCost,
+      margin: initialMargin,
+      price: initialPrice > 0 ? initialPrice : (initialCost + initialMargin),
+      originalPrice: initialOriginalPrice,
       minAlert: p.minAlert !== undefined ? Number(p.minAlert) : 3,
       updatedAt: new Date().toISOString(),
     });
@@ -50,18 +55,27 @@ export const getInitialCatalogSeed = () => {
   return items;
 };
 
-const mapDocToStockItem = (data) => ({
-  sku: data.sku,
-  name: String(data.name || "").trim(),
-  brand: String(data.brand || "General").trim(),
-  category: String(data.category || "Electronics").trim(),
-  image: data.image || "/logo.png",
-  quantity: Number(data.quantity) || 0,
-  price: Number(data.price) || 0,
-  costPrice: Number(data.costPrice ?? data.cost_price ?? 0),
-  minAlert: Number(data.minAlert ?? data.min_alert ?? 3),
-  updatedAt: data.updatedAt || data.updated_at || new Date().toISOString(),
-});
+const mapDocToStockItem = (data) => {
+  const costPrice = Number(data.costPrice ?? data.cost_price ?? 0);
+  const margin = Number(data.margin ?? 0);
+  const price = data.price !== undefined && data.price !== null ? Number(data.price) : (costPrice + margin);
+  const originalPrice = Number(data.originalPrice ?? data.original_price ?? data.listPrice ?? 0);
+
+  return {
+    sku: data.sku,
+    name: String(data.name || "").trim(),
+    brand: String(data.brand || "General").trim(),
+    category: String(data.category || "Electronics").trim(),
+    image: data.image || "/logo.png",
+    quantity: Number(data.quantity) || 0,
+    costPrice,
+    margin,
+    price,
+    originalPrice,
+    minAlert: Number(data.minAlert ?? data.min_alert ?? 3),
+    updatedAt: data.updatedAt || data.updated_at || new Date().toISOString(),
+  };
+};
 
 // Local storage handlers for offline fallback
 const getLocalStock = () => {
@@ -210,13 +224,22 @@ export const adjustStockDelta = async (sku, delta) => {
 };
 
 /**
- * Update product details including name, brand, category, price, quantity, cost price, and min alert threshold
+ * Update product details including name, brand, category, price, quantity, cost price, margin, and min alert threshold
  */
 export const updateProductDetails = async (
   sku,
-  { name, brand, category, price, quantity, costPrice, minAlert }
+  { name, brand, category, price, quantity, costPrice, margin, originalPrice, minAlert }
 ) => {
   const db = getFirebaseDb();
+
+  const cPrice = costPrice !== undefined ? Number(costPrice) : undefined;
+  const mMargin = margin !== undefined ? Number(margin) : undefined;
+  let sPrice = price !== undefined ? Number(price) : undefined;
+
+  // Auto-reconcile selling price if costPrice and margin are provided
+  if (cPrice !== undefined && mMargin !== undefined && price === undefined) {
+    sPrice = cPrice + mMargin;
+  }
 
   if (db && isFirebaseConfigured()) {
     try {
@@ -226,10 +249,12 @@ export const updateProductDetails = async (
       if (name !== undefined) updatePayload.name = String(name).trim();
       if (brand !== undefined) updatePayload.brand = String(brand).trim();
       if (category !== undefined) updatePayload.category = String(category).trim();
-      if (price !== undefined) updatePayload.price = Number(price);
+      if (cPrice !== undefined) updatePayload.costPrice = cPrice;
+      if (mMargin !== undefined) updatePayload.margin = mMargin;
+      if (sPrice !== undefined) updatePayload.price = sPrice;
+      if (originalPrice !== undefined) updatePayload.originalPrice = Number(originalPrice);
       if (quantity !== undefined)
         updatePayload.quantity = Math.max(0, parseInt(quantity, 10) || 0);
-      if (costPrice !== undefined) updatePayload.costPrice = Number(costPrice);
       if (minAlert !== undefined) updatePayload.minAlert = Number(minAlert);
 
       const docRef = doc(db, COLLECTION_NAME, sku);
@@ -247,12 +272,14 @@ export const updateProductDetails = async (
           name: name !== undefined ? String(name).trim() : item.name,
           brand: brand !== undefined ? String(brand).trim() : item.brand,
           category: category !== undefined ? String(category).trim() : item.category,
-          price: price !== undefined ? Number(price) : item.price,
+          costPrice: cPrice !== undefined ? cPrice : (item.costPrice || 0),
+          margin: mMargin !== undefined ? mMargin : (item.margin || 0),
+          price: sPrice !== undefined ? sPrice : (cPrice !== undefined && mMargin !== undefined ? cPrice + mMargin : item.price),
+          originalPrice: originalPrice !== undefined ? Number(originalPrice) : (item.originalPrice ?? 0),
           quantity:
             quantity !== undefined
               ? Math.max(0, parseInt(quantity, 10) || 0)
               : item.quantity,
-          costPrice: costPrice !== undefined ? Number(costPrice) : item.costPrice,
           minAlert: minAlert !== undefined ? Number(minAlert) : item.minAlert,
           updatedAt: new Date().toISOString(),
         }
@@ -265,8 +292,23 @@ export const updateProductDetails = async (
 /**
  * Add a new custom product to inventory
  */
-export const addCustomProduct = async ({ sku, name, brand, category, quantity, price, minAlert }) => {
+export const addCustomProduct = async ({
+  sku,
+  name,
+  brand,
+  category,
+  quantity,
+  costPrice = 0,
+  margin = 0,
+  price,
+  originalPrice = 0,
+  minAlert = 3,
+}) => {
   const cleanSku = sku.trim().toUpperCase();
+  const cPrice = Number(costPrice) || 0;
+  const mMargin = Number(margin) || 0;
+  const sPrice = price !== undefined ? Number(price) : (cPrice + mMargin);
+
   const newProduct = {
     sku: cleanSku,
     name: name.trim(),
@@ -274,8 +316,10 @@ export const addCustomProduct = async ({ sku, name, brand, category, quantity, p
     category: category.trim() || "Electronics",
     image: "/logo.png",
     quantity: Number(quantity) || 0,
-    price: Number(price) || 0,
-    costPrice: 0,
+    costPrice: cPrice,
+    margin: mMargin,
+    price: sPrice,
+    originalPrice: Number(originalPrice) || 0,
     minAlert: Number(minAlert) || 3,
     updatedAt: new Date().toISOString(),
   };
@@ -326,10 +370,12 @@ export const syncCatalogToStock = async () => {
           brand: s.brand,
           category: s.category,
           image: s.image,
-          // Preserve existing price, quantity, costPrice if modified
+          // Preserve existing quantity, costPrice, margin, price, originalPrice
           quantity: existing && existing.quantity !== null && existing.quantity !== undefined ? Number(existing.quantity) : s.quantity,
-          price: existing && existing.price !== null && existing.price !== undefined ? Number(existing.price) : s.price,
           costPrice: existing && existing.costPrice !== undefined ? Number(existing.costPrice) : (s.costPrice || 0),
+          margin: existing && existing.margin !== undefined ? Number(existing.margin) : (s.margin || Math.max(0, s.price - (s.costPrice || 0))),
+          price: existing && existing.price !== null && existing.price !== undefined ? Number(existing.price) : s.price,
+          originalPrice: existing && existing.originalPrice !== undefined ? Number(existing.originalPrice) : (s.originalPrice || 0),
           minAlert: existing && existing.minAlert !== undefined ? Number(existing.minAlert) : (s.minAlert || 3),
           updatedAt: new Date().toISOString(),
         };

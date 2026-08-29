@@ -9,9 +9,10 @@ import {
   FiShield,
   FiShoppingBag,
 } from "react-icons/fi";
-import { MdOutlineShoppingCart } from "react-icons/md";
+import { MdOutlineShoppingCart, MdShoppingCart } from "react-icons/md";
 import { useCart } from "../../context/CartContext";
 import { useCustomerAuth } from "../../context/CustomerAuthContext";
+import { AedSymbol, AedPrice } from "../common/AedSymbol";
 
 const CartDrawer = () => {
   const {
@@ -61,10 +62,10 @@ const CartDrawer = () => {
           <div className="pt-10 sm:pt-6 pb-4 sm:pb-5 px-5 sm:px-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/90 backdrop-blur-md">
             <div className="flex items-center gap-3">
               <div className="p-2.5 bg-sky-50 text-sky-700 rounded-xl shrink-0">
-                <MdOutlineShoppingCart className="text-xl" />
+                <MdShoppingCart className="text-xl fill-sky-700" />
               </div>
               <div>
-                <h2 className="text-sm! sm:text-base! font-bold! text-slate-900! leading-tight flex items-center gap-2">
+                <h2 className="text-base font-bold text-slate-900 leading-tight flex items-center gap-2">
                   Shopping Cart
                   {cartCount > 0 && (
                     <span className="bg-sky-700 text-white text-xs font-bold px-2 py-0.5 rounded-full">
@@ -194,12 +195,13 @@ const CartDrawer = () => {
 
                       {/* Live Unit/Total Price */}
                       <div className="text-right">
-                        <span className="font-mono font-bold text-xs text-slate-900 block">
-                          AED {(item.price * item.quantity).toFixed(2)}
-                        </span>
+                        <AedPrice
+                          amount={item.price * item.quantity}
+                          className="font-bold text-xs text-slate-900 justify-end"
+                        />
                         {item.quantity > 1 && (
-                          <span className="text-[9.5px] text-slate-400 font-mono">
-                            AED {item.price.toFixed(2)} ea
+                          <span className="text-[9.5px] text-slate-400 font-mono block">
+                            <AedPrice amount={item.price} className="text-[9.5px] text-slate-400 font-normal justify-end" /> ea
                           </span>
                         )}
                       </div>
@@ -216,25 +218,23 @@ const CartDrawer = () => {
               <div className="space-y-1.5 text-xs text-slate-600">
                 <div className="flex justify-between">
                   <span>Subtotal</span>
-                  <span className="font-mono font-bold text-slate-900">
-                    AED {cartSubtotal.toFixed(2)}
-                  </span>
+                  <AedPrice amount={cartSubtotal} className="font-bold text-slate-900" />
                 </div>
                 <div className="flex justify-between">
                   <span>Estimated Delivery</span>
-                  <span className="font-mono font-bold text-slate-900">
-                    {shippingFee === 0 ? (
-                      <span className="text-emerald-700 uppercase text-[10px] font-extrabold">FREE</span>
-                    ) : (
-                      `AED ${shippingFee.toFixed(2)}`
-                    )}
-                  </span>
+                  {shippingFee === 0 ? (
+                    <span className="text-emerald-700 uppercase text-[10px] font-extrabold">FREE</span>
+                  ) : (
+                    <AedPrice amount={shippingFee} className="font-bold text-slate-900" />
+                  )}
                 </div>
                 <div className="flex justify-between text-sm font-bold text-slate-900 pt-2 border-t border-slate-200">
                   <span>Total</span>
-                  <span className="font-mono text-sky-800 font-black">
-                    AED {cartTotal.toFixed(2)}
-                  </span>
+                  <AedPrice
+                    amount={cartTotal}
+                    className="text-sky-800 font-black text-base"
+                    symbolClassName="text-sky-700"
+                  />
                 </div>
               </div>
 

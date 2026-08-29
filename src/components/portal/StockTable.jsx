@@ -14,12 +14,17 @@ import {
   FiChevronRight,
   FiChevronsLeft,
   FiChevronsRight,
+  FiPercent,
+  FiDollarSign,
+  FiX,
 } from "react-icons/fi";
 import {
   updateProductDetails,
   syncCatalogToStock,
   addCustomProduct,
 } from "../../services/stockService";
+import { formatAED, CURRENCY_SYMBOL } from "../../utils/currencyFormatter";
+import { AedSymbol, AedPrice } from "../common/AedSymbol";
 
 const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
   const [search, setSearch] = useState("");
@@ -27,11 +32,16 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
   const [statusFilter, setStatusFilter] = useState("All"); // All | in-stock | low-stock | out-of-stock
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
-  const [editingItem, setEditingItem] = useState(null); // For Admin Price / Stock / Details editing
+
+  // Edit Modal State
+  const [editingItem, setEditingItem] = useState(null);
   const [editName, setEditName] = useState("");
   const [editBrand, setEditBrand] = useState("");
   const [editCategory, setEditCategory] = useState("");
+  const [editCostPrice, setEditCostPrice] = useState("");
+  const [editMargin, setEditMargin] = useState("");
   const [editPrice, setEditPrice] = useState("");
+  const [editOriginalPrice, setEditOriginalPrice] = useState("");
   const [editQty, setEditQty] = useState("");
   const [editAlert, setEditAlert] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -47,8 +57,11 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
   const [newName, setNewName] = useState("");
   const [newBrand, setNewBrand] = useState("");
   const [newCategory, setNewCategory] = useState("Electronics");
+  const [newCostPrice, setNewCostPrice] = useState(0);
+  const [newMargin, setNewMargin] = useState(0);
+  const [newPrice, setNewPrice] = useState(0);
+  const [newOriginalPrice, setNewOriginalPrice] = useState(0);
   const [newQty, setNewQty] = useState(10);
-  const [newPrice, setNewPrice] = useState(999);
   const [newAlert, setNewAlert] = useState(3);
 
   // Reset pagination to page 1 whenever filters change
@@ -148,7 +161,11 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
       (s) => s.quantity > 0 && s.quantity <= s.minAlert
     ).length;
     const outOfStockCount = stock.filter((s) => s.quantity === 0).length;
-    return { totalSkus, totalUnits, lowStockCount, outOfStockCount };
+    const totalValuation = stock.reduce(
+      (sum, s) => sum + (Number(s.price || (s.costPrice + s.margin) || 0) * Number(s.quantity || 0)),
+      0
+    );
+    return { totalSkus, totalUnits, lowStockCount, outOfStockCount, totalValuation };
   }, [stock]);
 
   const handleSync = async () => {
@@ -156,9 +173,9 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
     setSyncMessage("");
     try {
       const res = await syncCatalogToStock();
-      setSyncMessage(`Successfully synced ${res.total} products to database!`);
+      setSyncMessage(`Successfully synced ${res.total} products to Cloud Firestore!`);
       setTimeout(() => setSyncMessage(""), 4000);
-      onStockChanged();
+      if (onStockChanged) onStockChanged();
     } catch (err) {
       setSyncMessage(`Sync warning: ${err.message || "Check connection"}`);
       setTimeout(() => setSyncMessage(""), 4000);
@@ -167,35 +184,37 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
     }
   };
 
-  const handleAddProduct = async (e) => {
-    e.preventDefault();
-    if (!newSku.trim() || !newName.trim()) return;
-
-    await addCustomProduct({
-      sku: newSku,
-      name: newName,
-      brand: newBrand,
-      category: newCategory,
-      quantity: newQty,
-      price: newPrice,
-      minAlert: newAlert,
-    });
-
-    setNewSku("");
-    setNewName("");
-    setNewBrand("");
-    setShowAddProductModal(false);
-    onStockChanged();
-  };
-
   const handleOpenEdit = (item) => {
     setEditingItem(item);
     setEditName(item.name || "");
     setEditBrand(item.brand || "");
     setEditCategory(item.category || "");
-    setEditPrice(item.price ?? "");
+
+    const cost = item.costPrice !== undefined ? Number(item.costPrice) : 0;
+    const currentPrice = Number(item.price) || 0;
+    const margin = item.margin !== undefined ? Number(item.margin) : Math.max(0, currentPrice - cost);
+
+    setEditCostPrice(cost);
+    setEditMargin(margin);
+    setEditPrice(currentPrice > 0 ? currentPrice : cost + margin);
+    setEditOriginalPrice(item.originalPrice ?? "");
     setEditQty(item.quantity ?? 0);
     setEditAlert(item.minAlert ?? 3);
+  };
+
+  // Live Auto-reconcile Selling Price when Cost or Margin changes
+  const handleCostChange = (val) => {
+    setEditCostPrice(val);
+    const c = parseFloat(val) || 0;
+    const m = parseFloat(editMargin) || 0;
+    setEditPrice((c + m).toFixed(2));
+  };
+
+  const handleMarginChange = (val) => {
+    setEditMargin(val);
+    const c = parseFloat(editCostPrice) || 0;
+    const m = parseFloat(val) || 0;
+    setEditPrice((c + m).toFixed(2));
   };
 
   const handleSaveEdit = async (e) => {
@@ -203,16 +222,24 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
     if (!editingItem) return;
     setIsSaving(true);
     try {
+      const cost = parseFloat(editCostPrice) || 0;
+      const margin = parseFloat(editMargin) || 0;
+      const selling = parseFloat(editPrice) || (cost + margin);
+      const original = editOriginalPrice ? parseFloat(editOriginalPrice) : 0;
+
       await updateProductDetails(editingItem.sku, {
         name: editName,
         brand: editBrand,
         category: editCategory,
-        price: editPrice,
+        costPrice: cost,
+        margin: margin,
+        price: selling,
+        originalPrice: original,
         quantity: editQty,
         minAlert: editAlert,
       });
       setEditingItem(null);
-      onStockChanged();
+      if (onStockChanged) onStockChanged();
     } catch (err) {
       console.error("Save edit error:", err);
     } finally {
@@ -220,213 +247,311 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
     }
   };
 
+  const handleAddProduct = async (e) => {
+    e.preventDefault();
+    if (!newSku.trim() || !newName.trim()) return;
+
+    const cost = parseFloat(newCostPrice) || 0;
+    const margin = parseFloat(newMargin) || 0;
+    const price = parseFloat(newPrice) || (cost + margin);
+
+    await addCustomProduct({
+      sku: newSku,
+      name: newName,
+      brand: newBrand,
+      category: newCategory,
+      quantity: newQty,
+      costPrice: cost,
+      margin: margin,
+      price: price,
+      originalPrice: newOriginalPrice,
+      minAlert: newAlert,
+    });
+
+    setShowAddProductModal(false);
+    setNewSku("");
+    setNewName("");
+    setNewBrand("");
+    setNewCostPrice(0);
+    setNewMargin(0);
+    setNewPrice(0);
+    if (onStockChanged) onStockChanged();
+  };
+
+  // CSV Export with Cost, Margin & Selling Price
   const handleExportCSV = () => {
-    const headers = ["SKU", "Product Name", "Brand", "Category", "Quantity", "Price (AED)", "Min Alert"];
-    const rows = stock.map((s) => [
-      `"${s.sku}"`,
-      `"${s.name}"`,
-      `"${s.brand}"`,
-      `"${s.category}"`,
-      s.quantity,
-      s.price,
-      s.minAlert,
+    const headers = [
+      "SKU",
+      "Product Name",
+      "Brand",
+      "Category",
+      "Quantity",
+      `Cost Price (${CURRENCY_SYMBOL})`,
+      `Margin (${CURRENCY_SYMBOL})`,
+      `Selling Price (${CURRENCY_SYMBOL})`,
+      `Original Price (${CURRENCY_SYMBOL})`,
+      "Min Alert",
+    ];
+    const rows = filteredStock.map((i) => [
+      `"${i.sku}"`,
+      `"${i.name.replace(/"/g, '""')}"`,
+      `"${i.brand}"`,
+      `"${i.category}"`,
+      i.quantity,
+      i.costPrice || 0,
+      i.margin || 0,
+      i.price || ((i.costPrice || 0) + (i.margin || 0)),
+      i.originalPrice || 0,
+      i.minAlert,
     ]);
 
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `EALL_Stock_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute(
+      "download",
+      `EALL_Inventory_Stock_${new Date().toISOString().slice(0, 10)}.csv`
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
   return (
-    <div className="space-y-6">
-      
-      {/* 📊 SUMMARY CARDS */}
+    <div className="space-y-6 text-left">
+      {/* 📊 SUMMARY METRICS CARDS */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-          <div className="flex items-center justify-between text-slate-500 mb-1">
-            <span className="text-xs font-semibold uppercase tracking-wider">Total SKUs</span>
-            <FiPackage className="text-sky-600" />
+        {/* Total SKUs */}
+        <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Total SKUs
+            </p>
+            <p className="text-xl sm:text-2xl font-black text-slate-900 mt-1 font-mono">
+              {metrics.totalSkus}
+            </p>
           </div>
-          <p className="text-2xl font-bold text-slate-900">{metrics.totalSkus}</p>
-          <p className="text-[11px] text-slate-400 mt-0.5">Active database items</p>
+          <div className="p-2.5 bg-sky-50 text-sky-700 rounded-xl">
+            <FiPackage className="text-xl" />
+          </div>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-          <div className="flex items-center justify-between text-slate-500 mb-1">
-            <span className="text-xs font-semibold uppercase tracking-wider">Total Units</span>
-            <FiCheckCircle className="text-emerald-600" />
+        {/* Total Units in Stock */}
+        <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Total Units
+            </p>
+            <p className="text-xl sm:text-2xl font-black text-slate-900 mt-1 font-mono">
+              {metrics.totalUnits}
+            </p>
           </div>
-          <p className="text-2xl font-bold text-emerald-700">{metrics.totalUnits}</p>
-          <p className="text-[11px] text-slate-400 mt-0.5">Physical items on hand</p>
+          <div className="p-2.5 bg-emerald-50 text-emerald-700 rounded-xl">
+            <FiCheckCircle className="text-xl" />
+          </div>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-          <div className="flex items-center justify-between text-slate-500 mb-1">
-            <span className="text-xs font-semibold uppercase tracking-wider">Low Stock</span>
-            <FiAlertTriangle className="text-amber-500" />
+        {/* Low Stock Items */}
+        <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Low Stock Alert
+            </p>
+            <p className="text-xl sm:text-2xl font-black text-amber-600 mt-1 font-mono">
+              {metrics.lowStockCount}
+            </p>
           </div>
-          <p className="text-2xl font-bold text-amber-600">{metrics.lowStockCount}</p>
-          <p className="text-[11px] text-slate-400 mt-0.5">Needs reordering</p>
+          <div className="p-2.5 bg-amber-50 text-amber-600 rounded-xl">
+            <FiAlertTriangle className="text-xl" />
+          </div>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-          <div className="flex items-center justify-between text-slate-500 mb-1">
-            <span className="text-xs font-semibold uppercase tracking-wider">Out of Stock</span>
-            <FiXCircle className="text-rose-500" />
+        {/* Inventory Valuation */}
+        <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Stock Valuation
+            </p>
+            <div className="mt-1">
+              <AedPrice amount={metrics.totalValuation} decimals={0} className="text-lg sm:text-xl font-black text-sky-900 truncate" />
+            </div>
           </div>
-          <p className="text-2xl font-bold text-rose-600">{metrics.outOfStockCount}</p>
-          <p className="text-[11px] text-slate-400 mt-0.5">0 units remaining</p>
+          <div className="p-2.5 bg-indigo-50 text-indigo-700 rounded-xl">
+            <FiDollarSign className="text-xl" />
+          </div>
         </div>
       </div>
 
-      {/* 🔍 SEARCH & ACTION TOOLBAR */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs space-y-3">
-        {syncMessage && (
-          <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold flex items-center gap-2">
-            <FiCheckCircle className="text-base text-emerald-600" />
-            {syncMessage}
-          </div>
-        )}
-
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-          
-          {/* Search bar */}
+      {/* 🛠️ CONTROLS & ACTIONS BAR */}
+      <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          {/* Search Input */}
           <div className="relative flex-1">
-            <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-base" />
             <input
               type="text"
+              placeholder="Search by product name, SKU, brand, or category..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by SKU, product name, brand..."
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-sky-600 outline-none transition"
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium outline-none focus:bg-white focus:border-sky-600 transition"
             />
-            {search && (
-              <button
-                onClick={() => setSearch("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600"
-              >
-                Clear
-              </button>
-            )}
           </div>
 
-          {/* Action buttons */}
-          <div className="flex items-center gap-2">
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Export CSV */}
+            <button
+              type="button"
+              onClick={handleExportCSV}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition cursor-pointer"
+              title="Export filtered stock as CSV"
+            >
+              <FiDownload className="text-sm" />
+              <span>Export CSV</span>
+            </button>
+
+            {/* Sync from Catalog */}
+            <button
+              type="button"
+              onClick={handleSync}
+              disabled={syncing}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
+              title="Sync catalog to Firestore"
+            >
+              <FiRefreshCw className={`text-sm ${syncing ? "animate-spin" : ""}`} />
+              <span>{syncing ? "Syncing..." : "Sync Catalog"}</span>
+            </button>
+
+            {/* Add Custom Product (Admin Only) */}
             {isAdmin && (
               <button
                 type="button"
                 onClick={() => setShowAddProductModal(true)}
-                className="flex items-center gap-1.5 px-3.5 py-2.5 bg-sky-700 hover:bg-sky-800 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold transition shadow-xs cursor-pointer"
               >
-                <FiPlus />
-                Add Product
+                <FiPlus className="text-sm" />
+                <span>Add Product</span>
               </button>
             )}
-
-            <button
-              onClick={handleSync}
-              disabled={syncing}
-              title="Populate or refresh catalog products into database"
-              className="flex items-center gap-1.5 px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer"
-            >
-              <FiRefreshCw className={syncing ? "animate-spin" : ""} />
-              {syncing ? "Syncing..." : "Sync Catalog"}
-            </button>
-
-            <button
-              onClick={handleExportCSV}
-              className="flex items-center gap-1.5 px-3.5 py-2.5 bg-sky-50 hover:bg-sky-100 text-sky-800 rounded-xl text-xs font-semibold transition cursor-pointer"
-            >
-              <FiDownload />
-              Export CSV
-            </button>
           </div>
         </div>
 
+        {/* Sync message banner */}
+        {syncMessage && (
+          <div className="p-3 bg-sky-50 border border-sky-200 rounded-xl text-xs font-semibold text-sky-900 flex items-center gap-2">
+            <FiCheckCircle className="text-emerald-600 text-sm shrink-0" />
+            <span>{syncMessage}</span>
+          </div>
+        )}
+
         {/* Filter Pills */}
-        <div className="flex flex-wrap items-center gap-2 pt-1">
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs">
-            {["All", "in-stock", "low-stock", "out-of-stock"].map((status) => (
+        <div className="flex items-center justify-between gap-3 flex-wrap pt-2 border-t border-slate-100">
+          {/* Brand Filter */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">
+              Brand:
+            </span>
+            {brands.slice(0, 8).map((b) => (
               <button
-                key={status}
-                onClick={() => setStatusFilter(status)}
-                className={`
-                  px-2.5 py-1 rounded-lg font-medium transition cursor-pointer
-                  ${
-                    statusFilter === status
-                      ? "bg-white text-slate-900 shadow-xs font-bold"
-                      : "text-slate-500 hover:text-slate-800"
-                  }
-                `}
+                key={b}
+                type="button"
+                onClick={() => setBrandFilter(b)}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition cursor-pointer shrink-0 ${brandFilter === b
+                  ? "bg-slate-900 text-white shadow-2xs"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
               >
-                {status === "All"
-                  ? "All Stock"
-                  : status === "in-stock"
-                  ? "In Stock"
-                  : status === "low-stock"
-                  ? "Low Stock"
-                  : "Out of Stock"}
+                {b}
               </button>
             ))}
           </div>
 
-          {/* Brand select */}
-          <select
-            value={brandFilter}
-            onChange={(e) => setBrandFilter(e.target.value)}
-            className="text-xs bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 outline-none text-slate-700 cursor-pointer font-medium"
-          >
-            {brands.map((b) => (
-              <option key={b} value={b}>
-                {b === "All" ? "All Brands" : `Brand: ${b}`}
-              </option>
+          {/* Status Filter */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mr-1">
+              Status:
+            </span>
+            {[
+              { id: "All", label: "All" },
+              { id: "in-stock", label: "In Stock" },
+              { id: "low-stock", label: "Low Stock" },
+              { id: "out-of-stock", label: "Out of Stock" },
+            ].map((st) => (
+              <button
+                key={st.id}
+                type="button"
+                onClick={() => setStatusFilter(st.id)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${statusFilter === st.id
+                  ? "bg-sky-700 text-white"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+              >
+                {st.label}
+              </button>
             ))}
-          </select>
-
-          <span className="ml-auto text-xs text-slate-400">
-            Showing <strong className="text-slate-700">{totalItems}</strong> matching items
-          </span>
+          </div>
         </div>
       </div>
 
-      {/* 📋 INVENTORY TABLE */}
+      {/* 📦 INVENTORY TABLE */}
       <div
         ref={tableRef}
-        className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden scroll-mt-24"
+        className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden"
       >
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm border-collapse">
+          <table className="w-full text-left border-collapse text-xs sm:text-sm">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                <th className="py-3.5 px-4">SKU / Product</th>
-                <th className="py-3.5 px-4">Brand & Category</th>
-                <th className="py-3.5 px-4 text-right">Unit Price</th>
-                <th className="py-3.5 px-4 text-center">Available Stock</th>
+              <tr className="bg-slate-900 text-white text-[11px] font-bold uppercase tracking-wider">
+                <th className="py-3.5 px-4">Product &amp; SKU</th>
+                <th className="py-3.5 px-4">Brand &amp; Category</th>
+                {isAdmin && (
+                  <th className="py-3.5 px-3 text-right whitespace-nowrap">
+                    Cost (<AedSymbol />)
+                  </th>
+                )}
+                {isAdmin && (
+                  <th className="py-3.5 px-3 text-center whitespace-nowrap">
+                    Margin (<AedSymbol />)
+                  </th>
+                )}
+                <th className="py-3.5 px-4 text-right whitespace-nowrap">
+                  Selling Price (<AedSymbol />)
+                </th>
+                <th className="py-3.5 px-4 text-center whitespace-nowrap">
+                  Stock Units
+                </th>
                 <th className="py-3.5 px-4 text-center">Status</th>
-                {isAdmin && <th className="py-3.5 px-4 text-right">Actions</th>}
+                {isAdmin && <th className="py-3.5 px-4 text-right">Edit</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
               {paginatedStock.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400">
-                    No products match your search or filter criteria.
+                  <td
+                    colSpan={isAdmin ? 8 : 5}
+                    className="py-12 text-center text-slate-400"
+                  >
+                    <FiPackage className="text-3xl mx-auto mb-2 text-slate-300" />
+                    <p className="text-sm font-semibold">No stock items found matching your filters.</p>
                   </td>
                 </tr>
               ) : (
                 paginatedStock.map((item) => {
                   const isOutOfStock = item.quantity === 0;
                   const isLowStock = !isOutOfStock && item.quantity <= item.minAlert;
+                  const cost = Number(item.costPrice || 0);
+                  const margin = Number(item.margin || 0);
+                  const sellingPrice = Number(item.price || (cost + margin) || 0);
+                  const originalPrice = Number(item.originalPrice || 0);
+                  const hasDiscount = originalPrice > sellingPrice && sellingPrice > 0;
 
                   return (
                     <tr
                       key={item.sku}
-                      className="hover:bg-slate-50/70 transition-colors"
+                      className="hover:bg-slate-50/80 transition-colors"
                     >
                       {/* Product & SKU */}
                       <td className="py-3.5 px-4">
@@ -442,10 +567,10 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
                             />
                           )}
                           <div className="min-w-0">
-                            <p className="font-semibold text-slate-900 truncate max-w-xs sm:max-w-md">
+                            <p className="font-bold text-slate-900 truncate max-w-xs sm:max-w-md">
                               {item.name}
                             </p>
-                            <p className="text-xs font-mono text-slate-400">
+                            <p className="text-xs font-mono text-slate-400 font-medium">
                               {item.sku}
                             </p>
                           </div>
@@ -454,39 +579,62 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
 
                       {/* Brand & Category */}
                       <td className="py-3.5 px-4">
-                        <span className="inline-block px-2 py-0.5 rounded-md bg-sky-50 text-sky-800 text-xs font-semibold mb-0.5">
+                        <span className="inline-block px-2 py-0.5 rounded-md bg-sky-50 text-sky-800 text-xs font-bold mb-0.5">
                           {item.brand}
                         </span>
-                        <p className="text-[11px] text-slate-400">
+                        <p className="text-[11px] text-slate-400 truncate max-w-[140px]">
                           {item.category}
                         </p>
                       </td>
 
-                      {/* Unit Price */}
-                      <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-900">
-                        AED {Number(item.price).toLocaleString("en-AE", { minimumFractionDigits: 2 })}
+                      {/* Cost Price (Admin Only) */}
+                      {isAdmin && (
+                        <td className="py-3.5 px-3 text-right font-mono text-slate-600 text-xs whitespace-nowrap">
+                          <AedPrice amount={cost} />
+                        </td>
+                      )}
+
+                      {/* Margin (Admin Only - Centered) */}
+                      {isAdmin && (
+                        <td className="py-3.5 px-3 text-center font-mono whitespace-nowrap">
+                          <span className="inline-flex items-center justify-center gap-1 font-bold text-xs text-emerald-700 bg-emerald-50/90 px-2.5 py-0.5 rounded-lg border border-emerald-200/80">
+                            <span>+</span>
+                            <AedPrice amount={margin} symbolClassName="text-emerald-600" />
+                          </span>
+                        </td>
+                      )}
+
+                      {/* Selling Price */}
+                      <td className="py-3.5 px-4 text-right font-mono whitespace-nowrap">
+                        <div className="flex flex-col items-end">
+                          <AedPrice amount={sellingPrice} className="font-bold text-slate-950 text-sm" />
+                          {hasDiscount && (
+                            <span className="text-[10px] text-slate-400 line-through">
+                              <AedPrice amount={originalPrice} />
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Available Stock */}
-                      <td className="py-3.5 px-4 text-center font-mono font-bold">
+                      <td className="py-3.5 px-4 text-center font-mono font-bold whitespace-nowrap">
                         <span
-                          className={`inline-flex items-center px-3 py-1 rounded-xl text-xs font-extrabold ${
-                            isOutOfStock
-                              ? "bg-rose-100/80 text-rose-700 border border-rose-200"
-                              : isLowStock
+                          className={`inline-flex items-center px-2.5 py-1 rounded-xl text-xs font-extrabold ${isOutOfStock
+                            ? "bg-rose-100/80 text-rose-700 border border-rose-200"
+                            : isLowStock
                               ? "bg-amber-100/80 text-amber-800 border border-amber-200"
                               : "bg-slate-100 text-slate-800 border border-slate-200/60"
-                          }`}
+                            }`}
                         >
                           {item.quantity} <span className="text-[10px] text-slate-500 font-semibold ml-1">units</span>
                         </span>
                       </td>
 
                       {/* Status Badge */}
-                      <td className="py-3.5 px-4 text-center">
+                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
                         {isOutOfStock ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 text-xs font-bold">
-                            <FiXCircle /> Out of Stock
+                            <FiXCircle /> Out
                           </span>
                         ) : isLowStock ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-bold">
@@ -494,7 +642,7 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold">
-                            <FiCheckCircle /> Available
+                            <FiCheckCircle /> In Stock
                           </span>
                         )}
                       </td>
@@ -506,7 +654,7 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
                             type="button"
                             onClick={() => handleOpenEdit(item)}
                             className="p-2 text-slate-400 hover:text-sky-700 hover:bg-sky-50 rounded-xl transition cursor-pointer"
-                            title="Edit Product Info & Stock Quantity"
+                            title="Edit Product Details, Cost, Margin & Stock"
                           >
                             <FiEdit2 className="text-base" />
                           </button>
@@ -520,187 +668,230 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
           </table>
         </div>
 
-        {/* 📄 PAGINATION FOOTER */}
-        {totalItems > 0 && (
-          <div className="px-4 py-3.5 bg-slate-50/80 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-            {/* Page Info & Items Per Page Selector */}
-            <div className="flex flex-wrap items-center gap-3 text-slate-500 font-medium">
-              <div>
-                Showing <strong className="text-slate-900 font-bold">{startIndex + 1}</strong> to{" "}
-                <strong className="text-slate-900 font-bold">{endIndex}</strong> of{" "}
-                <strong className="text-slate-900 font-bold">{totalItems}</strong> entries
-              </div>
+        {/* 📄 PAGINATION CONTROLS */}
+        {totalPages > 1 && (
+          <div className="p-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+            <p className="text-slate-500 font-medium">
+              Showing{" "}
+              <strong className="text-slate-900 font-mono">{startIndex + 1}</strong> to{" "}
+              <strong className="text-slate-900 font-mono">{endIndex}</strong> of{" "}
+              <strong className="text-slate-900 font-mono">{totalItems}</strong> items
+            </p>
 
-              <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200">
-                <label htmlFor="itemsPerPageSelect" className="text-slate-500 font-medium">
-                  Show:
-                </label>
-                <select
-                  id="itemsPerPageSelect"
-                  value={itemsPerPage}
-                  onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                  className="bg-white border border-slate-200 rounded-lg px-2 py-1 font-semibold text-slate-800 outline-none focus:border-sky-600 cursor-pointer"
-                >
-                  <option value={10}>10</option>
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                </select>
-                <span className="text-slate-500 font-medium">per page</span>
-              </div>
-            </div>
-
-            {/* Page Controls */}
             <div className="flex items-center gap-1">
-              {/* First Page */}
               <button
                 type="button"
                 onClick={() => handlePageChange(1)}
                 disabled={validPage === 1}
+                className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 cursor-pointer"
                 title="First Page"
-                className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-slate-600 transition cursor-pointer"
               >
-                <FiChevronsLeft className="text-sm" />
+                <FiChevronsLeft />
               </button>
-
-              {/* Prev Page */}
               <button
                 type="button"
                 onClick={() => handlePageChange(validPage - 1)}
                 disabled={validPage === 1}
+                className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 cursor-pointer"
                 title="Previous Page"
-                className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-slate-600 transition cursor-pointer"
               >
-                <FiChevronLeft className="text-sm" />
+                <FiChevronLeft />
               </button>
 
-              {/* Page Numbers */}
-              <div className="flex items-center gap-1 mx-1">
-                {getPageNumbers().map((pg) => (
-                  <button
-                    key={pg}
-                    type="button"
-                    onClick={() => handlePageChange(pg)}
-                    className={`
-                      w-7 h-7 rounded-lg text-xs font-extrabold font-mono transition cursor-pointer
-                      ${
-                        validPage === pg
-                          ? "bg-sky-700 text-white shadow-xs"
-                          : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"
-                      }
-                    `}
-                  >
-                    {pg}
-                  </button>
-                ))}
-              </div>
+              {getPageNumbers().map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => handlePageChange(p)}
+                  className={`w-8 h-8 rounded-lg font-bold font-mono transition cursor-pointer ${validPage === p
+                    ? "bg-slate-900 text-white shadow-2xs"
+                    : "border border-slate-200 text-slate-700 hover:bg-slate-50"
+                    }`}
+                >
+                  {p}
+                </button>
+              ))}
 
-              {/* Next Page */}
               <button
                 type="button"
                 onClick={() => handlePageChange(validPage + 1)}
                 disabled={validPage === totalPages}
+                className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 cursor-pointer"
                 title="Next Page"
-                className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-slate-600 transition cursor-pointer"
               >
-                <FiChevronRight className="text-sm" />
+                <FiChevronRight />
               </button>
-
-              {/* Last Page */}
               <button
                 type="button"
                 onClick={() => handlePageChange(totalPages)}
                 disabled={validPage === totalPages}
+                className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 cursor-pointer"
                 title="Last Page"
-                className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-slate-600 transition cursor-pointer"
               >
-                <FiChevronsRight className="text-sm" />
+                <FiChevronsRight />
               </button>
             </div>
           </div>
         )}
       </div>
 
-      {/* ADMIN EDIT MODAL */}
+      {/* 🛠️ ADMIN EDIT MODAL (Optimized for iPhone 14 Pro Max & all screens) */}
       {editingItem && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-lg shadow-2xl space-y-4">
-            <div>
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-slate-900">
-                  Edit Product Info & Stock
-                </h3>
-                <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-mono font-bold border border-slate-200">
-                  {editingItem.sku}
-                </span>
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl p-5 sm:p-7 w-full max-w-lg shadow-2xl space-y-4 my-6 text-left border border-slate-100">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base sm:text-lg font-black text-slate-900">
+                    Edit Product &amp; Pricing
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-lg bg-sky-50 text-sky-800 text-xs font-mono font-bold border border-sky-200">
+                    {editingItem.sku}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Controller adjustments sync live to Cloud Firestore globally.
+                </p>
               </div>
-              <p className="text-xs text-slate-500 mt-1">
-                Modifying product details will update the live database and sync in real-time for all connected users.
-              </p>
+              <button
+                type="button"
+                onClick={() => setEditingItem(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+              >
+                <FiX className="text-lg" />
+              </button>
             </div>
 
             <form onSubmit={handleSaveEdit} className="space-y-4">
               {/* Product Name */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
                   Product Full Name
                 </label>
                 <input
                   type="text"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:bg-white focus:border-sky-600 transition"
+                  className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold outline-none focus:bg-white focus:border-sky-600 transition"
                   required
                 />
               </div>
 
-              {/* Brand & Category */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* Brand & Category (Clean 2-column grid) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
                     Brand
                   </label>
                   <input
                     type="text"
                     value={editBrand}
                     onChange={(e) => setEditBrand(e.target.value)}
-                    className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:bg-white focus:border-sky-600 transition"
+                    className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm outline-none focus:bg-white focus:border-sky-600 transition"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
                     Category
                   </label>
                   <input
                     type="text"
                     value={editCategory}
                     onChange={(e) => setEditCategory(e.target.value)}
-                    className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:bg-white focus:border-sky-600 transition"
+                    className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm outline-none focus:bg-white focus:border-sky-600 transition"
                     required
                   />
                 </div>
               </div>
 
-              {/* Price, Stock Quantity, Min Alert */}
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                    Price (AED)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={editPrice}
-                    onChange={(e) => setEditPrice(e.target.value)}
-                    className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-sm outline-none focus:bg-white focus:border-sky-600 transition"
-                    required
-                  />
+              {/* 💰 CONTROLLER PRICING ENGINE BOX */}
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-sky-50/70 border border-sky-100/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-sky-900 font-bold text-xs">
+                    <FiDollarSign className="text-sky-700" />
+                    <span>Controller Pricing Engine</span>
+                  </div>
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                    Selling = Cost + Margin
+                  </span>
                 </div>
 
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Cost Price */}
+                  <div>
+                    <label className="block text-[10.5px] font-bold text-slate-700 uppercase tracking-wider mb-1 h-5 flex items-center gap-1">
+                      <span>Cost Price</span> (<AedSymbol className="text-xs" />)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={editCostPrice}
+                      onChange={(e) => handleCostChange(e.target.value)}
+                      className="w-full py-2 px-3 bg-white border border-slate-200 rounded-xl font-mono text-xs sm:text-sm font-bold text-slate-900 outline-none focus:border-sky-600 transition"
+                      required
+                    />
+                  </div>
+
+                  {/* Profit Margin */}
+                  <div>
+                    <label className="block text-[10.5px] font-bold text-slate-700 uppercase tracking-wider mb-1 h-5 flex items-center gap-1">
+                      <span>Margin</span> (<AedSymbol className="text-xs" />)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={editMargin}
+                      onChange={(e) => handleMarginChange(e.target.value)}
+                      className="w-full py-2 px-3 bg-white border border-slate-200 rounded-xl font-mono text-xs sm:text-sm font-bold text-emerald-700 outline-none focus:border-sky-600 transition"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-1 border-t border-sky-100">
+                  {/* Selling Price */}
+                  <div>
+                    <label className="block text-[10.5px] font-bold text-sky-900 uppercase tracking-wider mb-1 h-5 flex items-center gap-1">
+                      <span>Selling Price</span> (<AedSymbol className="text-xs" />)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={editPrice}
+                      onChange={(e) => setEditPrice(e.target.value)}
+                      className="w-full py-2 px-3 bg-white border-2 border-sky-500 rounded-xl font-mono text-xs sm:text-sm font-black text-sky-950 outline-none transition"
+                      required
+                    />
+                  </div>
+
+                  {/* MSRP / Original Price */}
+                  <div>
+                    <label className="block text-[10.5px] font-bold text-slate-500 uppercase tracking-wider mb-1 h-5 flex items-center gap-1">
+                      <span>Original / List</span> (<AedSymbol className="text-xs" />)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="Optional"
+                      value={editOriginalPrice}
+                      onChange={(e) => setEditOriginalPrice(e.target.value)}
+                      className="w-full py-2 px-3 bg-white border border-slate-200 rounded-xl font-mono text-xs sm:text-sm text-slate-700 outline-none focus:border-sky-600 transition"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 📦 INVENTORY & ALERTS */}
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 h-5 flex items-center">
                     Stock Quantity
                   </label>
                   <input
@@ -708,46 +899,47 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
                     min="0"
                     value={editQty}
                     onChange={(e) => setEditQty(e.target.value)}
-                    className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-sm outline-none focus:bg-white focus:border-sky-600 transition"
+                    className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs sm:text-sm font-bold outline-none focus:bg-white focus:border-sky-600 transition"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                    Min Alert
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 h-5 flex items-center">
+                    Min Stock Alert
                   </label>
                   <input
                     type="number"
                     min="1"
                     value={editAlert}
                     onChange={(e) => setEditAlert(e.target.value)}
-                    className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-sm outline-none focus:bg-white focus:border-sky-600 transition"
+                    className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs sm:text-sm font-bold outline-none focus:bg-white focus:border-sky-600 transition"
                     required
                   />
                 </div>
               </div>
 
               {/* Live sync note */}
-              <div className="p-3 bg-sky-50 border border-sky-100 rounded-xl flex items-center gap-2 text-xs text-sky-800 font-medium">
-                <FiGlobe className="text-sky-600 text-sm shrink-0" />
-                <span>Saves directly to Cloud Firestore &amp; updates live globally across all devices.</span>
+              <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-2 text-[11px] text-slate-600 font-medium">
+                <FiGlobe className="text-sky-600 text-xs shrink-0" />
+                <span>Saves directly to Cloud Firestore &amp; updates live globally.</span>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setEditingItem(null)}
-                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-semibold transition"
+                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-semibold transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="px-5 py-2 bg-sky-700 hover:bg-sky-800 text-white rounded-xl text-xs font-semibold transition cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2.5 bg-sky-700 hover:bg-sky-800 text-white rounded-xl text-xs font-bold transition cursor-pointer disabled:opacity-50 shadow-md"
                 >
-                  {isSaving ? "Saving to Database..." : "Save Changes"}
+                  {isSaving ? "Saving..." : "Save Changes"}
                 </button>
               </div>
             </form>
@@ -757,20 +949,20 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
 
       {/* ADMIN ADD PRODUCT MODAL */}
       {showAddProductModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-lg shadow-2xl">
-            <h3 className="text-lg font-bold text-slate-900 mb-1">
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl p-5 sm:p-7 w-full max-w-lg shadow-2xl my-6 text-left border border-slate-100">
+            <h3 className="text-base sm:text-lg font-black text-slate-900 mb-1">
               Add New Product to Inventory
             </h3>
             <p className="text-xs text-slate-500 mb-4">
-              Enter product details to add directly to database stock.
+              Enter product details, pricing, and stock to save to Cloud Firestore.
             </p>
 
             <form onSubmit={handleAddProduct} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    SKU / Product Code *
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    SKU Code *
                   </label>
                   <input
                     type="text"
@@ -778,12 +970,12 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
                     placeholder="e.g. SONY-WH1000XM5"
                     value={newSku}
                     onChange={(e) => setNewSku(e.target.value)}
-                    className="w-full py-2.5 px-3 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs outline-none focus:bg-white focus:border-sky-600 uppercase"
+                    className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs outline-none focus:bg-white focus:border-sky-600 uppercase font-bold"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
                     Brand *
                   </label>
                   <input
@@ -792,28 +984,82 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
                     placeholder="e.g. Sony, Apple, Samsung"
                     value={newBrand}
                     onChange={(e) => setNewBrand(e.target.value)}
-                    className="w-full py-2.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:bg-white focus:border-sky-600"
+                    className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:bg-white focus:border-sky-600"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
                   Product Full Name *
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Sony WH-1000XM5 Noise Canceling Headphones"
+                  placeholder="e.g. Sony WH-1000XM5 Wireless Noise Canceling Headphones"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:bg-white focus:border-sky-600 font-medium"
+                  className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:bg-white focus:border-sky-600 font-semibold"
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="p-3 bg-sky-50 rounded-2xl border border-sky-100 grid grid-cols-3 gap-2 text-xs">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block font-bold text-slate-700 text-[10px] mb-1">
+                    Cost ({CURRENCY_SYMBOL})
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={newCostPrice}
+                    onChange={(e) => {
+                      setNewCostPrice(e.target.value);
+                      const c = parseFloat(e.target.value) || 0;
+                      const m = parseFloat(newMargin) || 0;
+                      setNewPrice((c + m).toFixed(2));
+                    }}
+                    className="w-full py-1.5 px-2 bg-white border border-slate-200 rounded-lg font-mono text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 text-[10px] mb-1">
+                    Margin ({CURRENCY_SYMBOL})
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={newMargin}
+                    onChange={(e) => {
+                      setNewMargin(e.target.value);
+                      const c = parseFloat(newCostPrice) || 0;
+                      const m = parseFloat(e.target.value) || 0;
+                      setNewPrice((c + m).toFixed(2));
+                    }}
+                    className="w-full py-1.5 px-2 bg-white border border-slate-200 rounded-lg font-mono text-xs text-emerald-700 font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-sky-900 text-[10px] mb-1">
+                    Selling ({CURRENCY_SYMBOL})
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    required
+                    value={newPrice}
+                    onChange={(e) => setNewPrice(e.target.value)}
+                    className="w-full py-1.5 px-2 bg-white border-2 border-sky-500 rounded-lg font-mono text-xs font-black text-sky-900"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
                     Initial Stock
                   </label>
                   <input
@@ -827,23 +1073,8 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Price (AED)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    required
-                    value={newPrice}
-                    onChange={(e) => setNewPrice(e.target.value)}
-                    className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs outline-none focus:bg-white focus:border-sky-600"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Min Alert
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Min Stock Alert
                   </label>
                   <input
                     type="number"
@@ -866,7 +1097,7 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-sky-700 hover:bg-sky-800 text-white rounded-xl text-xs font-semibold transition cursor-pointer"
+                  className="px-5 py-2 bg-sky-700 hover:bg-sky-800 text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-md"
                 >
                   Add Product
                 </button>

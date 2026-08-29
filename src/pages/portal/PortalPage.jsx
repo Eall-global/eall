@@ -12,12 +12,16 @@ import {
   FiRefreshCw,
   FiCheckCircle,
   FiInfo,
+  FiUsers,
+  FiTag,
 } from "react-icons/fi";
 import { useStaffAuth } from "../../context/StaffAuthContext";
 import PortalLogin from "../../components/portal/PortalLogin";
 import StockTable from "../../components/portal/StockTable";
 import BillingPOS from "../../components/portal/BillingPOS";
 import InvoiceAudit from "../../components/portal/InvoiceAudit";
+import CustomerManagement from "../../components/portal/CustomerManagement";
+import CouponManagement from "../../components/portal/CouponManagement";
 import PortalSettings from "../../components/portal/PortalSettings";
 import InvoiceDocument from "../../components/portal/InvoiceDocument";
 import { fetchStock } from "../../services/stockService";
@@ -93,6 +97,8 @@ const PortalPage = () => {
   ];
 
   if (isAdmin) {
+    tabs.push({ id: "customers", label: "Customers", icon: FiUsers });
+    tabs.push({ id: "coupons", label: "Coupons & Offers", icon: FiTag });
     tabs.push({ id: "settings", label: "System & Settings", icon: FiSettings });
   }
 
@@ -246,7 +252,17 @@ const PortalPage = () => {
           />
         )}
 
-        {/* TAB 4: SYSTEM SETTINGS (Admin Only) */}
+        {/* TAB 4: CUSTOMERS (Admin Only - Hidden for Salesperson) */}
+        {activeTab === "customers" && isAdmin && (
+          <CustomerManagement />
+        )}
+
+        {/* TAB 5: COUPONS & OFFERS (Admin Only) */}
+        {activeTab === "coupons" && isAdmin && (
+          <CouponManagement />
+        )}
+
+        {/* TAB 6: SYSTEM SETTINGS (Admin Only) */}
         {activeTab === "settings" && isAdmin && (
           <PortalSettings onConfigUpdated={loadData} />
         )}

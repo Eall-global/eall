@@ -111,7 +111,7 @@ const CartPage = () => {
                       </p>
                     ) : (
                       <p className="text-slate-700 font-medium text-xs">
-                        Add <strong className="font-mono text-sky-800">AED {amountToFreeShipping.toFixed(2)}</strong> for <strong className="text-emerald-700 font-bold">FREE Delivery</strong>
+                        Add <strong className="font-mono text-sky-800">د.إ {amountToFreeShipping.toFixed(2)}</strong> for <strong className="text-emerald-700 font-bold">FREE Delivery</strong>
                       </p>
                     )}
                   </div>
@@ -146,7 +146,7 @@ const CartPage = () => {
                             </p>
                           ) : null}
                           <p className="text-xs font-mono font-semibold text-slate-700 mt-0.5">
-                            AED {item.price.toFixed(2)} ea
+                            د.إ {item.price.toFixed(2)} ea
                           </p>
                         </div>
                       </div>
@@ -176,7 +176,7 @@ const CartPage = () => {
 
                         {/* Subtotal */}
                         <span className="font-mono font-bold text-xs sm:text-sm text-slate-900 min-w-17.5 text-right">
-                          AED {(item.price * item.quantity).toFixed(2)}
+                          د.إ {(item.price * item.quantity).toFixed(2)}
                         </span>
 
                         {/* Remove */}
@@ -207,7 +207,7 @@ const CartPage = () => {
                   <div className="flex justify-between">
                     <span>Subtotal</span>
                     <span className="font-mono font-bold text-slate-900">
-                      AED {cartSubtotal.toFixed(2)}
+                      د.إ {cartSubtotal.toFixed(2)}
                     </span>
                   </div>
 
@@ -217,7 +217,7 @@ const CartPage = () => {
                       {shippingFee === 0 ? (
                         <span className="text-emerald-700 font-extrabold text-[10px] uppercase">FREE</span>
                       ) : (
-                        `AED ${shippingFee.toFixed(2)}`
+                        `د.إ ${shippingFee.toFixed(2)}`
                       )}
                     </span>
                   </div>
@@ -226,7 +226,7 @@ const CartPage = () => {
                     <span className="font-bold text-slate-900 text-xs sm:text-sm">Total</span>
                     <div className="text-right">
                       <span className="font-mono font-black text-lg sm:text-xl text-sky-800">
-                        AED {cartTotal.toFixed(2)}
+                        د.إ {cartTotal.toFixed(2)}
                       </span>
                       <span className="text-[10px] font-mono text-slate-400 block">
                         ≈ USD {(cartTotal / 3.6725).toFixed(2)}

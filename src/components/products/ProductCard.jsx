@@ -5,6 +5,7 @@ import { useState } from "react";
 import { getColorSwatch } from "../../utils/getColorSwatch";
 import { useWishlist } from "../../context/WishlistContext";
 import { useCart } from "../../context/CartContext";
+import { AedSymbol, AedPrice } from "../common/AedSymbol";
 
 const ProductCard = ({ product }) => {
   const { isWishlisted, toggleWishlist } = useWishlist();
@@ -138,11 +139,38 @@ const ProductCard = ({ product }) => {
           </div>
 
           {/* 🏷️ LIVE PRICE & BOTTOM ACTION CTA */}
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-            <div>
-              <span className="font-mono font-black text-sm text-sky-900">
-                AED {(product.livePrice !== undefined ? Number(product.livePrice) : (product.price || 0)).toFixed(2)}
-              </span>
+          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+            <div className="flex flex-col">
+              {(() => {
+                const sellingPrice = product.livePrice !== undefined ? Number(product.livePrice) : (product.price || 0);
+                const originalPrice = Number(product.originalPrice || 0);
+                const hasDiscount = originalPrice > sellingPrice && sellingPrice > 0;
+                const discountPct = hasDiscount ? Math.round(((originalPrice - sellingPrice) / originalPrice) * 100) : 0;
+
+                return (
+                  <>
+                    <div className="flex items-baseline gap-1.5 flex-wrap">
+                      <AedPrice
+                        amount={sellingPrice}
+                        className="text-xs sm:text-sm font-black text-sky-950"
+                        symbolClassName="text-sky-700"
+                      />
+                      {hasDiscount && (
+                        <AedPrice
+                          amount={originalPrice}
+                          className="text-[10px] sm:text-[11px] font-normal text-slate-400 line-through"
+                          symbolClassName="text-slate-400"
+                        />
+                      )}
+                    </div>
+                    {hasDiscount && discountPct > 0 && (
+                      <span className="inline-block text-[9.5px] font-bold text-emerald-600 font-sans mt-0.5">
+                        Save {discountPct}%
+                      </span>
+                    )}
+                  </>
+                );
+              })()}
             </div>
 
             <div className="flex items-center gap-2">
@@ -153,10 +181,10 @@ const ProductCard = ({ product }) => {
                   e.stopPropagation();
                   addToCart(product, 1, { openDrawer: true });
                 }}
-                className="p-1.5 rounded-lg bg-sky-50/80 hover:bg-sky-700 text-sky-600 hover:text-sky-50 border border-sky-500 transition shadow-2xs cursor-pointer flex items-center gap-1 text-xs font-bold"
+                className="p-2 rounded-xl bg-sky-50/80 hover:bg-sky-700 text-sky-700 hover:text-white border border-sky-300 hover:border-sky-700 transition shadow-2xs cursor-pointer flex items-center gap-1 text-xs font-bold"
                 title="Add to Cart"
               >
-                <MdOutlineAddShoppingCart className="text-sm sm:text-base font-semibold" />
+                <MdOutlineAddShoppingCart className="text-base" />
               </button>
             </div>
           </div>

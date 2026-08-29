@@ -96,10 +96,32 @@ export const CatalogProvider = ({ children }) => {
         ? Number(prod.stock)
         : 0;
       const minAlert = liveItem ? Number(liveItem.minAlert || 3) : 3;
-      const livePrice = liveItem
-        ? Number(liveItem.price)
-        : prod.price !== undefined && prod.price !== null
-        ? Number(prod.price)
+      const costPrice = liveItem ? Number(liveItem.costPrice || 0) : (prod.costPrice !== undefined ? Number(prod.costPrice) : 0);
+      const margin = liveItem ? Number(liveItem.margin || 0) : (prod.margin !== undefined ? Number(prod.margin) : 0);
+
+      // Selling price is live price or cost + margin or static catalog price
+      let livePrice = 0;
+      if (liveItem && liveItem.price !== undefined && liveItem.price !== null && Number(liveItem.price) > 0) {
+        livePrice = Number(liveItem.price);
+      } else if (costPrice + margin > 0) {
+        livePrice = costPrice + margin;
+      } else if (prod.price !== undefined && prod.price !== null) {
+        livePrice = Number(prod.price);
+      }
+
+      // Original / List price for discount display
+      let originalPrice = 0;
+      if (liveItem && liveItem.originalPrice !== undefined && Number(liveItem.originalPrice) > 0) {
+        originalPrice = Number(liveItem.originalPrice);
+      } else if (prod.originalPrice !== undefined && Number(prod.originalPrice) > 0) {
+        originalPrice = Number(prod.originalPrice);
+      } else if (prod.listPrice !== undefined && Number(prod.listPrice) > 0) {
+        originalPrice = Number(prod.listPrice);
+      }
+
+      const hasDiscount = originalPrice > livePrice && livePrice > 0;
+      const discountPercentage = hasDiscount
+        ? Math.round(((originalPrice - livePrice) / originalPrice) * 100)
         : 0;
 
       const availabilityInfo = computeLiveAvailability(liveQty, minAlert);
@@ -108,7 +130,13 @@ export const CatalogProvider = ({ children }) => {
         ...prod,
         sku: cleanSku,
         liveQuantity: liveQty,
+        costPrice,
+        margin,
         livePrice,
+        price: livePrice, // sync standard price field for cart & checkout
+        originalPrice,
+        hasDiscount,
+        discountPercentage,
         minAlert,
         availability: availabilityInfo.status,
         availabilityBadge: availabilityInfo.badgeText,
