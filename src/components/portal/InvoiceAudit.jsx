@@ -22,8 +22,20 @@ import {
 import { updateInvoice, deleteInvoice } from "../../services/billingService";
 import { useStaffAuth } from "../../context/StaffAuthContext";
 
-const InvoiceAudit = ({ invoices = [], stock = [], onSelectInvoice, onInvoicesChanged }) => {
+const InvoiceAudit = ({
+  invoices = [],
+  stock = [],
+  onSelectInvoice,
+  onViewInvoice,
+  onInvoicesChanged,
+  onInvoicesUpdated,
+}) => {
   const { currentUser, isAdmin } = useStaffAuth();
+  const handleViewInvoice = onViewInvoice || onSelectInvoice;
+  const notifyInvoicesChanged = () => {
+    if (onInvoicesUpdated) onInvoicesUpdated();
+    if (onInvoicesChanged) onInvoicesChanged();
+  };
 
   const [search, setSearch] = useState("");
   const [filterPeriod, setFilterPeriod] = useState("all"); // all, today, month
@@ -215,7 +227,7 @@ const InvoiceAudit = ({ invoices = [], stock = [], onSelectInvoice, onInvoicesCh
       });
 
       setEditingInvoice(null);
-      if (onInvoicesChanged) onInvoicesChanged();
+      notifyInvoicesChanged();
     } catch (err) {
       setEditError(err.message || "Failed to update invoice");
     } finally {
@@ -231,7 +243,7 @@ const InvoiceAudit = ({ invoices = [], stock = [], onSelectInvoice, onInvoicesCh
     try {
       await deleteInvoice(deletingInvoice.invoiceNo);
       setDeletingInvoice(null);
-      if (onInvoicesChanged) onInvoicesChanged();
+      notifyInvoicesChanged();
     } catch (err) {
       alert("Failed to delete invoice: " + err.message);
     } finally {
@@ -479,7 +491,7 @@ const InvoiceAudit = ({ invoices = [], stock = [], onSelectInvoice, onInvoicesCh
                         {/* View / Print A4 Document */}
                         <button
                           type="button"
-                          onClick={() => onSelectInvoice(inv)}
+                          onClick={() => handleViewInvoice && handleViewInvoice(inv)}
                           className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-800 rounded-lg text-xs font-semibold transition cursor-pointer"
                           title="View and Print A4 Invoice"
                         >

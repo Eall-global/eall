@@ -5,8 +5,39 @@ import autoTable from "jspdf-autotable";
  * High-performance vector A4 Tax Invoice Generator
  * Generates exact standard A4 PDF (210mm x 297mm) with vector graphics, crisp typography, and AutoTable.
  */
-export const buildInvoicePDF = (invoice) => {
-  if (!invoice) return null;
+export const buildInvoicePDF = (rawInvoice) => {
+  if (!rawInvoice) return null;
+
+  // Safe normalization across POS invoices and Online Checkout orders
+  const invoice = {
+    invoiceNo: rawInvoice.invoiceNo || rawInvoice.orderId || rawInvoice.id || "INV-001",
+    customerName: rawInvoice.customerName || rawInvoice.fullName || "Customer",
+    customerPhone: rawInvoice.customerPhone || rawInvoice.phone || "N/A",
+    customerEmail: rawInvoice.customerEmail || rawInvoice.email || "",
+    customerTrn: rawInvoice.customerTrn || "",
+    paymentMethod: rawInvoice.paymentMethodName || rawInvoice.paymentMethod || "Cash",
+    createdBy: rawInvoice.createdBy || "Website Online Order",
+    notes: rawInvoice.notes || "",
+    createdAt: rawInvoice.createdAt || new Date().toISOString(),
+    subtotal: Number(rawInvoice.subtotal ?? rawInvoice.totalAmount ?? rawInvoice.total ?? 0),
+    vatRate: Number(rawInvoice.vatRate ?? 5),
+    vatAmount: Number(rawInvoice.vatAmount ?? 0),
+    discount: Number(rawInvoice.discount ?? 0),
+    totalAmount: Number(rawInvoice.totalAmount ?? rawInvoice.total ?? 0),
+    items: (rawInvoice.items || []).map((item) => {
+      const qty = Number(item.quantity) || 1;
+      const unitPrice = Number(item.unitPrice ?? item.price ?? 0);
+      const total = Number(item.total ?? unitPrice * qty);
+      return {
+        sku: item.sku || "N/A",
+        name: item.name || item.title || "Item",
+        brand: item.brand || "",
+        quantity: qty,
+        unitPrice,
+        total,
+      };
+    }),
+  };
 
   const doc = new jsPDF({
     orientation: "portrait",
@@ -28,11 +59,9 @@ export const buildInvoicePDF = (invoice) => {
   const borderGray = [226, 232, 240]; // #e2e8f0
 
   // 1. TOP HEADER - BRAND LOGO & COMPANY INFORMATION
-  // Logo placeholder / space (alone on top-left)
-  // Below logo: E-ALL (ELECTRONICS ALL FZCO)
   const headerY = 12;
 
-  // Company Title below logo space
+  // Company Title
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.setTextColor(...navy);
@@ -43,9 +72,9 @@ export const buildInvoicePDF = (invoice) => {
   doc.setTextColor(...slateMuted);
   doc.text("Premium Consumer Electronics Distribution & Solutions", margin, headerY + 16.5);
   doc.text("Dubai Silicon Oasis, DDP, Building A2, Dubai, United Arab Emirates", margin, headerY + 20.5);
-  doc.text("TRN (VAT No): 100482910400003   |   Email: contact@e-all.ae", margin, headerY + 24.5);
+  doc.text("TRN (VAT No): 100482910400003   |   Email: contact@eall.ae", margin, headerY + 24.5);
 
-  // 2. TAX INVOICE BADGE & META (RIGHT SIDE - CENTERED / BOTTOM ALIGNED)
+  // 2. TAX INVOICE BADGE & META (RIGHT SIDE)
   const rightHeaderY = headerY + 2;
 
   // "TAX INVOICE" Badge
@@ -74,7 +103,7 @@ export const buildInvoicePDF = (invoice) => {
   });
 
   doc.text(`Date: ${invoiceDate}   |   Time: ${invoiceTime}`, rightX, rightHeaderY + 16.5, { align: "right" });
-  doc.text(`Issued By: ${invoice.createdBy || "Staff"}   |   Payment: ${invoice.paymentMethod || "Cash"}`, rightX, rightHeaderY + 20.5, { align: "right" });
+  doc.text(`Issued By: ${invoice.createdBy}   |   Payment: ${invoice.paymentMethod}`, rightX, rightHeaderY + 20.5, { align: "right" });
 
   // Horizontal Divider Line
   doc.setDrawColor(...borderGray);
@@ -128,14 +157,14 @@ export const buildInvoicePDF = (invoice) => {
     doc.text(`Remarks: ${invoice.notes}`, rightX - 4, 57.5, { align: "right" });
   }
 
-  // 4. ITEMIZED PRODUCTS AUTOTABLE (Compact, Professional Padding & Typography)
-  const tableRows = (invoice.items || []).map((item, index) => [
+  // 4. ITEMIZED PRODUCTS AUTOTABLE
+  const tableRows = invoice.items.map((item, index) => [
     index + 1,
-    item.sku || "N/A",
+    item.sku,
     item.name + (item.brand ? ` (${item.brand})` : ""),
     item.quantity,
-    Number(item.unitPrice).toLocaleString("en-AE", { minimumFractionDigits: 2 }),
-    (Number(item.unitPrice) * Number(item.quantity)).toLocaleString("en-AE", { minimumFractionDigits: 2 }),
+    item.unitPrice.toLocaleString("en-AE", { minimumFractionDigits: 2 }),
+    item.total.toLocaleString("en-AE", { minimumFractionDigits: 2 }),
   ]);
 
   autoTable(doc, {
@@ -201,7 +230,7 @@ export const buildInvoicePDF = (invoice) => {
   // Subtotal
   doc.text("Subtotal:", totalsX, finalY + 3);
   doc.setFont("courier", "bold");
-  doc.text(`AED ${Number(invoice.subtotal).toLocaleString("en-AE", { minimumFractionDigits: 2 })}`, rightX, finalY + 3, { align: "right" });
+  doc.text(`AED ${invoice.subtotal.toLocaleString("en-AE", { minimumFractionDigits: 2 })}`, rightX, finalY + 3, { align: "right" });
 
   let curY = finalY + 7;
 
@@ -211,16 +240,16 @@ export const buildInvoicePDF = (invoice) => {
     doc.setTextColor(225, 29, 72); // Rose 600
     doc.text("Discount:", totalsX, curY);
     doc.setFont("courier", "bold");
-    doc.text(`- AED ${Number(invoice.discount).toLocaleString("en-AE", { minimumFractionDigits: 2 })}`, rightX, curY, { align: "right" });
+    doc.text(`- AED ${invoice.discount.toLocaleString("en-AE", { minimumFractionDigits: 2 })}`, rightX, curY, { align: "right" });
     curY += 4.5;
   }
 
   // VAT (5%)
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...slateText);
-  doc.text(`UAE VAT (${invoice.vatRate || 5}%):`, totalsX, curY);
+  doc.text(`UAE VAT (${invoice.vatRate}%):`, totalsX, curY);
   doc.setFont("courier", "bold");
-  doc.text(`AED ${Number(invoice.vatAmount).toLocaleString("en-AE", { minimumFractionDigits: 2 })}`, rightX, curY, { align: "right" });
+  doc.text(`AED ${invoice.vatAmount.toLocaleString("en-AE", { minimumFractionDigits: 2 })}`, rightX, curY, { align: "right" });
   curY += 5.5;
 
   // Grand Total Box
@@ -232,7 +261,7 @@ export const buildInvoicePDF = (invoice) => {
   doc.text("Grand Total:", totalsX + 2, curY + 3.8);
   doc.setFont("courier", "bold");
   doc.setFontSize(9.5);
-  doc.text(`AED ${Number(invoice.totalAmount).toLocaleString("en-AE", { minimumFractionDigits: 2 })}`, rightX - 2, curY + 3.8, { align: "right" });
+  doc.text(`AED ${invoice.totalAmount.toLocaleString("en-AE", { minimumFractionDigits: 2 })}`, rightX - 2, curY + 3.8, { align: "right" });
 
   // 6. BOTTOM SIGNATURE LINES
   const bottomY = Math.max(curY + 22, 258);
@@ -276,7 +305,9 @@ export const buildInvoicePDF = (invoice) => {
 export const downloadInvoicePDF = (invoice) => {
   const doc = buildInvoicePDF(invoice);
   if (!doc) return;
-  const fileName = `Invoice_${invoice.invoiceNo}_${invoice.customerName.replace(/[^a-zA-Z0-9]/g, "_")}.pdf`;
+  const num = invoice.invoiceNo || invoice.orderId || "Invoice";
+  const name = (invoice.customerName || invoice.fullName || "Customer").replace(/[^a-zA-Z0-9]/g, "_");
+  const fileName = `Invoice_${num}_${name}.pdf`;
   doc.save(fileName);
 };
 

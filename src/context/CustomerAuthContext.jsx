@@ -206,7 +206,9 @@ export const CustomerAuthProvider = ({ children }) => {
     } catch (err) {
       console.error("Firebase register error:", err);
       let msg = "Could not complete registration. Please try again.";
-      if (err.code === "auth/email-already-in-use") {
+      if (err.code === "auth/configuration-not-found" || err.code === "auth/operation-not-allowed") {
+        msg = "Firebase Authentication is not activated yet in Firebase Console. Please go to Firebase Console > Authentication > Sign-in method and enable Email/Password.";
+      } else if (err.code === "auth/email-already-in-use") {
         msg = "An account with this email already exists. Please sign in instead.";
       } else if (err.code === "auth/invalid-email") {
         msg = "Please enter a valid email address.";
@@ -251,7 +253,9 @@ export const CustomerAuthProvider = ({ children }) => {
     } catch (err) {
       console.error("Firebase login error:", err);
       let msg = "Invalid email or password. Please verify your credentials or create a new account.";
-      if (err.code === "auth/user-not-found" || err.code === "auth/invalid-credential") {
+      if (err.code === "auth/configuration-not-found" || err.code === "auth/operation-not-allowed") {
+        msg = "Firebase Authentication is not activated in Firebase Console. Please enable Email/Password under Firebase Console > Authentication > Sign-in method.";
+      } else if (err.code === "auth/user-not-found" || err.code === "auth/invalid-credential") {
         msg = "No registered account found with this email, or incorrect password. Please create an account if you haven't registered.";
       } else if (err.code === "auth/wrong-password") {
         msg = "Incorrect password. Please try again.";
@@ -298,7 +302,12 @@ export const CustomerAuthProvider = ({ children }) => {
     } catch (err) {
       console.error("Google Sign-In error:", err);
       let msg = "Google Sign-In was cancelled or failed.";
-      if (err.code === "auth/popup-closed-by-user") {
+      if (err.code === "auth/unauthorized-domain") {
+        const currentDomain = window?.location?.hostname || "your domain";
+        msg = `Domain not authorized. Please add "${currentDomain}" to Firebase Console > Authentication > Settings > Authorized domains.`;
+      } else if (err.code === "auth/configuration-not-found" || err.code === "auth/operation-not-allowed") {
+        msg = "Google Sign-In is not enabled yet in Firebase Console. Please go to Firebase Console > Authentication > Sign-in method and enable Google.";
+      } else if (err.code === "auth/popup-closed-by-user") {
         msg = "Sign-in window was closed before completing.";
       } else if (err.message) {
         msg = err.message;

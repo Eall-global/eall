@@ -72,9 +72,9 @@ const AuthModal = () => {
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 text-left">
       <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-200">
-        
+
         {/* HEADER */}
-        <div className="p-6 bg-gradient-to-br from-slate-900 via-sky-950 to-slate-900 text-white relative">
+        <div className="p-6 bg-linear-to-br from-slate-900 via-sky-950 to-slate-900 text-white relative">
           <button
             type="button"
             onClick={closeAuthModal}
@@ -104,22 +104,20 @@ const AuthModal = () => {
             <button
               type="button"
               onClick={() => setAuthMode("login")}
-              className={`flex-1 py-2 text-xs font-bold rounded-lg transition cursor-pointer ${
-                authMode === "login"
+              className={`flex-1 py-2 text-xs font-bold rounded-lg transition cursor-pointer ${authMode === "login"
                   ? "bg-sky-700 text-white shadow-xs"
                   : "text-slate-400 hover:text-white"
-              }`}
+                }`}
             >
               Sign In
             </button>
             <button
               type="button"
               onClick={() => setAuthMode("register")}
-              className={`flex-1 py-2 text-xs font-bold rounded-lg transition cursor-pointer ${
-                authMode === "register"
+              className={`flex-1 py-2 text-xs font-bold rounded-lg transition cursor-pointer ${authMode === "register"
                   ? "bg-sky-700 text-white shadow-xs"
                   : "text-slate-400 hover:text-white"
-              }`}
+                }`}
             >
               Create Account
             </button>
@@ -128,7 +126,7 @@ const AuthModal = () => {
 
         {/* BODY CONTENT */}
         <div className="p-6 space-y-4">
-          
+
           {/* ⚡ ONE-CLICK GOOGLE SIGN IN */}
           <button
             type="button"

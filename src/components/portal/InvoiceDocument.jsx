@@ -15,13 +15,46 @@ import {
   getInvoicePDFBlob,
 } from "../../services/pdfInvoiceGenerator";
 
-const InvoiceDocument = ({ invoice, onClose }) => {
+const InvoiceDocument = ({ invoice: rawInvoice, onClose }) => {
   const [downloading, setDownloading] = useState(false);
   const [sharing, setSharing] = useState(false);
 
-  if (!invoice) return null;
+  if (!rawInvoice) return null;
 
-  // 1. Direct 1-Click Vector PDF Download (No screen capturing, No browser print dialogs)
+  // Safe data normalization for invoices created from POS or Online Store Checkout
+  const invoice = {
+    ...rawInvoice,
+    invoiceNo: rawInvoice.invoiceNo || rawInvoice.orderId || rawInvoice.id || "INV-001",
+    customerName: rawInvoice.customerName || rawInvoice.fullName || "Customer",
+    customerPhone: rawInvoice.customerPhone || rawInvoice.phone || "N/A",
+    customerEmail: rawInvoice.customerEmail || rawInvoice.email || "",
+    customerTrn: rawInvoice.customerTrn || "",
+    paymentMethod: rawInvoice.paymentMethodName || rawInvoice.paymentMethod || "Cash",
+    createdBy: rawInvoice.createdBy || "Website Online Order",
+    notes: rawInvoice.notes || "",
+    createdAt: rawInvoice.createdAt || new Date().toISOString(),
+    subtotal: Number(rawInvoice.subtotal ?? rawInvoice.totalAmount ?? rawInvoice.total ?? 0),
+    vatRate: Number(rawInvoice.vatRate ?? 5),
+    vatAmount: Number(rawInvoice.vatAmount ?? 0),
+    discount: Number(rawInvoice.discount ?? 0),
+    totalAmount: Number(rawInvoice.totalAmount ?? rawInvoice.total ?? 0),
+    items: (rawInvoice.items || []).map((item) => {
+      const qty = Number(item.quantity) || 1;
+      const unitPrice = Number(item.unitPrice ?? item.price ?? 0);
+      const total = Number(item.total ?? unitPrice * qty);
+      return {
+        ...item,
+        sku: item.sku || "N/A",
+        name: item.name || item.title || "Item",
+        brand: item.brand || "",
+        quantity: qty,
+        unitPrice,
+        total,
+      };
+    }),
+  };
+
+  // 1. Direct 1-Click Vector PDF Download
   const handleDownload = () => {
     setDownloading(true);
     try {
@@ -119,134 +152,119 @@ const InvoiceDocument = ({ invoice, onClose }) => {
           </div>
         </div>
 
-        {/* Right: Actions (1-Click Download, Share, Print, Close) */}
-        <div className="flex items-center gap-2">
-
-          {/* 1-Click Download PDF */}
+        {/* Right: Quick Action Buttons */}
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+          {/* Download PDF */}
           <button
             type="button"
             onClick={handleDownload}
             disabled={downloading}
-            className="flex items-center gap-1.5 px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
-            title="Download true A4 Vector PDF on 1 click"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition shadow-md cursor-pointer disabled:opacity-50"
+            title="Download Vector A4 PDF directly"
           >
-            <FiDownload />
-            <span>{downloading ? "Downloading..." : "Download PDF"}</span>
+            <FiDownload className="text-sm" />
+            <span>{downloading ? "Generating..." : "Download PDF"}</span>
           </button>
 
-          {/* Share PDF */}
+          {/* Print PDF */}
+          <button
+            type="button"
+            onClick={handlePrint}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition cursor-pointer"
+            title="Print Official A4 Invoice"
+          >
+            <FiPrinter className="text-sm" />
+            <span>Print</span>
+          </button>
+
+          {/* Share */}
           <button
             type="button"
             onClick={handleShare}
             disabled={sharing}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
-            title="Share PDF via WhatsApp or Device"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
+            title="Share via WhatsApp or Device Share"
           >
-            <FiShare2 />
-            <span className="hidden sm:inline">Share</span>
-          </button>
-
-          {/* Print Isolated 1-Page */}
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition border border-slate-700 cursor-pointer"
-            title="Print isolated 1-sheet A4 page"
-          >
-            <FiPrinter />
-            <span className="hidden sm:inline">Print</span>
+            <FiShare2 className="text-sm" />
+            <span>{sharing ? "Sharing..." : "Share"}</span>
           </button>
 
           {/* Close */}
           <button
             type="button"
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition text-lg cursor-pointer ml-1"
+            className="p-2 rounded-xl bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white transition cursor-pointer ml-1"
             title="Close Viewer"
           >
-            <FiX />
+            <FiX className="text-lg" />
           </button>
         </div>
       </div>
 
       {/* 📄 CRISP A4 SHEET PREVIEW (Zoom-out auto-scaled for mobile) */}
-      <div className="w-full overflow-x-auto flex justify-center py-2 sm:py-6 px-1 sm:px-4">
+      <div className="w-full flex justify-center overflow-x-auto pb-12 print:pb-0">
         <div
-          style={{
-            width: "794px",
-            minWidth: "794px",
-            minHeight: "1123px",
-          }}
-          className="
-            bg-white text-slate-900 font-sans p-8 sm:p-12
-            shadow-2xl rounded-2xl border border-slate-200
-            flex flex-col justify-between text-left
-            shrink-0 origin-top
-            scale-[0.45] min-[400px]:scale-[0.52] min-[500px]:scale-[0.65] sm:scale-[0.8] md:scale-[0.9] lg:scale-100
-            -mb-[610px] min-[400px]:-mb-[520px] min-[500px]:-mb-[380px] sm:-mb-[220px] md:-mb-[110px] lg:mb-0
-            transition-transform duration-200
-          "
+          id="printable-invoice"
+          className="bg-white text-slate-900 shadow-2xl p-6 sm:p-10 md:p-12 transition-all duration-300 text-left border border-slate-200
+                     w-full max-w-[210mm] min-h-[297mm] flex flex-col justify-between
+                     rounded-2xl sm:rounded-3xl print:rounded-none print:shadow-none print:border-none print:m-0 print:p-8"
+          style={{ boxSizing: "border-box" }}
         >
-          {/* TOP HALF */}
           <div>
+            {/* 1. HEADER SECTION (LOGO ON TOP, DETAILS BELOW) */}
+            <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-4 border-b-2 border-slate-900">
+              
+              {/* Left: Brand Identity & Legal Details */}
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2.5">
+                  <img
+                    src="/logo.png"
+                    alt="E-ALL Logo"
+                    className="h-10 w-auto object-contain"
+                    onError={(e) => {
+                      e.target.style.display = "none";
+                    }}
+                  />
+                  <div>
+                    <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-950">
+                      E-ALL
+                    </h1>
+                    <p className="text-[11px] font-bold text-sky-800 tracking-wider uppercase">
+                      Electronics ALL FZCO
+                    </p>
+                  </div>
+                </div>
 
-            {/* 1. BRAND HEADER & TAX INVOICE BADGE */}
-            <div className="flex flex-row justify-between items-start gap-6 pb-4 border-b border-slate-300 text-left">
-
-              {/* Top Left: Logo & Company Identification */}
-              <div className="flex-1 text-left">
-                <img
-                  src="/logo.png"
-                  alt="E-ALL Logo"
-                  className="h-20! w-auto object-contain shrink-0 mb-2"
-                  onError={(e) => {
-                    e.target.style.display = "none";
-                  }}
-                />
-
-                <h1 className="text-sm! font-bold! text-slate-900! tracking-widest!">
-                  E-ALL (ELECTRONICS ALL)
-                </h1>
-
-                <p className="text-[11px] text-slate-500 font-medium">
-                  Premium Consumer Electronics Distribution & Solutions
-                </p>
-
-                <div className="text-[11px] text-slate-600 mt-1.2! space-y-0.5 leading-relaxed">
-                  <p className="flex items-center gap-1.5">
-                    <FiMapPin className="text-slate-400 shrink-0" />
-                    Dubai Silicon Oasis, DDP, Building A2, Dubai, UAE
+                <div className="text-[11.5px] text-slate-500 space-y-0.5 pt-1 leading-relaxed">
+                  <p className="font-medium text-slate-700 flex items-center gap-1.5">
+                    <FiMapPin className="text-sky-700 shrink-0 text-xs" />
+                    <span>Dubai Silicon Oasis, DDP, Building A2, Dubai, United Arab Emirates</span>
                   </p>
-                  <p className="flex items-center gap-1.5 font-mono">
-                    <span className="font-semibold text-slate-700">TRN (VAT):</span>
-                    <strong className="text-slate-900 font-bold bg-slate-100 px-1.5 py-0.5 rounded">
-                      100482910400003
-                    </strong>
-                  </p>
-                  <p className="flex items-center gap-1.5">
-                    <FiMail className="text-slate-400 shrink-0" />
-                    contact@e-all.ae • <FiGlobe className="text-slate-400 shrink-0 ml-1" /> www.e-all.ae
+                  <p className="flex items-center gap-3">
+                    <span className="font-mono font-bold text-slate-800">TRN (VAT): 100482910400003</span>
+                    <span>•</span>
+                    <span className="flex items-center gap-1">
+                      <FiMail className="text-slate-400 text-xs" /> contact@eall.ae
+                    </span>
                   </p>
                 </div>
               </div>
 
-              {/* Top Right: Tax Invoice Details (Centered / Bottom Aligned in Header) */}
-              <div className="text-right shrink-0 flex flex-col justify-between items-end">
-                <div className="inline-block bg-slate-900 text-white px-3.5 py-1 rounded-md font-bold text-[11px] uppercase tracking-wider mb-2">
-                  TAX INVOICE
+              {/* Right: Tax Invoice Identifier & Date Meta */}
+              <div className="sm:text-right space-y-1 self-stretch sm:self-auto flex flex-col justify-between">
+                <div>
+                  <span className="inline-block px-3 py-1 bg-slate-950 text-white font-black text-xs uppercase tracking-widest rounded-lg mb-1 shadow-xs">
+                    TAX INVOICE
+                  </span>
+                  <h2 className="text-base sm:text-lg font-mono font-bold text-slate-900 tracking-tight">
+                    {invoice.invoiceNo}
+                  </h2>
                 </div>
 
-                <p className="text-lg font-mono font-bold text-slate-900 tracking-tight">
-                  {invoice.invoiceNo}
-                </p>
-
-                <div className="text-[11px] text-slate-600 mt-1.5 space-y-0.5 text-right">
-                  <p className="flex justify-end gap-1.5">
-                    <span className="text-slate-400">Date:</span>
-                    <strong className="text-slate-800 font-mono font-semibold">
-                      {new Date(invoice.createdAt).toLocaleDateString("en-GB")}
-                    </strong>
-                    <span className="text-slate-400 ml-1">Time:</span>
+                <div className="text-[11px] text-slate-500 space-y-0.5 font-medium">
+                  <p>
+                    Date: <strong className="text-slate-800">{new Date(invoice.createdAt).toLocaleDateString("en-GB")}</strong>{" "}
+                    Time:{" "}
                     <span className="text-slate-700 font-mono">
                       {new Date(invoice.createdAt).toLocaleTimeString([], {
                         hour: "2-digit",
@@ -310,14 +328,14 @@ const InvoiceDocument = ({ invoice, onClose }) => {
               </div>
             </div>
 
-            {/* 3. ITEMIZED PRODUCTS TABLE (Compact Vertical Padding & Professional Font Size) */}
+            {/* 3. ITEMIZED PRODUCTS TABLE */}
             <div className="mt-4 overflow-hidden rounded-xl border border-slate-200">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-slate-900 text-white text-[11px] font-bold uppercase tracking-wider">
                     <th className="py-2 px-3 text-center w-10">#</th>
                     <th className="py-2 px-3 w-32">SKU Code</th>
-                    <th className="py-2 px-3">Item & Description</th>
+                    <th className="py-2 px-3">Item &amp; Description</th>
                     <th className="py-2 px-3 text-center w-14">Qty</th>
                     <th className="py-2 px-3 text-right w-28">Unit Price</th>
                     <th className="py-2 px-3 text-right w-28">Total (AED)</th>
@@ -347,7 +365,7 @@ const InvoiceDocument = ({ invoice, onClose }) => {
                         {Number(item.unitPrice).toLocaleString("en-AE", { minimumFractionDigits: 2 })}
                       </td>
                       <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900 text-xs">
-                        {(item.quantity * item.unitPrice).toLocaleString("en-AE", { minimumFractionDigits: 2 })}
+                        {Number(item.total).toLocaleString("en-AE", { minimumFractionDigits: 2 })}
                       </td>
                     </tr>
                   ))}
@@ -361,7 +379,7 @@ const InvoiceDocument = ({ invoice, onClose }) => {
               {/* Terms & Conditions */}
               <div className="max-w-xs text-[11px] text-slate-500 leading-relaxed text-left">
                 <p className="font-bold text-slate-800 uppercase tracking-wider mb-1">
-                  Terms & Conditions:
+                  Terms &amp; Conditions:
                 </p>
                 <p>• Goods once sold can be returned/exchanged within 7 days in original sealed condition.</p>
                 <p>• Warranty terms apply as per official manufacturer coverage.</p>
@@ -409,7 +427,7 @@ const InvoiceDocument = ({ invoice, onClose }) => {
             <div className="text-left">
               <p className="font-bold text-slate-800 mb-10">Customer Acceptance:</p>
               <div className="border-b border-dashed border-slate-400 w-48" />
-              <p className="text-[10px] text-slate-400 mt-1">Name & Signature</p>
+              <p className="text-[10px] text-slate-400 mt-1">Name &amp; Signature</p>
             </div>
 
             <div className="text-right">

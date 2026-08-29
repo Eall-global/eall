@@ -209,14 +209,10 @@ const PortalPage = () => {
       <main className="flex-1 p-4 sm:p-6 lg:p-8 bg-slate-900 text-slate-900">
         {/* INVOICE VIEWER OVERLAY / FULL MODAL */}
         {viewingInvoice && (
-          <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-            <div className="relative w-full max-w-4xl bg-white rounded-3xl p-6 sm:p-8 shadow-2xl my-8">
-              <InvoiceDocument
-                invoice={viewingInvoice}
-                onClose={() => setViewingInvoice(null)}
-              />
-            </div>
-          </div>
+          <InvoiceDocument
+            invoice={viewingInvoice}
+            onClose={() => setViewingInvoice(null)}
+          />
         )}
 
         {/* TAB 1: STOCK MANAGER */}
