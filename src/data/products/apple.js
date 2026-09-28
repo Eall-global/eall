@@ -88,10 +88,10 @@ export const iphone18Products = [
 
     // AED prices per storage tier — admin can override individual variant SKUs in Firestore
     storagePricing: {
-      "256GB": 4199,
-      "512GB": 4799,
-      "1TB":   5499,
-      "2TB":   6299,
+      "256GB": 5099,
+      "512GB": 5949,
+      "1TB": 7649,
+      "2TB": 10199,
     },
 
     shortDescription:
@@ -223,10 +223,10 @@ export const iphone18Products = [
 
     // AED prices per storage tier — admin can override individual variant SKUs in Firestore
     storagePricing: {
-      "256GB": 4599,
-      "512GB": 5199,
-      "1TB":   5999,
-      "2TB":   6799,
+      "256GB": 5499,
+      "512GB": 6349,
+      "1TB": 8049,
+      "2TB": 10599,
     },
 
     shortDescription:
@@ -323,10 +323,10 @@ export const appleProducts = [
 
     // AED prices per storage tier
     storagePricing: {
-      "128GB": 3199,
-      "256GB": 3499,
-      "512GB": 3999,
-      "1TB":   4599,
+      "128GB": 4699,
+      "256GB": 5099,
+      "512GB": 5949,
+      "1TB": 7649,
     },
 
     shortDescription: "Apple iPhone 16 Pro — A18 Pro chip, 48MP Fusion camera, 6.3-inch Super Retina XDR display.",
@@ -416,9 +416,9 @@ export const appleProducts = [
 
     // AED prices per storage tier
     storagePricing: {
-      "256GB": 3999,
-      "512GB": 4499,
-      "1TB":   5199,
+      "256GB": 4499,
+      "512GB": 5349,
+      "1TB": 7049,
     },
 
     shortDescription: "Apple iPhone 17 Pro Max — A19 Pro chip, 48MP Pro Fusion camera, 6.9-inch Super Retina XDR display.",
