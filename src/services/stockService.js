@@ -9,11 +9,15 @@ import {
   writeBatch,
 } from "../lib/firebaseClient";
 import { products as catalogProducts } from "../data/products/index";
+import { expandToFlatSkus } from "../utils/productVariant";
+
 
 const STORAGE_KEY = "eall_inventory_stock";
 const COLLECTION_NAME = "product_stock";
 
-// Helper to seed initial stock from existing product catalog with guaranteed unique SKUs
+// Helper to seed initial stock from existing product catalog.
+// Products with color variants and/or storage options are expanded into
+// individual SKU rows (one row per color × storage combination).
 export const getInitialCatalogSeed = () => {
   const seenSkus = new Set();
   const items = [];
@@ -22,38 +26,65 @@ export const getInitialCatalogSeed = () => {
     if (!p) return;
     const baseSku = (p.sku || `EALL-${(p.brand || "GEN").toUpperCase()}-${p.id || idx + 1}`).trim().toUpperCase();
 
-    let sku = baseSku;
-    let counter = 1;
-    while (seenSkus.has(sku)) {
-      sku = `${baseSku}-${counter}`;
-      counter++;
-    }
-    seenSkus.add(sku);
+    // Expand product into flat SKU rows (color × storage combinations)
+    const rows = expandToFlatSkus({ ...p, sku: baseSku });
 
-    const initialPrice = p.price !== undefined && p.price !== null ? Number(p.price) : 0;
-    const initialQty = p.quantity !== undefined ? Number(p.quantity) : (p.stock !== undefined ? Number(p.stock) : 0);
-    const initialCost = p.costPrice !== undefined ? Number(p.costPrice) : Math.round(initialPrice * 0.8);
-    const initialMargin = p.margin !== undefined ? Number(p.margin) : Math.max(0, initialPrice - initialCost);
-    const initialOriginalPrice = p.originalPrice !== undefined ? Number(p.originalPrice) : (p.listPrice || (initialPrice > 0 ? Math.round(initialPrice * 1.15) : 0));
+    rows.forEach((row) => {
+      let sku = row.sku;
+      let counter = 1;
+      while (seenSkus.has(sku)) {
+        sku = `${row.sku}-${counter}`;
+        counter++;
+      }
+      seenSkus.add(sku);
 
-    items.push({
-      sku,
-      name: String(p.name || p.shortName || "Unnamed Product").trim(),
-      brand: String(p.brand || "General").trim(),
-      category: String(p.categoryName || p.category || "Electronics").trim(),
-      image: String(p.image || "/logo.png"),
-      quantity: initialQty,
-      costPrice: initialCost,
-      margin: initialMargin,
-      price: initialPrice > 0 ? initialPrice : (initialCost + initialMargin),
-      originalPrice: initialOriginalPrice,
-      minAlert: p.minAlert !== undefined ? Number(p.minAlert) : 3,
-      updatedAt: new Date().toISOString(),
+      // Determine base price for this variant
+      let basePrice = 0;
+      if (row.storage && p.storagePricing?.[row.storage]) {
+        basePrice = Number(p.storagePricing[row.storage]);
+      } else if (p.price !== undefined && p.price !== null) {
+        basePrice = Number(p.price);
+      }
+
+      const initialQty = p.quantity !== undefined ? Number(p.quantity) : (p.stock !== undefined ? Number(p.stock) : 0);
+      const initialCost = p.costPrice !== undefined ? Number(p.costPrice) : Math.round(basePrice * 0.8);
+      const initialMargin = p.margin !== undefined ? Number(p.margin) : Math.max(0, basePrice - initialCost);
+      const initialOriginalPrice = p.originalPrice !== undefined ? Number(p.originalPrice) : (basePrice > 0 ? Math.round(basePrice * 1.1) : 0);
+
+      // Derive a human-readable name from color + storage
+      const suffix = [row.color, row.storage].filter(Boolean).join(" / ");
+      const name = suffix
+        ? `${String(p.name || p.shortName || "Unnamed Product").trim()} (${suffix})`
+        : String(p.name || p.shortName || "Unnamed Product").trim();
+
+      items.push({
+        sku,
+        // Parent product identifiers
+        parentSku: baseSku,
+        slug: p.slug || "",
+        name,
+        brand: String(p.brand || "General").trim(),
+        category: String(p.categoryName || p.category || "Electronics").trim(),
+        image: String(row.image || p.image || "/logo.png"),
+        // Variant dimensions
+        color: row.color || null,
+        colorSlug: row.colorSlug || null,
+        storage: row.storage || null,
+        // Inventory
+        quantity: initialQty,
+        costPrice: initialCost,
+        margin: initialMargin,
+        price: basePrice > 0 ? basePrice : (initialCost + initialMargin),
+        originalPrice: initialOriginalPrice,
+        minAlert: p.minAlert !== undefined ? Number(p.minAlert) : 3,
+        updatedAt: new Date().toISOString(),
+      });
     });
   });
 
   return items;
 };
+
 
 const mapDocToStockItem = (data) => {
   const costPrice = Number(data.costPrice ?? data.cost_price ?? 0);
@@ -63,10 +94,17 @@ const mapDocToStockItem = (data) => {
 
   return {
     sku: data.sku,
+    parentSku: data.parentSku || data.sku,
+    slug: data.slug || "",
     name: String(data.name || "").trim(),
     brand: String(data.brand || "General").trim(),
     category: String(data.category || "Electronics").trim(),
     image: data.image || "/logo.png",
+    // Variant dimensions
+    color: data.color || null,
+    colorSlug: data.colorSlug || null,
+    storage: data.storage || null,
+    // Inventory
     quantity: Number(data.quantity) || 0,
     costPrice,
     margin,
@@ -76,6 +114,7 @@ const mapDocToStockItem = (data) => {
     updatedAt: data.updatedAt || data.updated_at || new Date().toISOString(),
   };
 };
+
 
 // Local storage handlers for offline fallback
 const getLocalStock = () => {
@@ -366,10 +405,16 @@ export const syncCatalogToStock = async () => {
 
         const payload = {
           sku: s.sku,
+          parentSku: s.parentSku || s.sku,
+          slug: s.slug || "",
           name: s.name,
           brand: s.brand,
           category: s.category,
           image: s.image,
+          // Variant dimensions
+          color: s.color || null,
+          colorSlug: s.colorSlug || null,
+          storage: s.storage || null,
           // Preserve existing quantity, costPrice, margin, price, originalPrice
           quantity: existing && existing.quantity !== null && existing.quantity !== undefined ? Number(existing.quantity) : s.quantity,
           costPrice: existing && existing.costPrice !== undefined ? Number(existing.costPrice) : (s.costPrice || 0),

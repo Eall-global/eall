@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { FiArrowLeft, FiChevronRight } from "react-icons/fi";
 
 import Container from "../../components/common/Container";
@@ -12,7 +12,11 @@ import ProductSEO from "../../components/products/ProductSEO";
 
 import { products as fallbackProducts } from "../../data/products/index";
 import { brands } from "../../data/brandsData";
-import { getDefaultVariant } from "../../utils/productVariant";
+import {
+  getDefaultVariant,
+  getDefaultStorage,
+  getActiveVariant,
+} from "../../utils/productVariant";
 import { useCatalog } from "../../context/CatalogContext";
 
 const ProductDetailPage = () => {
@@ -21,15 +25,27 @@ const ProductDetailPage = () => {
 
   const product = getProductBySlug(slug) || (products || fallbackProducts).find((p) => p.slug === slug);
 
-  const [selectedVariant, setSelectedVariant] = useState(
+  // Two independent axes: colour variant + storage
+  const [selectedColorVariant, setSelectedColorVariant] = useState(
     getDefaultVariant(product),
   );
+  const [selectedStorage, setSelectedStorage] = useState(
+    getDefaultStorage(product),
+  );
 
+  // Reset both axes when navigating to a different product
   useEffect(() => {
     if (product) {
-      setSelectedVariant(getDefaultVariant(product));
+      setSelectedColorVariant(getDefaultVariant(product));
+      setSelectedStorage(getDefaultStorage(product));
     }
   }, [slug, product]);
+
+  // Derive the active merged variant (image + sku + live price + availability)
+  const activeVariant = useMemo(
+    () => getActiveVariant(product, selectedColorVariant, selectedStorage),
+    [product, selectedColorVariant, selectedStorage],
+  );
 
   if (!product) {
     return (
@@ -80,16 +96,18 @@ const ProductDetailPage = () => {
         <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 text-left items-start">
           {/* LEFT: GALLERY */}
           <ProductGallery
-            gallery={selectedVariant?.gallery || product.gallery}
-            image={selectedVariant?.image || product.image}
+            gallery={activeVariant?.gallery || product.gallery}
+            image={activeVariant?.image || product.image}
             name={product.name}
           />
 
           {/* RIGHT: INFO + PRICING + CART CTA */}
           <ProductInfo
             product={product}
-            selectedVariant={selectedVariant || getDefaultVariant(product)}
-            onVariantChange={setSelectedVariant}
+            selectedVariant={activeVariant}
+            selectedStorage={selectedStorage}
+            onVariantChange={setSelectedColorVariant}
+            onStorageChange={setSelectedStorage}
           />
         </div>
 

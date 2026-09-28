@@ -82,11 +82,39 @@ export const CatalogProvider = ({ children }) => {
     };
   }, [refreshStock]);
 
+  // Build a map: parentSku → { variantSku → liveItem }
+  // This lets each product page look up live data for any color×storage combo.
+  const liveVariantsMap = useMemo(() => {
+    const map = new Map(); // parentSku → Map(variantSku → liveItem)
+    liveStockMap.forEach((item) => {
+      const parent = (item.parentSku || item.sku || "").toUpperCase();
+      if (!map.has(parent)) map.set(parent, new Map());
+      map.get(parent).set(item.sku.toUpperCase(), item);
+    });
+    return map;
+  }, [liveStockMap]);
+
   // Merge static catalog specifications with dynamic live inventory on SKU
   const products = useMemo(() => {
     return (staticCatalog || []).map((prod) => {
       const cleanSku = (prod.sku || `EALL-${(prod.brand || "GEN").toUpperCase()}-${prod.id}`).toUpperCase();
       const liveItem = liveStockMap.get(cleanSku);
+
+      // Build liveVariants: variantSku → live stock data for this product's children
+      const variantMap = liveVariantsMap.get(cleanSku) || new Map();
+      // Convert Map to plain object for easy access in components
+      const liveVariants = {};
+      variantMap.forEach((item, sku) => {
+        const avail = computeLiveAvailability(item.quantity, item.minAlert ?? 3);
+        liveVariants[sku] = {
+          ...item,
+          availability: avail.status,
+          availabilityBadge: avail.badgeText,
+          isInStock: avail.inStock,
+          isLowStock: avail.isLowStock,
+          stockUnitsLeft: avail.unitsLeft,
+        };
+      });
 
       const liveQty = liveItem
         ? Number(liveItem.quantity)
@@ -144,9 +172,11 @@ export const CatalogProvider = ({ children }) => {
         isInStock: availabilityInfo.inStock,
         isLowStock: availabilityInfo.isLowStock,
         stockUnitsLeft: availabilityInfo.unitsLeft,
+        // ← Per-variant live data (color×storage SKU → stock/price info)
+        liveVariants,
       };
     });
-  }, [liveStockMap]);
+  }, [liveStockMap, liveVariantsMap]);
 
   const getProductBySlug = useCallback(
     (slug) => {

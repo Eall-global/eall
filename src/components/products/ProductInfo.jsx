@@ -10,6 +10,7 @@ import {
   FiPlus,
   FiMinus,
   FiCheck,
+  FiHardDrive,
 } from "react-icons/fi";
 import { useCart } from "../../context/CartContext";
 import { useWishlist } from "../../context/WishlistContext";
@@ -30,7 +31,23 @@ const availabilityStyles = {
   },
 };
 
-const ProductInfo = ({ product, selectedVariant, onVariantChange }) => {
+/**
+ * ProductInfo
+ * Props:
+ *   product         – full product object (merged with live stock from CatalogContext)
+ *   selectedVariant – active merged variant (color + storage + live price + sku)
+ *                     produced by getActiveVariant() in ProductDetailPage
+ *   selectedStorage – the currently selected storage string, e.g. "256GB"
+ *   onVariantChange – (colorVariant) => void  — called when user picks a colour
+ *   onStorageChange – (storageString) => void — called when user picks storage
+ */
+const ProductInfo = ({
+  product,
+  selectedVariant,
+  selectedStorage,
+  onVariantChange,
+  onStorageChange,
+}) => {
   const { addToCart } = useCart();
   const { isWishlisted, toggleWishlist } = useWishlist();
 
@@ -38,12 +55,33 @@ const ProductInfo = ({ product, selectedVariant, onVariantChange }) => {
   const [addedNotice, setAddedNotice] = useState(false);
 
   const availability =
-    availabilityStyles[product.availability] ||
+    availabilityStyles[selectedVariant?.availability || product.availability] ||
     availabilityStyles["Available on Request"];
 
-  const displayPrice = product.livePrice !== undefined
-    ? Number(product.livePrice)
-    : (product.price !== undefined ? Number(product.price) : 0);
+  // Price: prefer the active variant's live price → product-level livePrice → 0
+  const displayPrice =
+    selectedVariant?.livePrice !== undefined && selectedVariant.livePrice > 0
+      ? Number(selectedVariant.livePrice)
+      : selectedVariant?.price !== undefined && selectedVariant.price > 0
+      ? Number(selectedVariant.price)
+      : product.livePrice !== undefined
+      ? Number(product.livePrice)
+      : product.price !== undefined
+      ? Number(product.price)
+      : 0;
+
+  // Original price for strike-through (from active variant or product)
+  const originalPrice =
+    selectedVariant?.originalPrice && selectedVariant.originalPrice > displayPrice
+      ? Number(selectedVariant.originalPrice)
+      : product.originalPrice && product.originalPrice > displayPrice
+      ? Number(product.originalPrice)
+      : 0;
+
+  const hasDiscount = originalPrice > 0 && displayPrice > 0 && originalPrice > displayPrice;
+  const discountPct = hasDiscount
+    ? Math.round(((originalPrice - displayPrice) / originalPrice) * 100)
+    : 0;
 
   const wishlisted = isWishlisted(product.slug);
 
@@ -51,12 +89,22 @@ const ProductInfo = ({ product, selectedVariant, onVariantChange }) => {
     e.preventDefault();
     addToCart(product, quantity, {
       color: selectedVariant?.color || "",
-      storage: selectedVariant?.storage || "",
+      storage: selectedVariant?.storage || selectedStorage || "",
+      sku: selectedVariant?.sku || product.sku,
+      price: displayPrice,
       openDrawer: true,
     });
     setAddedNotice(true);
     setTimeout(() => setAddedNotice(false), 2500);
   };
+
+  // Normalise storageOptions — array of strings or objects {label, isDefault}
+  const storageOptions = (product.storageOptions || []).map((s) =>
+    typeof s === "object" ? s.label : s
+  );
+
+  const hasStorage = storageOptions.length > 0;
+  const hasColors = product.variants?.length > 0;
 
   return (
     <div className="space-y-6 text-left">
@@ -80,7 +128,11 @@ const ProductInfo = ({ product, selectedVariant, onVariantChange }) => {
         <span
           className={`px-3 py-1 rounded-full text-xs font-bold border ${availability.bg}`}
         >
-          ● {product.availabilityBadge || product.availability}
+          ●{" "}
+          {selectedVariant?.availabilityBadge ||
+            product.availabilityBadge ||
+            selectedVariant?.availability ||
+            product.availability}
         </span>
 
         {product.warranty && (
@@ -90,26 +142,83 @@ const ProductInfo = ({ product, selectedVariant, onVariantChange }) => {
         )}
       </div>
 
-      {/* Colour Selection */}
-      {product.variants?.length > 0 && (
+      {/* ── COLOUR SELECTOR ── */}
+      {hasColors && (
         <div className="pt-2 border-t border-slate-100">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Available Colours</h3>
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2.5">
+            Colour
+            {selectedVariant?.color && (
+              <span className="ml-2 text-slate-800 normal-case font-semibold">
+                — {selectedVariant.color}
+              </span>
+            )}
+          </h3>
           <div className="flex flex-wrap gap-2.5">
-            {product.variants.map((variant) => (
-              <button
-                key={variant.colorSlug}
-                type="button"
-                onClick={() => onVariantChange(variant)}
-                className={`flex items-center gap-2.5 px-3 py-1.5 rounded-xl border transition cursor-pointer ${
-                  selectedVariant.colorSlug === variant.colorSlug
-                    ? "border-sky-600 bg-sky-50/80 text-sky-900 ring-2 ring-sky-600/20 font-bold"
-                    : "border-slate-200 hover:border-slate-300 text-slate-700"
-                }`}
-              >
-                <img src={variant.image} alt={variant.color} className="w-7 h-7 object-contain" />
-                <span className="text-xs font-medium">{variant.color}</span>
-              </button>
-            ))}
+            {product.variants.map((variant) => {
+              const isActive = selectedVariant?.colorSlug === variant.colorSlug;
+              return (
+                <button
+                  key={variant.colorSlug}
+                  type="button"
+                  onClick={() => onVariantChange(variant)}
+                  title={variant.color}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition cursor-pointer ${
+                    isActive
+                      ? "border-sky-600 bg-sky-50/80 text-sky-900 ring-2 ring-sky-600/20 font-bold"
+                      : "border-slate-200 hover:border-slate-300 text-slate-700"
+                  }`}
+                >
+                  <img
+                    src={variant.image}
+                    alt={variant.color}
+                    className="w-7 h-7 object-contain"
+                  />
+                  <span className="text-xs font-medium">{variant.color}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── STORAGE SELECTOR ── */}
+      {hasStorage && (
+        <div className="pt-2 border-t border-slate-100">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2.5 flex items-center gap-1.5">
+            <FiHardDrive className="text-slate-400" />
+            Storage
+            {selectedStorage && (
+              <span className="ml-1 text-slate-800 normal-case font-semibold">
+                — {selectedStorage}
+              </span>
+            )}
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {storageOptions.map((stor) => {
+              const isActive = selectedStorage === stor;
+              // Show price delta hint from storagePricing if available
+              const tierPrice = product.storagePricing?.[stor];
+              return (
+                <button
+                  key={stor}
+                  type="button"
+                  onClick={() => onStorageChange(stor)}
+                  className={`flex flex-col items-center justify-center px-3.5 py-2 rounded-xl border transition cursor-pointer min-w-[60px] ${
+                    isActive
+                      ? "border-sky-600 bg-sky-50 text-sky-900 ring-2 ring-sky-600/20 font-bold shadow-sm"
+                      : "border-slate-200 hover:border-sky-300 text-slate-700 bg-white"
+                  }`}
+                >
+                  <span className="text-xs font-bold">{stor}</span>
+                  {tierPrice > 0 && (
+                    <span className="text-[10px] font-mono text-slate-400 mt-0.5">
+                      <AedSymbol className="text-[9px]" />
+                      {tierPrice.toLocaleString()}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -128,7 +237,10 @@ const ProductInfo = ({ product, selectedVariant, onVariantChange }) => {
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Highlights</h3>
           <div className="flex flex-wrap gap-2">
             {product.tags.map((tag) => (
-              <span key={tag} className="border border-slate-200 rounded-full px-3 py-1 text-xs bg-white text-slate-700">
+              <span
+                key={tag}
+                className="border border-slate-200 rounded-full px-3 py-1 text-xs bg-white text-slate-700"
+              >
                 {tag}
               </span>
             ))}
@@ -142,30 +254,41 @@ const ProductInfo = ({ product, selectedVariant, onVariantChange }) => {
           <div>
             <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
               Unit Price
+              {selectedStorage && (
+                <span className="ml-1 normal-case text-sky-600">· {selectedStorage}</span>
+              )}
             </span>
             <div className="flex items-baseline gap-2 mt-0.5 flex-wrap">
-              <AedPrice
-                amount={displayPrice}
-                className="text-2xl sm:text-3xl font-black text-sky-950"
-                symbolClassName="text-sky-700"
-              />
+              {displayPrice > 0 ? (
+                <AedPrice
+                  amount={displayPrice}
+                  className="text-2xl sm:text-3xl font-black text-sky-950"
+                  symbolClassName="text-sky-700"
+                />
+              ) : (
+                <span className="text-lg font-bold text-slate-400 italic">
+                  Price on request
+                </span>
+              )}
 
-              {product.hasDiscount && product.originalPrice > displayPrice && (
+              {hasDiscount && (
                 <>
                   <AedPrice
-                    amount={product.originalPrice}
+                    amount={originalPrice}
                     className="text-sm sm:text-base font-normal text-slate-400 line-through"
                     symbolClassName="text-slate-400"
                   />
                   <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
-                    Save {product.discountPercentage}%
+                    Save {discountPct}%
                   </span>
                 </>
               )}
 
-              <span className="text-xs font-mono text-slate-400 ml-auto sm:ml-0">
-                ≈ USD {(displayPrice / 3.6725).toFixed(2)}
-              </span>
+              {displayPrice > 0 && (
+                <span className="text-xs font-mono text-slate-400 ml-auto sm:ml-0">
+                  ≈ USD {(displayPrice / 3.6725).toFixed(2)}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -181,9 +304,7 @@ const ProductInfo = ({ product, selectedVariant, onVariantChange }) => {
             >
               <FiMinus className="text-xs" />
             </button>
-            <span className="font-mono font-bold text-xs text-slate-900">
-              {quantity}
-            </span>
+            <span className="font-mono font-bold text-xs text-slate-900">{quantity}</span>
             <button
               type="button"
               onClick={() => setQuantity((q) => q + 1)}
@@ -237,9 +358,7 @@ const InfoItem = ({ icon, label, value }) => (
       {icon}
       {label}
     </p>
-    <p className="mt-0.5 font-semibold text-xs text-slate-800">
-      {value || "-"}
-    </p>
+    <p className="mt-0.5 font-semibold text-xs text-slate-800">{value || "-"}</p>
   </div>
 );
 
