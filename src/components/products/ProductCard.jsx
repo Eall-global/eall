@@ -6,6 +6,7 @@ import { getColorSwatch } from "../../utils/getColorSwatch";
 import { useWishlist } from "../../context/WishlistContext";
 import { useCart } from "../../context/CartContext";
 import { AedSymbol, AedPrice } from "../common/AedSymbol";
+import { buildVariantSku } from "../../utils/productVariant";
 
 // ⚡ Helper: Sanitize & format verbose raw specifications into compact, elegant micro-pills
 const formatShortSpec = (text) => {
@@ -31,6 +32,8 @@ const formatShortSpec = (text) => {
     const m = clean.match(/exynos\s*\d+/i);
     return m ? m[0] : "Exynos";
   }
+  if (/a20\s*pro/i.test(clean)) return "A20 Pro (2 nm)";
+  if (/a19\s*pro/i.test(clean)) return "A19 Pro";
   if (/a18\s*pro/i.test(clean)) return "A18 Pro";
   if (/a18/i.test(clean)) return "A18";
   if (/a17\s*pro/i.test(clean)) return "A17 Pro";
@@ -78,6 +81,14 @@ const ProductCard = ({ product }) => {
     product.variants?.find((v) => v.isDefault) ?? product.variants?.[0];
 
   const [previewVariant, setPreviewVariant] = useState(defaultVariant);
+
+  const startingStorage =
+    product.startingStorage ||
+    (product.storageOptions?.length > 0
+      ? typeof product.storageOptions[0] === "object"
+        ? product.storageOptions[0].label
+        : product.storageOptions[0]
+      : null);
 
   const wishlisted = isWishlisted(product.slug || product.id);
 
@@ -270,10 +281,25 @@ const ProductCard = ({ product }) => {
                 const originalPrice = Number(product.originalPrice || 0);
                 const hasDiscount = originalPrice > sellingPrice && sellingPrice > 0;
                 const discountPct = hasDiscount ? Math.round(((originalPrice - sellingPrice) / originalPrice) * 100) : 0;
+                const hasStorageTiers = (product.storageOptions && product.storageOptions.length > 0) || Boolean(product.storagePricing);
+                const isFromPrice = product.startingFromPrice === true || hasStorageTiers;
+
+                if (sellingPrice <= 0) {
+                  return (
+                    <span className="text-[10px] sm:text-xs font-semibold text-slate-400 italic">
+                      Price on Request
+                    </span>
+                  );
+                }
 
                 return (
                   <>
                     <div className="flex items-baseline gap-1.5 flex-wrap">
+                      {isFromPrice && (
+                        <span className="text-[9px] sm:text-[10px] font-semibold text-slate-400 uppercase tracking-wide self-end mb-0.5">
+                          From
+                        </span>
+                      )}
                       <AedPrice
                         amount={sellingPrice}
                         className="text-xs sm:text-sm font-black text-sky-950"
@@ -287,15 +313,26 @@ const ProductCard = ({ product }) => {
                         />
                       )}
                     </div>
-                    {hasDiscount && discountPct > 0 && (
-                      <span className="inline-block text-[9.5px] font-bold text-emerald-600 font-sans mt-0.5">
-                        Save {discountPct}%
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                      {hasDiscount && discountPct > 0 && (
+                        <span className="inline-block text-[9.5px] font-bold text-emerald-600 font-sans">
+                          Save {discountPct}%
+                        </span>
+                      )}
+                      {startingStorage && (
+                        <span
+                          className="inline-flex items-center text-[9px] font-bold text-sky-800 bg-sky-50 border border-sky-200/80 px-1.5 py-0.5 rounded leading-none"
+                          title={`Starting price is for ${startingStorage}`}
+                        >
+                          {startingStorage}
+                        </span>
+                      )}
+                    </div>
                   </>
                 );
               })()}
             </div>
+
 
             <div className="flex items-center gap-2">
               <button
@@ -303,7 +340,15 @@ const ProductCard = ({ product }) => {
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  addToCart(product, 1, { openDrawer: true });
+                  const targetSku = previewVariant
+                    ? buildVariantSku(product.sku, previewVariant.colorSlug, startingStorage)
+                    : product.sku;
+                  addToCart(product, 1, {
+                    color: previewVariant?.color || "",
+                    storage: startingStorage || "",
+                    sku: targetSku,
+                    openDrawer: true,
+                  });
                 }}
                 className="p-2 rounded-xl bg-sky-50/80 hover:bg-sky-700 text-sky-700 hover:text-white border border-sky-300 hover:border-sky-700 transition shadow-2xs cursor-pointer flex items-center gap-1 text-xs font-bold"
                 title="Add to Cart"

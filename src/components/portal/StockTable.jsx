@@ -567,12 +567,37 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
                             />
                           )}
                           <div className="min-w-0">
-                            <p className="font-bold text-slate-900 truncate max-w-xs sm:max-w-md">
-                              {item.name}
-                            </p>
-                            <p className="text-xs font-mono text-slate-400 font-medium">
-                              {item.sku}
-                            </p>
+                            {(() => {
+                              const inferredStorage =
+                                item.storage ||
+                                (() => {
+                                  const m = (item.sku || "").match(/-(128|256|512|1024|1TB|2TB)(?:GB)?/i);
+                                  if (m) {
+                                    const raw = m[1].toUpperCase();
+                                    return raw.endsWith("TB") || raw.endsWith("GB") ? raw : `${raw}GB`;
+                                  }
+                                  return null;
+                                })();
+                              const hasStorageInName = inferredStorage && item.name.toLowerCase().includes(inferredStorage.toLowerCase());
+
+                              return (
+                                <>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <p className="font-bold text-slate-900 truncate max-w-xs sm:max-w-md">
+                                      {item.name}
+                                    </p>
+                                    {inferredStorage && !hasStorageInName && (
+                                      <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200/80 shrink-0">
+                                        {inferredStorage}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-xs font-mono text-slate-400 font-medium">
+                                    {item.sku}
+                                  </p>
+                                </>
+                              );
+                            })()}
                           </div>
                         </div>
                       </td>

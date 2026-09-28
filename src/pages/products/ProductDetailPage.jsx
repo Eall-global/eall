@@ -113,11 +113,11 @@ const ProductDetailPage = () => {
 
         {/* FULL-WIDTH FEATURES & SPECIFICATIONS OVERVIEW */}
         <div className="py-6 sm:py-10 space-y-10 text-left border-t border-slate-200/80 mt-4">
-          {/* KEY HIGHLIGHTS CARDS */}
-          <ProductFeatures features={product.features} />
-
           {/* COMPREHENSIVE TECHNICAL SPECIFICATIONS MATRIX & TRUST BADGES */}
           <ProductSpecifications specifications={product.specifications} product={product} />
+
+          {/* KEY HIGHLIGHTS CARDS */}
+          <ProductFeatures features={product.features} />
         </div>
 
         {/* RELATED PRODUCTS */}
