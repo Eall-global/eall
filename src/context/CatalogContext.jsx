@@ -96,16 +96,39 @@ export const CatalogProvider = ({ children }) => {
         const itemParent = (item.parentSku || "").toUpperCase();
         const itemSlug = (item.slug || "").toLowerCase();
 
-        const isExactParent = itemParent && itemParent === cleanSku;
+        // 1. Exact SKU match (for standalone / single-SKU items)
         const isExactSku = itemSku === cleanSku;
-        const isChildSku = itemSku.startsWith(`${cleanSku}-`);
-        const isSameSlug = itemSlug && prodSlug && itemSlug === prodSlug;
-        const isFamilyPrefixMatch =
-          (cleanSku.startsWith("APL-IP16P") && itemSku.startsWith("APL-IP16P")) ||
-          (cleanSku.startsWith("APL-IP17PM") && itemSku.startsWith("APL-IP17PM")) ||
-          (cleanSku.startsWith("APPLE-IP18") && itemSku.startsWith("APPLE-IP18"));
 
-        if (isExactParent || isExactSku || isChildSku || isSameSlug || isFamilyPrefixMatch) {
+        // 2. Exact parentSku match
+        const isExactParent = Boolean(itemParent && itemParent === cleanSku);
+
+        // 3. Exact slug match
+        const isSameSlug = Boolean(itemSlug && prodSlug && itemSlug === prodSlug);
+
+        // 4. Strict child SKU prefix match (${cleanSku}-)
+        // Guard against shorter prefixes greedily matching longer models (e.g. 18-PRO must not match 18-PRO-MAX)
+        let isChildSku = false;
+        if (itemSku.startsWith(`${cleanSku}-`)) {
+          if (cleanSku === "APPLE-IP18-PRO" && itemSku.startsWith("APPLE-IP18-PRO-MAX-")) {
+            isChildSku = false;
+          } else if (cleanSku === "APPLE-IP18" && (itemSku.startsWith("APPLE-IP18-PRO-") || itemSku.startsWith("APPLE-IP18-PRO-MAX-"))) {
+            isChildSku = false;
+          } else if (cleanSku === "APL-IP16P" && itemSku.startsWith("APL-IP16PM-")) {
+            isChildSku = false;
+          } else {
+            isChildSku = true;
+          }
+        }
+
+        // 5. Specific legacy SKU family prefixes
+        let isFamilyPrefixMatch = false;
+        if (cleanSku === "APL-IP16P-256-BLK" && (itemSku === "APL-IP16P-256-BLK" || (itemSku.startsWith("APL-IP16P-") && !itemSku.startsWith("APL-IP16PM-")))) {
+          isFamilyPrefixMatch = true;
+        } else if (cleanSku === "APL-IP17PM-256-ORN" && (itemSku === "APL-IP17PM-256-ORN" || itemSku.startsWith("APL-IP17PM-"))) {
+          isFamilyPrefixMatch = true;
+        }
+
+        if (isExactParent || isExactSku || isSameSlug || isChildSku || isFamilyPrefixMatch) {
           matchingItems.push(item);
         }
       });
