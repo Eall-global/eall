@@ -37,8 +37,6 @@ const nokiaProducts = [
 
     family: "classic-phones",
 
-    stock: 120,
-
     shortDescription: "Premium flagship smartphone with advanced AI features.",
 
     features: [
