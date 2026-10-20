@@ -263,11 +263,11 @@ export const adjustStockDelta = async (sku, delta) => {
 };
 
 /**
- * Update product details including name, brand, category, price, quantity, cost price, margin, and min alert threshold
+ * Update product details including name, brand, category, price, quantity, cost price, margin, originalPrice, minAlert, and image
  */
 export const updateProductDetails = async (
   sku,
-  { name, brand, category, price, quantity, costPrice, margin, originalPrice, minAlert }
+  { name, brand, category, price, quantity, costPrice, margin, originalPrice, minAlert, image }
 ) => {
   const db = getFirebaseDb();
 
@@ -288,6 +288,7 @@ export const updateProductDetails = async (
       if (name !== undefined) updatePayload.name = String(name).trim();
       if (brand !== undefined) updatePayload.brand = String(brand).trim();
       if (category !== undefined) updatePayload.category = String(category).trim();
+      if (image !== undefined) updatePayload.image = String(image).trim();
       if (cPrice !== undefined) updatePayload.costPrice = cPrice;
       if (mMargin !== undefined) updatePayload.margin = mMargin;
       if (sPrice !== undefined) updatePayload.price = sPrice;
@@ -311,6 +312,7 @@ export const updateProductDetails = async (
           name: name !== undefined ? String(name).trim() : item.name,
           brand: brand !== undefined ? String(brand).trim() : item.brand,
           category: category !== undefined ? String(category).trim() : item.category,
+          image: image !== undefined ? String(image).trim() : item.image,
           costPrice: cPrice !== undefined ? cPrice : (item.costPrice || 0),
           margin: mMargin !== undefined ? mMargin : (item.margin || 0),
           price: sPrice !== undefined ? sPrice : (cPrice !== undefined && mMargin !== undefined ? cPrice + mMargin : item.price),
@@ -329,14 +331,15 @@ export const updateProductDetails = async (
 };
 
 /**
- * Add a new custom product to inventory
+ * Add a new custom product to inventory. Initial quantity is 0 because stock enters through procurement.
  */
 export const addCustomProduct = async ({
   sku,
   name,
   brand,
   category,
-  quantity,
+  image,
+  quantity = 0,
   costPrice = 0,
   margin = 0,
   price,
@@ -347,13 +350,14 @@ export const addCustomProduct = async ({
   const cPrice = Number(costPrice) || 0;
   const mMargin = Number(margin) || 0;
   const sPrice = price !== undefined ? Number(price) : (cPrice + mMargin);
+  const prodImage = (image && String(image).trim()) || "/logo.png";
 
   const newProduct = {
     sku: cleanSku,
     name: name.trim(),
     brand: brand.trim() || "General",
     category: category.trim() || "Electronics",
-    image: "/logo.png",
+    image: prodImage,
     quantity: Number(quantity) || 0,
     costPrice: cPrice,
     margin: mMargin,

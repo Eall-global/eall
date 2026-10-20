@@ -1,14 +1,14 @@
 /**
- * UAE Official Currency Formatter (د.إ / AED)
+ * UAE Official Currency Formatter (AED)
  */
 
-export const CURRENCY_SYMBOL = "د.إ";
+export const CURRENCY_SYMBOL = "AED";
 
 /**
- * Format any numerical price or currency into official UAE Dirham (د.إ) representation
+ * Format any numerical price or currency into official UAE Dirham (AED) representation
  * @param {number|string} amount
  * @param {number} decimals
- * @returns {string} e.g. "د.إ 159.00"
+ * @returns {string} e.g. "AED 159.00"
  */
 export const formatAED = (amount, decimals = 2) => {
   const val = Number(amount);

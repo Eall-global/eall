@@ -14,18 +14,21 @@ import {
   FiInfo,
   FiUsers,
   FiTag,
+  FiTruck,
 } from "react-icons/fi";
 import { useStaffAuth } from "../../context/StaffAuthContext";
 import PortalLogin from "../../components/portal/PortalLogin";
 import StockTable from "../../components/portal/StockTable";
 import BillingPOS from "../../components/portal/BillingPOS";
 import InvoiceAudit from "../../components/portal/InvoiceAudit";
+import PurchaseManagement from "../../components/portal/PurchaseManagement";
 import CustomerManagement from "../../components/portal/CustomerManagement";
 import CouponManagement from "../../components/portal/CouponManagement";
 import PortalSettings from "../../components/portal/PortalSettings";
 import InvoiceDocument from "../../components/portal/InvoiceDocument";
 import { fetchStock } from "../../services/stockService";
 import { fetchInvoices } from "../../services/billingService";
+import { fetchPurchases } from "../../services/purchaseService";
 import {
   getFirebaseDb,
   isFirebaseConfigured,
@@ -36,21 +39,24 @@ import {
 const PortalPage = () => {
   const { isAuthenticated, currentUser, role, isAdmin, logout } = useStaffAuth();
 
-  const [activeTab, setActiveTab] = useState("stock"); // stock | billing | invoices | settings
+  const [activeTab, setActiveTab] = useState("stock"); // stock | purchases | billing | invoices | settings
   const [stock, setStock] = useState([]);
   const [invoices, setInvoices] = useState([]);
+  const [purchases, setPurchases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewingInvoice, setViewingInvoice] = useState(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [stockData, invoicesData] = await Promise.all([
+      const [stockData, invoicesData, purchasesData] = await Promise.all([
         fetchStock(),
         fetchInvoices(),
+        fetchPurchases(),
       ]);
       setStock(stockData);
       setInvoices(invoicesData);
+      setPurchases(purchasesData);
     } catch (err) {
       console.error("Failed to load portal data:", err);
     } finally {
@@ -67,16 +73,20 @@ const PortalPage = () => {
     const db = getFirebaseDb();
     if (db && isFirebaseConfigured()) {
       try {
-        const un過程1 = onSnapshot(collection(db, "product_stock"), () => {
+        const unSub1 = onSnapshot(collection(db, "product_stock"), () => {
           loadData();
         });
-        const un過程2 = onSnapshot(collection(db, "invoices"), () => {
+        const unSub2 = onSnapshot(collection(db, "invoices"), () => {
+          loadData();
+        });
+        const unSub3 = onSnapshot(collection(db, "purchase_records"), () => {
           loadData();
         });
 
         return () => {
-          un過程1();
-          un過程2();
+          unSub1();
+          unSub2();
+          unSub3();
         };
       } catch (e) {
         console.warn("Could not attach Firestore portal listener:", e);
@@ -92,6 +102,7 @@ const PortalPage = () => {
 
   const tabs = [
     { id: "stock", label: "Stock Manager", icon: FiPackage },
+    { id: "purchases", label: "Purchase Records", icon: FiTruck },
     { id: "billing", label: "Billing & POS", icon: FiFileText },
     { id: "invoices", label: "Sales & Invoices Audit", icon: FiClipboard },
   ];
@@ -201,6 +212,11 @@ const PortalPage = () => {
                   {stock.length}
                 </span>
               )}
+              {tab.id === "purchases" && (
+                <span className="text-[10px] bg-black/30 px-1.5 py-0.5 rounded-full font-mono">
+                  {purchases.length}
+                </span>
+              )}
               {tab.id === "invoices" && (
                 <span className="text-[10px] bg-black/30 px-1.5 py-0.5 rounded-full font-mono">
                   {invoices.length}
@@ -225,7 +241,20 @@ const PortalPage = () => {
         {activeTab === "stock" && (
           <StockTable
             stock={stock}
+            invoices={invoices}
+            purchases={purchases}
             onStockUpdated={loadData}
+            isAdmin={isAdmin}
+          />
+        )}
+
+        {/* TAB: PURCHASE RECORDS (Procurement) */}
+        {activeTab === "purchases" && (
+          <PurchaseManagement
+            stock={stock}
+            purchases={purchases}
+            onPurchasesUpdated={loadData}
+            currentUser={currentUser}
             isAdmin={isAdmin}
           />
         )}

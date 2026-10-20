@@ -17,6 +17,8 @@ import {
   FiPercent,
   FiDollarSign,
   FiX,
+  FiUpload,
+  FiImage,
 } from "react-icons/fi";
 import {
   updateProductDetails,
@@ -25,13 +27,24 @@ import {
 } from "../../services/stockService";
 import { formatAED, CURRENCY_SYMBOL } from "../../utils/currencyFormatter";
 import { AedSymbol, AedPrice } from "../common/AedSymbol";
+import ProductLedgerDrawer from "./ProductLedgerDrawer";
 
-const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
+const StockTable = ({
+  stock = [],
+  onStockChanged,
+  onStockUpdated,
+  isAdmin,
+  invoices = [],
+  purchases = [],
+}) => {
   const [search, setSearch] = useState("");
   const [brandFilter, setBrandFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All"); // All | in-stock | low-stock | out-of-stock
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
+
+  // Drawer State
+  const [selectedProductForDrawer, setSelectedProductForDrawer] = useState(null);
 
   // Edit Modal State
   const [editingItem, setEditingItem] = useState(null);
@@ -57,12 +70,27 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
   const [newName, setNewName] = useState("");
   const [newBrand, setNewBrand] = useState("");
   const [newCategory, setNewCategory] = useState("Electronics");
+  const [newImage, setNewImage] = useState("");
   const [newCostPrice, setNewCostPrice] = useState(0);
   const [newMargin, setNewMargin] = useState(0);
   const [newPrice, setNewPrice] = useState(0);
   const [newOriginalPrice, setNewOriginalPrice] = useState(0);
-  const [newQty, setNewQty] = useState(10);
   const [newAlert, setNewAlert] = useState(3);
+
+  const handleImageFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert("Image file size should be less than 2MB.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setNewImage(event.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   // Reset pagination to page 1 whenever filters change
   useEffect(() => {
@@ -260,7 +288,8 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
       name: newName,
       brand: newBrand,
       category: newCategory,
-      quantity: newQty,
+      image: newImage || "/logo.png",
+      quantity: 0, // Stock enters strictly through Purchase Records procurement
       costPrice: cost,
       margin: margin,
       price: price,
@@ -272,10 +301,12 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
     setNewSku("");
     setNewName("");
     setNewBrand("");
+    setNewImage("");
     setNewCostPrice(0);
     setNewMargin(0);
     setNewPrice(0);
     if (onStockChanged) onStockChanged();
+    if (onStockUpdated) onStockUpdated();
   };
 
   // CSV Export with Cost, Margin & Selling Price
@@ -551,7 +582,9 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
                   return (
                     <tr
                       key={item.sku}
-                      className="hover:bg-slate-50/80 transition-colors"
+                      onClick={() => setSelectedProductForDrawer(item)}
+                      className="hover:bg-sky-50/60 cursor-pointer transition-colors group"
+                      title="Click product to view sales and stock movements ledger"
                     >
                       {/* Product & SKU */}
                       <td className="py-3.5 px-4">
@@ -674,10 +707,13 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
 
                       {/* Admin Edit Modal Trigger */}
                       {isAdmin && (
-                        <td className="py-3.5 px-4 text-right">
+                        <td className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
                           <button
                             type="button"
-                            onClick={() => handleOpenEdit(item)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenEdit(item);
+                            }}
                             className="p-2 text-slate-400 hover:text-sky-700 hover:bg-sky-50 rounded-xl transition cursor-pointer"
                             title="Edit Product Details, Cost, Margin & Stock"
                           >
@@ -1082,34 +1118,81 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                    Initial Stock
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    required
-                    value={newQty}
-                    onChange={(e) => setNewQty(e.target.value)}
-                    className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs outline-none focus:bg-white focus:border-sky-600"
-                  />
-                </div>
+              {/* Product Image Field (Optional) */}
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                  Product Image <span className="text-slate-400 font-normal lowercase">(optional)</span>
+                </label>
 
+                <div className="flex items-center gap-3">
+                  <div className="w-14 h-14 rounded-xl border border-slate-200 bg-white p-1 flex items-center justify-center shrink-0 overflow-hidden">
+                    {newImage ? (
+                      <img
+                        src={newImage}
+                        alt="Preview"
+                        className="w-full h-full object-contain"
+                        onError={(e) => {
+                          e.target.src = "/logo.png";
+                        }}
+                      />
+                    ) : (
+                      <FiImage className="text-2xl text-slate-300" />
+                    )}
+                  </div>
+
+                  <div className="flex-1 space-y-1.5">
+                    <input
+                      type="url"
+                      placeholder="Paste Image URL (https://...)"
+                      value={newImage}
+                      onChange={(e) => setNewImage(e.target.value)}
+                      className="w-full py-1.5 px-2.5 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:border-sky-600"
+                    />
+
+                    <div className="flex items-center gap-2">
+                      <label className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-[11px] font-semibold cursor-pointer transition">
+                        <FiUpload className="text-xs" />
+                        <span>Upload File</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageFileChange}
+                          className="hidden"
+                        />
+                      </label>
+
+                      {newImage && (
+                        <button
+                          type="button"
+                          onClick={() => setNewImage("")}
+                          className="text-[11px] text-rose-600 hover:underline font-medium cursor-pointer"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Min Stock Alert (Stock starts at 0, procured via Purchase Records) */}
+              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-200">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
                     Min Stock Alert
                   </label>
-                  <input
-                    type="number"
-                    min="1"
-                    required
-                    value={newAlert}
-                    onChange={(e) => setNewAlert(e.target.value)}
-                    className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs outline-none focus:bg-white focus:border-sky-600"
-                  />
+                  <p className="text-[10px] text-slate-500">
+                    Initial stock starts at 0. Procurement is recorded via Purchase Records.
+                  </p>
                 </div>
+                <input
+                  type="number"
+                  min="1"
+                  required
+                  value={newAlert}
+                  onChange={(e) => setNewAlert(e.target.value)}
+                  className="w-20 py-1.5 px-2 bg-white border border-slate-200 rounded-lg font-mono text-xs text-center font-bold outline-none focus:border-sky-600"
+                />
               </div>
 
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
@@ -1130,6 +1213,20 @@ const StockTable = ({ stock = [], onStockChanged, isAdmin }) => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* 🧭 RIGHT-SIDE PRODUCT SALES & STOCK LEDGER DRAWER */}
+      {selectedProductForDrawer && (
+        <ProductLedgerDrawer
+          product={
+            stock.find((s) => s.sku === selectedProductForDrawer.sku) ||
+            selectedProductForDrawer
+          }
+          invoices={invoices}
+          purchases={purchases}
+          onClose={() => setSelectedProductForDrawer(null)}
+          onOpenEdit={(item) => handleOpenEdit(item)}
+        />
       )}
     </div>
   );
