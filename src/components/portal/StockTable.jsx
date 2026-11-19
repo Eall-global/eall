@@ -28,6 +28,8 @@ import {
 import { formatAED, CURRENCY_SYMBOL } from "../../utils/currencyFormatter";
 import { AedSymbol, AedPrice } from "../common/AedSymbol";
 import ProductLedgerDrawer from "./ProductLedgerDrawer";
+import PortalKpiGrid from "./PortalKpiGrid";
+import { PortalFilterMenu, ActiveFilterChips } from "./PortalFilterMenu";
 
 const StockTable = ({
   stock = [],
@@ -39,6 +41,7 @@ const StockTable = ({
 }) => {
   const [search, setSearch] = useState("");
   const [brandFilter, setBrandFilter] = useState("All");
+  const [categoryFilter, setCategoryFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All"); // All | in-stock | low-stock | out-of-stock
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
@@ -95,7 +98,7 @@ const StockTable = ({
   // Reset pagination to page 1 whenever filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, brandFilter, statusFilter, itemsPerPage]);
+  }, [search, brandFilter, categoryFilter, statusFilter, itemsPerPage]);
 
   const brands = useMemo(() => {
     const list = Array.from(
@@ -105,13 +108,26 @@ const StockTable = ({
           .filter(Boolean)
       )
     );
-    return ["All", ...list.sort((a, b) => a.localeCompare(b))];
+    return list.sort((a, b) => a.localeCompare(b));
+  }, [stock]);
+
+  const categories = useMemo(() => {
+    const list = Array.from(
+      new Set(
+        stock
+          .map((s) => (s.category ? String(s.category).trim() : ""))
+          .filter(Boolean)
+      )
+    );
+    return list.sort((a, b) => a.localeCompare(b));
   }, [stock]);
 
   const filteredStock = useMemo(() => {
     return stock.filter((item) => {
       const itemBrand = (item.brand || "").trim();
+      const itemCategory = (item.category || "").trim();
       const targetBrand = brandFilter.trim();
+      const targetCategory = categoryFilter.trim();
 
       // Search
       if (search.trim()) {
@@ -120,7 +136,7 @@ const StockTable = ({
           (item.name || "").toLowerCase().includes(q) ||
           (item.sku || "").toLowerCase().includes(q) ||
           itemBrand.toLowerCase().includes(q) ||
-          (item.category || "").toLowerCase().includes(q);
+          itemCategory.toLowerCase().includes(q);
         if (!matches) return false;
       }
 
@@ -128,6 +144,14 @@ const StockTable = ({
       if (
         brandFilter !== "All" &&
         itemBrand.toLowerCase() !== targetBrand.toLowerCase()
+      ) {
+        return false;
+      }
+
+      // Category
+      if (
+        categoryFilter !== "All" &&
+        itemCategory.toLowerCase() !== targetCategory.toLowerCase()
       ) {
         return false;
       }
@@ -143,7 +167,72 @@ const StockTable = ({
 
       return true;
     });
-  }, [stock, search, brandFilter, statusFilter]);
+  }, [stock, search, brandFilter, categoryFilter, statusFilter]);
+
+  // Two-column unified Filter menu definition (Filter | Options)
+  const filterSections = useMemo(() => {
+    const inStockCount = stock.filter((s) => s.quantity > 0).length;
+    const lowStockCount = stock.filter(
+      (s) => s.quantity > 0 && s.quantity <= s.minAlert
+    ).length;
+    const outOfStockCount = stock.filter((s) => s.quantity === 0).length;
+
+    return [
+      {
+        id: "brand",
+        label: "Brand",
+        value: brandFilter,
+        defaultValue: "All",
+        onChange: setBrandFilter,
+        options: [
+          { value: "All", label: "All Brands", count: stock.length },
+          ...brands.map((b) => ({
+            value: b,
+            label: b,
+            count: stock.filter(
+              (s) => (s.brand || "").trim().toLowerCase() === b.toLowerCase()
+            ).length,
+          })),
+        ],
+      },
+      {
+        id: "category",
+        label: "Category",
+        value: categoryFilter,
+        defaultValue: "All",
+        onChange: setCategoryFilter,
+        options: [
+          { value: "All", label: "All Categories", count: stock.length },
+          ...categories.map((c) => ({
+            value: c,
+            label: c,
+            count: stock.filter(
+              (s) => (s.category || "").trim().toLowerCase() === c.toLowerCase()
+            ).length,
+          })),
+        ],
+      },
+      {
+        id: "status",
+        label: "Status",
+        value: statusFilter,
+        defaultValue: "All",
+        onChange: setStatusFilter,
+        options: [
+          { value: "All", label: "All Statuses", count: stock.length },
+          { value: "in-stock", label: "In Stock", count: inStockCount },
+          { value: "low-stock", label: "Low Stock", count: lowStockCount },
+          { value: "out-of-stock", label: "Out of Stock", count: outOfStockCount },
+        ],
+      },
+    ];
+  }, [stock, brands, categories, brandFilter, categoryFilter, statusFilter]);
+
+  const handleResetFilters = () => {
+    setBrandFilter("All");
+    setCategoryFilter("All");
+    setStatusFilter("All");
+  };
 
   // Pagination Calculations
   const totalItems = filteredStock.length;
@@ -204,6 +293,7 @@ const StockTable = ({
       setSyncMessage(`Successfully synced ${res.total} products to Cloud Firestore!`);
       setTimeout(() => setSyncMessage(""), 4000);
       if (onStockChanged) onStockChanged();
+      if (onStockUpdated) onStockUpdated();
     } catch (err) {
       setSyncMessage(`Sync warning: ${err.message || "Check connection"}`);
       setTimeout(() => setSyncMessage(""), 4000);
@@ -268,6 +358,7 @@ const StockTable = ({
       });
       setEditingItem(null);
       if (onStockChanged) onStockChanged();
+      if (onStockUpdated) onStockUpdated();
     } catch (err) {
       console.error("Save edit error:", err);
     } finally {
@@ -352,108 +443,110 @@ const StockTable = ({
   };
 
   return (
-    <div className="space-y-6 text-left">
+    <div className="space-y-4 sm:space-y-5 text-left">
       {/* 📊 SUMMARY METRICS CARDS */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-        {/* Total SKUs */}
-        <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Total SKUs
-            </p>
-            <p className="text-xl sm:text-2xl font-black text-slate-900 mt-1 font-mono">
-              {metrics.totalSkus}
-            </p>
-          </div>
-          <div className="p-2.5 bg-sky-50 text-sky-700 rounded-xl">
-            <FiPackage className="text-xl" />
-          </div>
-        </div>
-
-        {/* Total Units in Stock */}
-        <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Total Units
-            </p>
-            <p className="text-xl sm:text-2xl font-black text-slate-900 mt-1 font-mono">
-              {metrics.totalUnits}
-            </p>
-          </div>
-          <div className="p-2.5 bg-emerald-50 text-emerald-700 rounded-xl">
-            <FiCheckCircle className="text-xl" />
-          </div>
-        </div>
-
-        {/* Low Stock Items */}
-        <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Low Stock Alert
-            </p>
-            <p className="text-xl sm:text-2xl font-black text-amber-600 mt-1 font-mono">
-              {metrics.lowStockCount}
-            </p>
-          </div>
-          <div className="p-2.5 bg-amber-50 text-amber-600 rounded-xl">
-            <FiAlertTriangle className="text-xl" />
-          </div>
-        </div>
-
-        {/* Inventory Valuation */}
-        <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Stock Valuation
-            </p>
-            <div className="mt-1">
-              <AedPrice amount={metrics.totalValuation} decimals={0} className="text-lg sm:text-xl font-black text-sky-900 truncate" />
-            </div>
-          </div>
-          <div className="p-2.5 bg-indigo-50 text-indigo-700 rounded-xl">
-            <FiDollarSign className="text-xl" />
-          </div>
-        </div>
-      </div>
+      <PortalKpiGrid
+        items={[
+          {
+            id: "skus",
+            label: "Total SKUs",
+            value: metrics.totalSkus,
+            icon: FiPackage,
+            tone: "sky",
+          },
+          {
+            id: "units",
+            label: "Total Units",
+            value: metrics.totalUnits,
+            icon: FiCheckCircle,
+            tone: "emerald",
+            valueClassName: "text-slate-900 dark:text-white",
+          },
+          {
+            id: "low",
+            label: "Low Stock",
+            value: metrics.lowStockCount,
+            icon: FiAlertTriangle,
+            tone: "amber",
+          },
+          {
+            id: "valuation",
+            label: "Stock Valuation",
+            value: (
+              <AedPrice
+                amount={metrics.totalValuation}
+                decimals={0}
+                className="font-mono font-black text-sky-900 dark:text-sky-300"
+              />
+            ),
+            icon: FiDollarSign,
+            tone: "indigo",
+          },
+        ]}
+      />
 
       {/* 🛠️ CONTROLS & ACTIONS BAR */}
-      <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          {/* Search Input */}
-          <div className="relative flex-1">
-            <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-base" />
-            <input
-              type="text"
-              placeholder="Search by product name, SKU, brand, or category..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium outline-none focus:bg-white focus:border-sky-600 transition"
-            />
+      <div className="p-3 sm:p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-3 transition-colors">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 sm:gap-3">
+          {/* Search Input + Unified Filter Icon */}
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div className="relative flex-1 min-w-0">
+              <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 text-base" />
+              <input
+                type="text"
+                placeholder="Search by product name, SKU, brand, or category..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full h-10 pl-10 pr-4 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-sky-600 dark:focus:border-sky-500 transition"
+              />
+            </div>
+
+            {/* Unified Two-Column Filter Menu Trigger (Desktop inline next to search) */}
+            <div className="hidden md:block">
+              <PortalFilterMenu
+                sections={filterSections}
+                onResetAll={handleResetFilters}
+                resultCount={filteredStock.length}
+                resultLabel="products"
+              />
+            </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Export CSV */}
+          {/* Action Buttons (Mobile: icon-only Filter/Export/Sync + Add Product on one single row) */}
+          <div className="flex items-center gap-2">
+            {/* Unified Two-Column Filter Trigger on Mobile */}
+            <div className="md:hidden">
+              <PortalFilterMenu
+                sections={filterSections}
+                onResetAll={handleResetFilters}
+                resultCount={filteredStock.length}
+                resultLabel="products"
+              />
+            </div>
+
+            {/* Export CSV (Icon-only on mobile, icon + text on desktop) */}
             <button
               type="button"
               onClick={handleExportCSV}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition cursor-pointer"
+              aria-label="Export CSV"
               title="Export filtered stock as CSV"
+              className="inline-flex items-center justify-center gap-1.5 w-10 h-10 md:w-auto md:px-3.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition cursor-pointer shrink-0"
             >
-              <FiDownload className="text-sm" />
-              <span>Export CSV</span>
+              <FiDownload className="text-[16px] md:text-sm" />
+              <span className="hidden md:inline">Export CSV</span>
             </button>
 
-            {/* Sync from Catalog */}
+            {/* Sync from Catalog (Icon-only on mobile, icon + text on desktop) */}
             <button
               type="button"
               onClick={handleSync}
               disabled={syncing}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
+              aria-label={syncing ? "Syncing catalog" : "Sync Catalog"}
               title="Sync catalog to Firestore"
+              className="inline-flex items-center justify-center gap-1.5 w-10 h-10 md:w-auto md:px-3.5 rounded-xl bg-sky-50 dark:bg-sky-500/15 hover:bg-sky-100 dark:hover:bg-sky-500/25 text-sky-800 dark:text-sky-300 border border-sky-200/60 dark:border-sky-500/25 text-xs font-semibold transition cursor-pointer disabled:opacity-50 shrink-0"
             >
-              <FiRefreshCw className={`text-sm ${syncing ? "animate-spin" : ""}`} />
-              <span>{syncing ? "Syncing..." : "Sync Catalog"}</span>
+              <FiRefreshCw className={`text-[16px] md:text-sm ${syncing ? "animate-spin" : ""}`} />
+              <span className="hidden md:inline">{syncing ? "Syncing..." : "Sync Catalog"}</span>
             </button>
 
             {/* Add Custom Product (Admin Only) */}
@@ -461,7 +554,7 @@ const StockTable = ({
               <button
                 type="button"
                 onClick={() => setShowAddProductModal(true)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold transition shadow-xs cursor-pointer"
+                className="ml-auto md:ml-0 inline-flex items-center justify-center gap-1.5 h-10 px-3.5 rounded-xl bg-sky-700 hover:bg-sky-800 dark:bg-sky-600 dark:hover:bg-sky-500 text-white text-xs font-bold transition shadow-xs cursor-pointer whitespace-nowrap"
               >
                 <FiPlus className="text-sm" />
                 <span>Add Product</span>
@@ -472,70 +565,28 @@ const StockTable = ({
 
         {/* Sync message banner */}
         {syncMessage && (
-          <div className="p-3 bg-sky-50 border border-sky-200 rounded-xl text-xs font-semibold text-sky-900 flex items-center gap-2">
-            <FiCheckCircle className="text-emerald-600 text-sm shrink-0" />
+          <div className="p-3 bg-sky-50 dark:bg-sky-500/10 border border-sky-200 dark:border-sky-500/25 rounded-xl text-xs font-semibold text-sky-900 dark:text-sky-200 flex items-center gap-2">
+            <FiCheckCircle className="text-emerald-600 dark:text-emerald-400 text-sm shrink-0" />
             <span>{syncMessage}</span>
           </div>
         )}
 
-        {/* Filter Pills */}
-        <div className="flex items-center justify-between gap-3 flex-wrap pt-2 border-t border-slate-100">
-          {/* Brand Filter */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">
-              Brand:
-            </span>
-            {brands.slice(0, 8).map((b) => (
-              <button
-                key={b}
-                type="button"
-                onClick={() => setBrandFilter(b)}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition cursor-pointer shrink-0 ${brandFilter === b
-                  ? "bg-slate-900 text-white shadow-2xs"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
-              >
-                {b}
-              </button>
-            ))}
-          </div>
-
-          {/* Status Filter */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mr-1">
-              Status:
-            </span>
-            {[
-              { id: "All", label: "All" },
-              { id: "in-stock", label: "In Stock" },
-              { id: "low-stock", label: "Low Stock" },
-              { id: "out-of-stock", label: "Out of Stock" },
-            ].map((st) => (
-              <button
-                key={st.id}
-                type="button"
-                onClick={() => setStatusFilter(st.id)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${statusFilter === st.id
-                  ? "bg-sky-700 text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
-              >
-                {st.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* Active Filter Chips (Only visible when a filter is applied) */}
+        <ActiveFilterChips
+          sections={filterSections}
+          onResetAll={handleResetFilters}
+        />
       </div>
 
       {/* 📦 INVENTORY TABLE */}
       <div
         ref={tableRef}
-        className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden"
+        className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs overflow-hidden transition-colors"
       >
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs sm:text-sm">
             <thead>
-              <tr className="bg-slate-900 text-white text-[11px] font-bold uppercase tracking-wider">
+              <tr className="bg-slate-50/90 dark:bg-slate-800/70 border-b border-slate-200/80 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-[11px] font-bold uppercase tracking-wider">
                 <th className="py-3.5 px-4">Product &amp; SKU</th>
                 <th className="py-3.5 px-4">Brand &amp; Category</th>
                 {isAdmin && (
@@ -558,14 +609,14 @@ const StockTable = ({
                 {isAdmin && <th className="py-3.5 px-4 text-right">Edit</th>}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 font-medium text-slate-700 dark:text-slate-300">
               {paginatedStock.length === 0 ? (
                 <tr>
                   <td
                     colSpan={isAdmin ? 8 : 5}
-                    className="py-12 text-center text-slate-400"
+                    className="py-12 text-center text-slate-400 dark:text-slate-500"
                   >
-                    <FiPackage className="text-3xl mx-auto mb-2 text-slate-300" />
+                    <FiPackage className="text-3xl mx-auto mb-2 text-slate-300 dark:text-slate-600" />
                     <p className="text-sm font-semibold">No stock items found matching your filters.</p>
                   </td>
                 </tr>
@@ -583,7 +634,7 @@ const StockTable = ({
                     <tr
                       key={item.sku}
                       onClick={() => setSelectedProductForDrawer(item)}
-                      className="hover:bg-sky-50/60 cursor-pointer transition-colors group"
+                      className="hover:bg-sky-50/60 dark:hover:bg-slate-800/60 cursor-pointer transition-colors group"
                       title="Click product to view sales and stock movements ledger"
                     >
                       {/* Product & SKU */}
@@ -593,7 +644,7 @@ const StockTable = ({
                             <img
                               src={item.image}
                               alt={item.name}
-                              className="w-10 h-10 object-contain rounded-lg bg-slate-50 p-1 border border-slate-100 shrink-0"
+                              className="w-10 h-10 object-contain rounded-lg bg-slate-50 dark:bg-white p-1 border border-slate-100 dark:border-slate-700 shrink-0"
                               onError={(e) => {
                                 e.target.style.display = "none";
                               }}
@@ -616,16 +667,16 @@ const StockTable = ({
                               return (
                                 <>
                                   <div className="flex items-center gap-1.5 flex-wrap">
-                                    <p className="font-bold text-slate-900 truncate max-w-xs sm:max-w-md">
+                                    <p className="font-bold text-slate-900 dark:text-slate-100 truncate max-w-xs sm:max-w-md">
                                       {item.name}
                                     </p>
                                     {inferredStorage && !hasStorageInName && (
-                                      <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200/80 shrink-0">
+                                      <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-sky-50 dark:bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-200/80 dark:border-sky-500/25 shrink-0">
                                         {inferredStorage}
                                       </span>
                                     )}
                                   </div>
-                                  <p className="text-xs font-mono text-slate-400 font-medium">
+                                  <p className="text-xs font-mono text-slate-400 dark:text-slate-500 font-medium">
                                     {item.sku}
                                   </p>
                                 </>
@@ -637,17 +688,17 @@ const StockTable = ({
 
                       {/* Brand & Category */}
                       <td className="py-3.5 px-4">
-                        <span className="inline-block px-2 py-0.5 rounded-md bg-sky-50 text-sky-800 text-xs font-bold mb-0.5">
+                        <span className="inline-block px-2 py-0.5 rounded-md bg-sky-50 dark:bg-sky-500/15 text-sky-800 dark:text-sky-300 text-xs font-bold mb-0.5">
                           {item.brand}
                         </span>
-                        <p className="text-[11px] text-slate-400 truncate max-w-[140px]">
+                        <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate max-w-[140px]">
                           {item.category}
                         </p>
                       </td>
 
                       {/* Cost Price (Admin Only) */}
                       {isAdmin && (
-                        <td className="py-3.5 px-3 text-right font-mono text-slate-600 text-xs whitespace-nowrap">
+                        <td className="py-3.5 px-3 text-right font-mono text-slate-600 dark:text-slate-400 text-xs whitespace-nowrap">
                           <AedPrice amount={cost} />
                         </td>
                       )}
@@ -655,9 +706,9 @@ const StockTable = ({
                       {/* Margin (Admin Only - Centered) */}
                       {isAdmin && (
                         <td className="py-3.5 px-3 text-center font-mono whitespace-nowrap">
-                          <span className="inline-flex items-center justify-center gap-1 font-bold text-xs text-emerald-700 bg-emerald-50/90 px-2.5 py-0.5 rounded-lg border border-emerald-200/80">
+                          <span className="inline-flex items-center justify-center gap-1 font-bold text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-50/90 dark:bg-emerald-500/15 px-2.5 py-0.5 rounded-lg border border-emerald-200/80 dark:border-emerald-500/25">
                             <span>+</span>
-                            <AedPrice amount={margin} symbolClassName="text-emerald-600" />
+                            <AedPrice amount={margin} symbolClassName="text-emerald-600 dark:text-emerald-400" />
                           </span>
                         </td>
                       )}
@@ -665,9 +716,9 @@ const StockTable = ({
                       {/* Selling Price */}
                       <td className="py-3.5 px-4 text-right font-mono whitespace-nowrap">
                         <div className="flex flex-col items-end">
-                          <AedPrice amount={sellingPrice} className="font-bold text-slate-950 text-sm" />
+                          <AedPrice amount={sellingPrice} className="font-bold text-slate-950 dark:text-white text-sm" />
                           {hasDiscount && (
-                            <span className="text-[10px] text-slate-400 line-through">
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500 line-through">
                               <AedPrice amount={originalPrice} />
                             </span>
                           )}
@@ -678,28 +729,28 @@ const StockTable = ({
                       <td className="py-3.5 px-4 text-center font-mono font-bold whitespace-nowrap">
                         <span
                           className={`inline-flex items-center px-2.5 py-1 rounded-xl text-xs font-extrabold ${isOutOfStock
-                            ? "bg-rose-100/80 text-rose-700 border border-rose-200"
+                            ? "bg-rose-100/80 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/25"
                             : isLowStock
-                              ? "bg-amber-100/80 text-amber-800 border border-amber-200"
-                              : "bg-slate-100 text-slate-800 border border-slate-200/60"
+                              ? "bg-amber-100/80 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/25"
+                              : "bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200/60 dark:border-slate-700"
                             }`}
                         >
-                          {item.quantity} <span className="text-[10px] text-slate-500 font-semibold ml-1">units</span>
+                          {item.quantity} <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold ml-1">units</span>
                         </span>
                       </td>
 
                       {/* Status Badge */}
                       <td className="py-3.5 px-4 text-center whitespace-nowrap">
                         {isOutOfStock ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 text-xs font-bold">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 text-xs font-bold">
                             <FiXCircle /> Out
                           </span>
                         ) : isLowStock ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-bold">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 text-xs font-bold">
                             <FiAlertTriangle /> Low ({item.quantity})
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-xs font-bold">
                             <FiCheckCircle /> In Stock
                           </span>
                         )}
@@ -714,7 +765,7 @@ const StockTable = ({
                               e.stopPropagation();
                               handleOpenEdit(item);
                             }}
-                            className="p-2 text-slate-400 hover:text-sky-700 hover:bg-sky-50 rounded-xl transition cursor-pointer"
+                            className="p-2 text-slate-400 dark:text-slate-500 hover:text-sky-700 dark:hover:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-500/15 rounded-xl transition cursor-pointer"
                             title="Edit Product Details, Cost, Margin & Stock"
                           >
                             <FiEdit2 className="text-base" />
@@ -731,12 +782,12 @@ const StockTable = ({
 
         {/* 📄 PAGINATION CONTROLS */}
         {totalPages > 1 && (
-          <div className="p-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-            <p className="text-slate-500 font-medium">
+          <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+            <p className="text-slate-500 dark:text-slate-400 font-medium">
               Showing{" "}
-              <strong className="text-slate-900 font-mono">{startIndex + 1}</strong> to{" "}
-              <strong className="text-slate-900 font-mono">{endIndex}</strong> of{" "}
-              <strong className="text-slate-900 font-mono">{totalItems}</strong> items
+              <strong className="text-slate-900 dark:text-white font-mono">{startIndex + 1}</strong> to{" "}
+              <strong className="text-slate-900 dark:text-white font-mono">{endIndex}</strong> of{" "}
+              <strong className="text-slate-900 dark:text-white font-mono">{totalItems}</strong> items
             </p>
 
             <div className="flex items-center gap-1">
@@ -744,7 +795,7 @@ const StockTable = ({
                 type="button"
                 onClick={() => handlePageChange(1)}
                 disabled={validPage === 1}
-                className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 cursor-pointer"
+                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 cursor-pointer"
                 title="First Page"
               >
                 <FiChevronsLeft />
@@ -753,7 +804,7 @@ const StockTable = ({
                 type="button"
                 onClick={() => handlePageChange(validPage - 1)}
                 disabled={validPage === 1}
-                className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 cursor-pointer"
+                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 cursor-pointer"
                 title="Previous Page"
               >
                 <FiChevronLeft />
@@ -765,8 +816,8 @@ const StockTable = ({
                   type="button"
                   onClick={() => handlePageChange(p)}
                   className={`w-8 h-8 rounded-lg font-bold font-mono transition cursor-pointer ${validPage === p
-                    ? "bg-slate-900 text-white shadow-2xs"
-                    : "border border-slate-200 text-slate-700 hover:bg-slate-50"
+                    ? "bg-slate-900 dark:bg-sky-600 text-white shadow-2xs"
+                    : "border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
                     }`}
                 >
                   {p}
@@ -777,7 +828,7 @@ const StockTable = ({
                 type="button"
                 onClick={() => handlePageChange(validPage + 1)}
                 disabled={validPage === totalPages}
-                className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 cursor-pointer"
+                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 cursor-pointer"
                 title="Next Page"
               >
                 <FiChevronRight />
@@ -786,7 +837,7 @@ const StockTable = ({
                 type="button"
                 onClick={() => handlePageChange(totalPages)}
                 disabled={validPage === totalPages}
-                className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 cursor-pointer"
+                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 cursor-pointer"
                 title="Last Page"
               >
                 <FiChevronsRight />
@@ -798,27 +849,27 @@ const StockTable = ({
 
       {/* 🛠️ ADMIN EDIT MODAL (Optimized for iPhone 14 Pro Max & all screens) */}
       {editingItem && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl p-5 sm:p-7 w-full max-w-lg shadow-2xl space-y-4 my-6 text-left border border-slate-100">
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-7 w-full max-w-lg shadow-2xl space-y-4 my-6 text-left border border-slate-200/80 dark:border-slate-800">
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-base sm:text-lg font-black text-slate-900">
+                  <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
                     Edit Product &amp; Pricing
                   </h3>
-                  <span className="px-2 py-0.5 rounded-lg bg-sky-50 text-sky-800 text-xs font-mono font-bold border border-sky-200">
+                  <span className="px-2 py-0.5 rounded-lg bg-sky-50 dark:bg-sky-500/15 text-sky-800 dark:text-sky-300 text-xs font-mono font-bold border border-sky-200 dark:border-sky-500/25">
                     {editingItem.sku}
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-500 mt-0.5">
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
                   Controller adjustments sync live to Cloud Firestore globally.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setEditingItem(null)}
-                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+                className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
               >
                 <FiX className="text-lg" />
               </button>
@@ -827,14 +878,14 @@ const StockTable = ({
             <form onSubmit={handleSaveEdit} className="space-y-4">
               {/* Product Name */}
               <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
                   Product Full Name
                 </label>
                 <input
                   type="text"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold outline-none focus:bg-white focus:border-sky-600 transition"
+                  className="w-full py-2.5 px-3.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-xs sm:text-sm font-semibold outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-sky-600 dark:focus:border-sky-500 transition"
                   required
                 />
               </div>
@@ -842,39 +893,39 @@ const StockTable = ({
               {/* Brand & Category (Clean 2-column grid) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
                     Brand
                   </label>
                   <input
                     type="text"
                     value={editBrand}
                     onChange={(e) => setEditBrand(e.target.value)}
-                    className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm outline-none focus:bg-white focus:border-sky-600 transition"
+                    className="w-full py-2.5 px-3.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-xs sm:text-sm outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-sky-600 dark:focus:border-sky-500 transition"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
                     Category
                   </label>
                   <input
                     type="text"
                     value={editCategory}
                     onChange={(e) => setEditCategory(e.target.value)}
-                    className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm outline-none focus:bg-white focus:border-sky-600 transition"
+                    className="w-full py-2.5 px-3.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-xs sm:text-sm outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-sky-600 dark:focus:border-sky-500 transition"
                     required
                   />
                 </div>
               </div>
 
               {/* 💰 CONTROLLER PRICING ENGINE BOX */}
-              <div className="p-3.5 sm:p-4 rounded-2xl bg-sky-50/70 border border-sky-100/80 space-y-3">
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-sky-50/70 dark:bg-sky-500/10 border border-sky-100/80 dark:border-sky-500/20 space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-sky-900 font-bold text-xs">
-                    <FiDollarSign className="text-sky-700" />
+                  <div className="flex items-center gap-1.5 text-sky-900 dark:text-sky-300 font-bold text-xs">
+                    <FiDollarSign className="text-sky-700 dark:text-sky-400" />
                     <span>Controller Pricing Engine</span>
                   </div>
-                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300">
                     Selling = Cost + Margin
                   </span>
                 </div>
@@ -882,7 +933,7 @@ const StockTable = ({
                 <div className="grid grid-cols-2 gap-3">
                   {/* Cost Price */}
                   <div>
-                    <label className="block text-[10.5px] font-bold text-slate-700 uppercase tracking-wider mb-1 h-5 flex items-center gap-1">
+                    <label className="text-[10.5px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1 h-5 flex items-center gap-1">
                       <span>Cost Price</span> (<AedSymbol className="text-xs" />)
                     </label>
                     <input
@@ -892,14 +943,14 @@ const StockTable = ({
                       placeholder="0.00"
                       value={editCostPrice}
                       onChange={(e) => handleCostChange(e.target.value)}
-                      className="w-full py-2 px-3 bg-white border border-slate-200 rounded-xl font-mono text-xs sm:text-sm font-bold text-slate-900 outline-none focus:border-sky-600 transition"
+                      className="w-full py-2 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-xs sm:text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-sky-600 dark:focus:border-sky-500 transition"
                       required
                     />
                   </div>
 
                   {/* Profit Margin */}
                   <div>
-                    <label className="block text-[10.5px] font-bold text-slate-700 uppercase tracking-wider mb-1 h-5 flex items-center gap-1">
+                    <label className="text-[10.5px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1 h-5 flex items-center gap-1">
                       <span>Margin</span> (<AedSymbol className="text-xs" />)
                     </label>
                     <input
@@ -908,16 +959,16 @@ const StockTable = ({
                       placeholder="0.00"
                       value={editMargin}
                       onChange={(e) => handleMarginChange(e.target.value)}
-                      className="w-full py-2 px-3 bg-white border border-slate-200 rounded-xl font-mono text-xs sm:text-sm font-bold text-emerald-700 outline-none focus:border-sky-600 transition"
+                      className="w-full py-2 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-xs sm:text-sm font-bold text-emerald-700 dark:text-emerald-400 outline-none focus:border-sky-600 dark:focus:border-sky-500 transition"
                       required
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 pt-1 border-t border-sky-100">
+                <div className="grid grid-cols-2 gap-3 pt-1 border-t border-sky-100 dark:border-sky-500/20">
                   {/* Selling Price */}
                   <div>
-                    <label className="block text-[10.5px] font-bold text-sky-900 uppercase tracking-wider mb-1 h-5 flex items-center gap-1">
+                    <label className="text-[10.5px] font-bold text-sky-900 dark:text-sky-300 uppercase tracking-wider mb-1 h-5 flex items-center gap-1">
                       <span>Selling Price</span> (<AedSymbol className="text-xs" />)
                     </label>
                     <input
@@ -926,14 +977,14 @@ const StockTable = ({
                       step="0.01"
                       value={editPrice}
                       onChange={(e) => setEditPrice(e.target.value)}
-                      className="w-full py-2 px-3 bg-white border-2 border-sky-500 rounded-xl font-mono text-xs sm:text-sm font-black text-sky-950 outline-none transition"
+                      className="w-full py-2 px-3 bg-white dark:bg-slate-900 border-2 border-sky-500 rounded-xl font-mono text-xs sm:text-sm font-black text-sky-950 dark:text-sky-300 outline-none transition"
                       required
                     />
                   </div>
 
                   {/* MSRP / Original Price */}
                   <div>
-                    <label className="block text-[10.5px] font-bold text-slate-500 uppercase tracking-wider mb-1 h-5 flex items-center gap-1">
+                    <label className="text-[10.5px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1 h-5 flex items-center gap-1">
                       <span>Original / List</span> (<AedSymbol className="text-xs" />)
                     </label>
                     <input
@@ -943,7 +994,7 @@ const StockTable = ({
                       placeholder="Optional"
                       value={editOriginalPrice}
                       onChange={(e) => setEditOriginalPrice(e.target.value)}
-                      className="w-full py-2 px-3 bg-white border border-slate-200 rounded-xl font-mono text-xs sm:text-sm text-slate-700 outline-none focus:border-sky-600 transition"
+                      className="w-full py-2 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-xs sm:text-sm text-slate-700 dark:text-slate-300 outline-none focus:border-sky-600 dark:focus:border-sky-500 transition"
                     />
                   </div>
                 </div>
@@ -952,7 +1003,7 @@ const StockTable = ({
               {/* 📦 INVENTORY & ALERTS */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 h-5 flex items-center">
+                  <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1 h-5 flex items-center">
                     Stock Quantity
                   </label>
                   <input
@@ -960,13 +1011,13 @@ const StockTable = ({
                     min="0"
                     value={editQty}
                     onChange={(e) => setEditQty(e.target.value)}
-                    className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs sm:text-sm font-bold outline-none focus:bg-white focus:border-sky-600 transition"
+                    className="w-full py-2.5 px-3.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl font-mono text-xs sm:text-sm font-bold outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-sky-600 dark:focus:border-sky-500 transition"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 h-5 flex items-center">
+                  <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1 h-5 flex items-center">
                     Min Stock Alert
                   </label>
                   <input
@@ -974,31 +1025,31 @@ const StockTable = ({
                     min="1"
                     value={editAlert}
                     onChange={(e) => setEditAlert(e.target.value)}
-                    className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs sm:text-sm font-bold outline-none focus:bg-white focus:border-sky-600 transition"
+                    className="w-full py-2.5 px-3.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl font-mono text-xs sm:text-sm font-bold outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-sky-600 dark:focus:border-sky-500 transition"
                     required
                   />
                 </div>
               </div>
 
               {/* Live sync note */}
-              <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-2 text-[11px] text-slate-600 font-medium">
-                <FiGlobe className="text-sky-600 text-xs shrink-0" />
+              <div className="p-2.5 bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-xl flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-300 font-medium">
+                <FiGlobe className="text-sky-600 dark:text-sky-400 text-xs shrink-0" />
                 <span>Saves directly to Cloud Firestore &amp; updates live globally.</span>
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setEditingItem(null)}
-                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-semibold transition cursor-pointer"
+                  className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-xs font-semibold transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="px-5 py-2.5 bg-sky-700 hover:bg-sky-800 text-white rounded-xl text-xs font-bold transition cursor-pointer disabled:opacity-50 shadow-md"
+                  className="px-5 py-2.5 bg-sky-700 hover:bg-sky-800 dark:bg-sky-600 dark:hover:bg-sky-500 text-white rounded-xl text-xs font-bold transition cursor-pointer disabled:opacity-50 shadow-md"
                 >
                   {isSaving ? "Saving..." : "Save Changes"}
                 </button>
@@ -1010,19 +1061,19 @@ const StockTable = ({
 
       {/* ADMIN ADD PRODUCT MODAL */}
       {showAddProductModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl p-5 sm:p-7 w-full max-w-lg shadow-2xl my-6 text-left border border-slate-100">
-            <h3 className="text-base sm:text-lg font-black text-slate-900 mb-1">
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-7 w-full max-w-lg shadow-2xl my-6 text-left border border-slate-200/80 dark:border-slate-800">
+            <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white mb-1">
               Add New Product to Inventory
             </h3>
-            <p className="text-xs text-slate-500 mb-4">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
               Enter product details, pricing, and stock to save to Cloud Firestore.
             </p>
 
             <form onSubmit={handleAddProduct} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
                     SKU Code *
                   </label>
                   <input
@@ -1031,12 +1082,12 @@ const StockTable = ({
                     placeholder="e.g. SONY-WH1000XM5"
                     value={newSku}
                     onChange={(e) => setNewSku(e.target.value)}
-                    className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs outline-none focus:bg-white focus:border-sky-600 uppercase font-bold"
+                    className="w-full py-2 px-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl font-mono text-xs outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-sky-600 dark:focus:border-sky-500 uppercase font-bold"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
                     Brand *
                   </label>
                   <input
@@ -1045,13 +1096,13 @@ const StockTable = ({
                     placeholder="e.g. Sony, Apple, Samsung"
                     value={newBrand}
                     onChange={(e) => setNewBrand(e.target.value)}
-                    className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:bg-white focus:border-sky-600"
+                    className="w-full py-2 px-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-xs outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-sky-600 dark:focus:border-sky-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
                   Product Full Name *
                 </label>
                 <input
@@ -1060,13 +1111,13 @@ const StockTable = ({
                   placeholder="e.g. Sony WH-1000XM5 Wireless Noise Canceling Headphones"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:bg-white focus:border-sky-600 font-semibold"
+                  className="w-full py-2 px-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-xs outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-sky-600 dark:focus:border-sky-500 font-semibold"
                 />
               </div>
 
-              <div className="p-3 bg-sky-50 rounded-2xl border border-sky-100 grid grid-cols-3 gap-2 text-xs">
+              <div className="p-3 bg-sky-50 dark:bg-sky-500/10 rounded-2xl border border-sky-100 dark:border-sky-500/20 grid grid-cols-3 gap-2 text-xs">
                 <div>
-                  <label className="block font-bold text-slate-700 text-[10px] mb-1">
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 text-[10px] mb-1">
                     Cost ({CURRENCY_SYMBOL})
                   </label>
                   <input
@@ -1080,12 +1131,12 @@ const StockTable = ({
                       const m = parseFloat(newMargin) || 0;
                       setNewPrice((c + m).toFixed(2));
                     }}
-                    className="w-full py-1.5 px-2 bg-white border border-slate-200 rounded-lg font-mono text-xs"
+                    className="w-full py-1.5 px-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg font-mono text-xs"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 text-[10px] mb-1">
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 text-[10px] mb-1">
                     Margin ({CURRENCY_SYMBOL})
                   </label>
                   <input
@@ -1098,12 +1149,12 @@ const StockTable = ({
                       const m = parseFloat(e.target.value) || 0;
                       setNewPrice((c + m).toFixed(2));
                     }}
-                    className="w-full py-1.5 px-2 bg-white border border-slate-200 rounded-lg font-mono text-xs text-emerald-700 font-bold"
+                    className="w-full py-1.5 px-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-xs text-emerald-700 dark:text-emerald-400 font-bold"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-bold text-sky-900 text-[10px] mb-1">
+                  <label className="block font-bold text-sky-900 dark:text-sky-300 text-[10px] mb-1">
                     Selling ({CURRENCY_SYMBOL})
                   </label>
                   <input
@@ -1113,19 +1164,19 @@ const StockTable = ({
                     required
                     value={newPrice}
                     onChange={(e) => setNewPrice(e.target.value)}
-                    className="w-full py-1.5 px-2 bg-white border-2 border-sky-500 rounded-lg font-mono text-xs font-black text-sky-900"
+                    className="w-full py-1.5 px-2 bg-white dark:bg-slate-900 border-2 border-sky-500 rounded-lg font-mono text-xs font-black text-sky-900 dark:text-sky-300"
                   />
                 </div>
               </div>
 
               {/* Product Image Field (Optional) */}
-              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
-                <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-                  Product Image <span className="text-slate-400 font-normal lowercase">(optional)</span>
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/70 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2">
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                  Product Image <span className="text-slate-400 dark:text-slate-500 font-normal lowercase">(optional)</span>
                 </label>
 
                 <div className="flex items-center gap-3">
-                  <div className="w-14 h-14 rounded-xl border border-slate-200 bg-white p-1 flex items-center justify-center shrink-0 overflow-hidden">
+                  <div className="w-14 h-14 rounded-xl border border-slate-200 dark:border-slate-700 bg-white p-1 flex items-center justify-center shrink-0 overflow-hidden">
                     {newImage ? (
                       <img
                         src={newImage}
@@ -1146,11 +1197,11 @@ const StockTable = ({
                       placeholder="Paste Image URL (https://...)"
                       value={newImage}
                       onChange={(e) => setNewImage(e.target.value)}
-                      className="w-full py-1.5 px-2.5 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:border-sky-600"
+                      className="w-full py-1.5 px-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg text-xs outline-none focus:border-sky-600 dark:focus:border-sky-500"
                     />
 
                     <div className="flex items-center gap-2">
-                      <label className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-[11px] font-semibold cursor-pointer transition">
+                      <label className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg text-[11px] font-semibold cursor-pointer transition">
                         <FiUpload className="text-xs" />
                         <span>Upload File</span>
                         <input
@@ -1165,7 +1216,7 @@ const StockTable = ({
                         <button
                           type="button"
                           onClick={() => setNewImage("")}
-                          className="text-[11px] text-rose-600 hover:underline font-medium cursor-pointer"
+                          className="text-[11px] text-rose-600 dark:text-rose-400 hover:underline font-medium cursor-pointer"
                         >
                           Clear
                         </button>
@@ -1176,12 +1227,12 @@ const StockTable = ({
               </div>
 
               {/* Min Stock Alert (Stock starts at 0, procured via Purchase Records) */}
-              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-200">
+              <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/70 rounded-2xl border border-slate-200 dark:border-slate-700">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                     Min Stock Alert
                   </label>
-                  <p className="text-[10px] text-slate-500">
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">
                     Initial stock starts at 0. Procurement is recorded via Purchase Records.
                   </p>
                 </div>
@@ -1191,21 +1242,21 @@ const StockTable = ({
                   required
                   value={newAlert}
                   onChange={(e) => setNewAlert(e.target.value)}
-                  className="w-20 py-1.5 px-2 bg-white border border-slate-200 rounded-lg font-mono text-xs text-center font-bold outline-none focus:border-sky-600"
+                  className="w-20 py-1.5 px-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg font-mono text-xs text-center font-bold outline-none focus:border-sky-600 dark:focus:border-sky-500"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setShowAddProductModal(false)}
-                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-semibold transition"
+                  className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-xs font-semibold transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-sky-700 hover:bg-sky-800 text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-md"
+                  className="px-5 py-2 bg-sky-700 hover:bg-sky-800 dark:bg-sky-600 dark:hover:bg-sky-500 text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-md"
                 >
                   Add Product
                 </button>

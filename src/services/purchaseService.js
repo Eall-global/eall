@@ -9,6 +9,7 @@ import {
   onSnapshot,
 } from "../lib/firebaseClient";
 import { fetchStock, updateStockQuantity, updateProductDetails } from "./stockService";
+import { logAuditEvent } from "./auditService";
 
 const PURCHASES_STORAGE_KEY = "eall_purchase_records";
 const COLLECTION_NAME = "purchase_records";
@@ -194,6 +195,7 @@ export const createPurchaseRecord = async ({
           quantity: newQty,
           costPrice: unitCost,
           price: unitCost + currentMargin,
+          skipAudit: true,
         });
       } else {
         await updateStockQuantity(item.sku, newQty);
@@ -216,6 +218,20 @@ export const createPurchaseRecord = async ({
   const localList = getLocalPurchases();
   const updatedLocal = [newPurchase, ...localList];
   saveLocalPurchases(updatedLocal);
+
+  logAuditEvent({
+    module: "purchases",
+    action: "create",
+    severity: "info",
+    targetId: purchaseNo,
+    targetLabel: `${purchaseNo} • ${newPurchase.supplierName}`,
+    summary: `Recorded purchase ${purchaseNo} from ${newPurchase.supplierName} (+${totalQuantity} units • AED ${totalAmount.toFixed(2)})`,
+    changes: [
+      { field: "Inward Units", before: "—", after: `+${totalQuantity} units` },
+      { field: "Total Cost", before: "—", after: `AED ${totalAmount.toFixed(2)}` },
+      { field: "Payment Status", before: "—", after: paymentStatus },
+    ],
+  });
 
   return newPurchase;
 };
@@ -258,6 +274,19 @@ export const deletePurchaseRecord = async (purchaseNo, reverseStock = true) => {
   const localList = getLocalPurchases();
   const updatedList = localList.filter((p) => p.purchaseNo !== purchaseNo);
   saveLocalPurchases(updatedList);
+
+  logAuditEvent({
+    module: "purchases",
+    action: "void",
+    severity: "critical",
+    targetId: purchaseNo,
+    targetLabel: `${purchaseNo} • ${target.supplierName}`,
+    summary: `Voided purchase order ${purchaseNo} (${target.supplierName}) and reversed ${target.totalQuantity} inward units`,
+    changes: [
+      { field: "Status", before: target.paymentStatus, after: "Voided / Reversed" },
+      { field: "Amount", before: `AED ${Number(target.totalAmount).toFixed(2)}`, after: "AED 0.00" },
+    ],
+  });
 
   return updatedList;
 };

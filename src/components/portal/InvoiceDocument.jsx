@@ -29,14 +29,17 @@ const InvoiceDocument = ({ invoice: rawInvoice, onClose }) => {
     customerPhone: rawInvoice.customerPhone || rawInvoice.phone || "N/A",
     customerEmail: rawInvoice.customerEmail || rawInvoice.email || "",
     customerTrn: rawInvoice.customerTrn || "",
+    customerAddress: rawInvoice.customerAddress || rawInvoice.shippingAddress || "",
     paymentMethod: rawInvoice.paymentMethodName || rawInvoice.paymentMethod || "Cash",
+    paymentReference: rawInvoice.paymentReference || rawInvoice.waveTransactionId || "",
+    couponCode: rawInvoice.couponCode || rawInvoice.appliedCoupon || "",
     createdBy: rawInvoice.createdBy || "Website Online Order",
     notes: rawInvoice.notes || "",
     createdAt: rawInvoice.createdAt || new Date().toISOString(),
     subtotal: Number(rawInvoice.subtotal ?? rawInvoice.totalAmount ?? rawInvoice.total ?? 0),
     vatRate: Number(rawInvoice.vatRate ?? 5),
     vatAmount: Number(rawInvoice.vatAmount ?? 0),
-    discount: Number(rawInvoice.discount ?? 0),
+    discount: Number(rawInvoice.discount ?? rawInvoice.discountAmount ?? 0),
     totalAmount: Number(rawInvoice.totalAmount ?? rawInvoice.total ?? 0),
     items: (rawInvoice.items || []).map((item) => {
       const qty = Number(item.quantity) || 1;
@@ -47,6 +50,7 @@ const InvoiceDocument = ({ invoice: rawInvoice, onClose }) => {
         sku: item.sku || "N/A",
         name: item.name || item.title || "Item",
         brand: item.brand || "",
+        serials: Array.isArray(item.serials) ? item.serials.filter(Boolean) : [],
         quantity: qty,
         unitPrice,
         total,
@@ -129,24 +133,24 @@ const InvoiceDocument = ({ invoice: rawInvoice, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/90 backdrop-blur-md flex flex-col items-center p-2 sm:p-4 md:p-6 print:p-0 print:bg-white print:static text-left">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/65 dark:bg-slate-950/90 backdrop-blur-md flex flex-col items-center p-2 sm:p-4 md:p-6 print:p-0 print:bg-white print:static text-left">
 
       {/* 🛠️ CUSTOM DOCUMENT VIEWER TOOLBAR */}
-      <div className="sticky top-2 z-20 w-full max-w-4xl bg-slate-900/95 backdrop-blur-lg text-white rounded-2xl shadow-2xl border border-slate-700/80 px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3 mb-4 print:hidden">
+      <div className="sticky top-2 z-20 w-full max-w-4xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg text-slate-900 dark:text-white rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700/80 px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3 mb-4 print:hidden">
 
         {/* Left: Document Info */}
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-sky-500/20 text-sky-400 rounded-xl">
+          <div className="p-2 bg-sky-50 dark:bg-sky-500/20 text-sky-700 dark:text-sky-400 border border-sky-200/70 dark:border-sky-500/25 rounded-xl">
             <FiFileText className="text-lg" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-bold text-sm text-white">Document Viewer</span>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+              <span className="font-bold text-sm text-slate-900 dark:text-white">Document Viewer</span>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30">
                 A4 Vector Engine
               </span>
             </div>
-            <p className="text-xs text-slate-400 font-mono">
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
               {invoice.invoiceNo} • {invoice.customerName}
             </p>
           </div>
@@ -183,7 +187,7 @@ const InvoiceDocument = ({ invoice: rawInvoice, onClose }) => {
           <button
             type="button"
             onClick={handlePrint}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition border border-slate-700 cursor-pointer"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition border border-slate-200 dark:border-slate-700 cursor-pointer"
             title="Print isolated 1-sheet A4 page"
           >
             <FiPrinter />
@@ -194,7 +198,7 @@ const InvoiceDocument = ({ invoice: rawInvoice, onClose }) => {
           <button
             type="button"
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition text-lg cursor-pointer ml-1"
+            className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition text-lg cursor-pointer ml-1"
             title="Close Viewer"
           >
             <FiX />
@@ -278,6 +282,9 @@ const InvoiceDocument = ({ invoice: rawInvoice, onClose }) => {
                   <p>Time: <span className="text-slate-700 font-mono">{new Date(invoice.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></p>
                   <p>Issued By: <strong className="text-slate-800">{invoice.createdBy}</strong></p>
                   <p>Payment: <span className="font-semibold text-slate-800">{invoice.paymentMethod}</span></p>
+                  {invoice.paymentReference && (
+                    <p>Ref: <span className="font-mono font-semibold text-slate-800">{invoice.paymentReference}</span></p>
+                  )}
                 </div>
               </div>
             </div>
@@ -299,6 +306,11 @@ const InvoiceDocument = ({ invoice: rawInvoice, onClose }) => {
                     </span>
                   )}
                 </p>
+                {invoice.customerAddress && (
+                  <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">
+                    Address: {invoice.customerAddress}
+                  </p>
+                )}
               </div>
 
               <div className="text-right flex flex-col justify-between">
@@ -356,6 +368,11 @@ const InvoiceDocument = ({ invoice: rawInvoice, onClose }) => {
                           <span className="text-[10px] text-slate-400 font-medium ml-1.5">
                             ({item.brand})
                           </span>
+                        )}
+                        {item.serials?.length > 0 && (
+                          <p className="text-[10px] font-mono text-slate-500 mt-0.5">
+                            IMEI / S/N: {item.serials.join(", ")}
+                          </p>
                         )}
                       </td>
                       <td className="py-1.5 px-3 text-center font-bold text-slate-900 text-xs">

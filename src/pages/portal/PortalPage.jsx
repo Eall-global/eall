@@ -1,34 +1,53 @@
-import { useState, useEffect, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   FiPackage,
   FiFileText,
   FiClipboard,
   FiSettings,
-  FiLogOut,
-  FiShield,
-  FiUserCheck,
-  FiArrowLeft,
-  FiRefreshCw,
-  FiCheckCircle,
-  FiInfo,
   FiUsers,
   FiTag,
   FiTruck,
+  FiBriefcase,
+  FiBarChart2,
+  FiActivity,
+  FiShoppingBag,
+  FiGlobe,
+  FiCpu,
+  FiPercent,
 } from "react-icons/fi";
 import { useStaffAuth } from "../../context/StaffAuthContext";
+import { PortalThemeProvider } from "../../context/PortalThemeContext";
 import PortalLogin from "../../components/portal/PortalLogin";
+import PortalSidebar from "../../components/portal/PortalSidebar";
+import PortalHeader from "../../components/portal/PortalHeader";
 import StockTable from "../../components/portal/StockTable";
+import OnlineOrdersManagement from "../../components/portal/OnlineOrdersManagement";
+import B2BRfqManagement from "../../components/portal/B2BRfqManagement";
+import WarrantyImeiManagement from "../../components/portal/WarrantyImeiManagement";
+import LandedCostCalculator from "../../components/portal/LandedCostCalculator";
 import BillingPOS from "../../components/portal/BillingPOS";
 import InvoiceAudit from "../../components/portal/InvoiceAudit";
 import PurchaseManagement from "../../components/portal/PurchaseManagement";
 import CustomerManagement from "../../components/portal/CustomerManagement";
 import CouponManagement from "../../components/portal/CouponManagement";
+import EmployeeManagement from "../../components/portal/EmployeeManagement";
+import ReportsAnalytics from "../../components/portal/ReportsAnalytics";
+import AuditLogs from "../../components/portal/AuditLogs";
 import PortalSettings from "../../components/portal/PortalSettings";
 import InvoiceDocument from "../../components/portal/InvoiceDocument";
 import { fetchStock } from "../../services/stockService";
+import { fetchOnlineOrders } from "../../services/orderService";
+import { fetchAllRFQs } from "../../services/b2bService";
+import { fetchImeiRegistry } from "../../services/warrantyService";
+import { fetchLandedCostSheets } from "../../services/landedCostService";
+import {
+  fetchCustomersList,
+  fetchPosContacts,
+} from "../../services/customerService";
+import { fetchCoupons } from "../../services/couponService";
 import { fetchInvoices } from "../../services/billingService";
 import { fetchPurchases } from "../../services/purchaseService";
+import { fetchAuditLogs } from "../../services/auditService";
 import {
   getFirebaseDb,
   isFirebaseConfigured,
@@ -36,63 +55,459 @@ import {
   onSnapshot,
 } from "../../lib/firebaseClient";
 
-const PortalPage = () => {
-  const { isAuthenticated, currentUser, role, isAdmin, logout } = useStaffAuth();
+const SIDEBAR_STORAGE_KEY = "eall_portal_sidebar_collapsed";
+const ADMIN_ONLY_TABS = [
+  "customers",
+  "coupons",
+  "employees",
+  "reports",
+  "audits",
+  "settings",
+];
 
-  const [activeTab, setActiveTab] = useState("stock"); // stock | purchases | billing | invoices | settings
+const PortalContent = () => {
+  const { isAuthenticated, currentUser, members, role, isAdmin, logout } =
+    useStaffAuth();
+
+  const [activeTab, setActiveTab] = useState("stock");
   const [stock, setStock] = useState([]);
+  const [onlineOrders, setOnlineOrders] = useState([]);
+  const [rfqs, setRfqs] = useState([]);
+  const [imeiRecords, setImeiRecords] = useState([]);
+  const [landedSheets, setLandedSheets] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [posContacts, setPosContacts] = useState([]);
+  const [coupons, setCoupons] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [purchases, setPurchases] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewingInvoice, setViewingInvoice] = useState(null);
+  const [posPrefill, setPosPrefill] = useState(null);
+
+  // Desktop collapsible sidebar state (persisted) & Mobile burger menu drawer state
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const toggleSidebarCollapsed = useCallback(() => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(SIDEBAR_STORAGE_KEY, String(next));
+      } catch {
+        // Ignore storage restrictions
+      }
+      return next;
+    });
+  }, []);
+
+  // Keyboard shortcut: Ctrl/Cmd + B toggles desktop sidebar collapse
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const handleKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "b") {
+        const tag = document.activeElement?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+        e.preventDefault();
+        toggleSidebarCollapsed();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isAuthenticated, toggleSidebarCollapsed]);
+
+  const fetchPortalSnapshot = useCallback(async () => {
+    const [
+      stockData,
+      ordersData,
+      rfqsData,
+      imeiData,
+      landedData,
+      customersData,
+      posContactsData,
+      couponsData,
+      invoicesData,
+      purchasesData,
+      auditData,
+    ] = await Promise.all([
+      fetchStock(),
+      fetchOnlineOrders(),
+      fetchAllRFQs(),
+      fetchImeiRegistry(),
+      fetchLandedCostSheets(),
+      fetchCustomersList(),
+      fetchPosContacts(),
+      fetchCoupons(),
+      fetchInvoices(),
+      fetchPurchases(),
+      fetchAuditLogs(),
+    ]);
+    return {
+      stockData,
+      ordersData,
+      rfqsData,
+      imeiData,
+      landedData,
+      customersData,
+      posContactsData,
+      couponsData,
+      invoicesData,
+      purchasesData,
+      auditData,
+    };
+  }, []);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [stockData, invoicesData, purchasesData] = await Promise.all([
-        fetchStock(),
-        fetchInvoices(),
-        fetchPurchases(),
-      ]);
+      const {
+        stockData,
+        ordersData,
+        rfqsData,
+        imeiData,
+        landedData,
+        customersData,
+        posContactsData,
+        couponsData,
+        invoicesData,
+        purchasesData,
+        auditData,
+      } = await fetchPortalSnapshot();
       setStock(stockData);
+      setOnlineOrders(ordersData);
+      setRfqs(rfqsData);
+      setImeiRecords(imeiData);
+      setLandedSheets(landedData);
+      setCustomers(customersData);
+      setPosContacts(posContactsData);
+      setCoupons(couponsData);
       setInvoices(invoicesData);
       setPurchases(purchasesData);
+      setAuditLogs(auditData);
     } catch (err) {
       console.error("Failed to load portal data:", err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchPortalSnapshot]);
 
-  // ⚡ AUTOMATIC REALTIME SUBSCRIPTION (Google Firebase Firestore onSnapshot)
+  // Real-time Cloud Firestore listener
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    loadData();
+    let cancelled = false;
+
+    const syncFromSource = async () => {
+      try {
+        const {
+          stockData,
+          ordersData,
+          rfqsData,
+          imeiData,
+          landedData,
+          customersData,
+          posContactsData,
+          couponsData,
+          invoicesData,
+          purchasesData,
+          auditData,
+        } = await fetchPortalSnapshot();
+        if (cancelled) return;
+        setStock(stockData);
+        setOnlineOrders(ordersData);
+        setRfqs(rfqsData);
+        setImeiRecords(imeiData);
+        setLandedSheets(landedData);
+        setCustomers(customersData);
+        setPosContacts(posContactsData);
+        setCoupons(couponsData);
+        setInvoices(invoicesData);
+        setPurchases(purchasesData);
+        setAuditLogs(auditData);
+      } catch (err) {
+        console.error("Failed to load portal data:", err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    syncFromSource();
 
     const db = getFirebaseDb();
     if (db && isFirebaseConfigured()) {
       try {
         const unSub1 = onSnapshot(collection(db, "product_stock"), () => {
-          loadData();
+          syncFromSource();
         });
         const unSub2 = onSnapshot(collection(db, "invoices"), () => {
-          loadData();
+          syncFromSource();
         });
         const unSub3 = onSnapshot(collection(db, "purchase_records"), () => {
-          loadData();
+          syncFromSource();
         });
+        const unSub4 = onSnapshot(collection(db, "audit_logs"), () => {
+          syncFromSource();
+        });
+        const unSub5 = onSnapshot(collection(db, "customer_orders"), () => {
+          syncFromSource();
+        });
+        const unSub6 = onSnapshot(collection(db, "b2b_rfqs"), () => {
+          syncFromSource();
+        });
+        const unSub7 = onSnapshot(collection(db, "imei_registry"), () => {
+          syncFromSource();
+        });
+        const unSub8 = onSnapshot(collection(db, "pos_contacts"), () => {
+          syncFromSource();
+        });
+        const unSub9 = onSnapshot(collection(db, "customers"), () => {
+          syncFromSource();
+        });
+        const unSub10 = onSnapshot(
+          collection(db, "landed_cost_sheets"),
+          () => {
+            syncFromSource();
+          }
+        );
 
         return () => {
+          cancelled = true;
           unSub1();
           unSub2();
           unSub3();
+          unSub4();
+          unSub5();
+          unSub6();
+          unSub7();
+          unSub8();
+          unSub9();
+          unSub10();
         };
       } catch (e) {
         console.warn("Could not attach Firestore portal listener:", e);
       }
     }
-  }, [isAuthenticated, loadData]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, fetchPortalSnapshot]);
+
+  // Alert indicators for sidebar
+  const stockAlertCount = useMemo(
+    () => stock.filter((s) => s.quantity <= (s.minAlert ?? 3)).length,
+    [stock]
+  );
+
+  const pendingOrdersCount = useMemo(
+    () =>
+      onlineOrders.filter((o) =>
+        ["Order Placed", "Awaiting Wave Verification"].includes(o.status)
+      ).length,
+    [onlineOrders]
+  );
+
+  const pendingRfqsCount = useMemo(
+    () =>
+      rfqs.filter((r) =>
+        ["Pending Executive Review", "In Review"].includes(r.status)
+      ).length,
+    [rfqs]
+  );
+
+  const openRmaCount = useMemo(
+    () => imeiRecords.filter((r) => r.status === "Warranty Claim").length,
+    [imeiRecords]
+  );
+
+  const criticalAuditCount = useMemo(
+    () => auditLogs.filter((l) => l.severity === "critical").length,
+    [auditLogs]
+  );
+
+  // Enterprise 3-group sidebar IA: Operations | Administration | System
+  const navGroups = useMemo(() => {
+    const groups = [
+      {
+        title: "Operations",
+        items: [
+          {
+            id: "stock",
+            label: "Stock Manager",
+            description:
+              "Inventory valuation, pricing controls & real-time stock alerts",
+            icon: FiPackage,
+            badge: stock.length,
+            alertCount: stockAlertCount,
+          },
+          {
+            id: "orders",
+            label: "Online Orders",
+            description:
+              "Storefront order fulfillment, Wave/COD verification & courier tracking",
+            icon: FiShoppingBag,
+            badge: onlineOrders.length,
+            alertCount: pendingOrdersCount,
+          },
+          {
+            id: "rfqs",
+            label: "B2B Quotes",
+            description:
+              "Wholesale RFQ pipeline, Incoterms quotations & POS conversion",
+            icon: FiGlobe,
+            badge: rfqs.length,
+            alertCount: pendingRfqsCount,
+          },
+          {
+            id: "warranty",
+            label: "IMEI & Warranty",
+            description:
+              "Serialized IMEI registry, warranty coverage countdowns & RMA claims",
+            icon: FiCpu,
+            badge: imeiRecords.length,
+            alertCount: openRmaCount,
+          },
+          {
+            id: "purchases",
+            label: "Purchase Records",
+            description:
+              "Supplier procurement, inward goods & purchase vouchers",
+            icon: FiTruck,
+            badge: purchases.length,
+          },
+          {
+            id: "landed_cost",
+            label: "Landed Cost",
+            description:
+              "Package logistics calculator, 1-piece landed price lookup & WAC stock sync",
+            icon: FiPercent,
+            badge: landedSheets.length,
+          },
+          {
+            id: "billing",
+            label: "Billing & POS",
+            description:
+              "Point-of-sale checkout, Address Book, IMEI binding & UAE 5% VAT",
+            icon: FiFileText,
+          },
+          {
+            id: "invoices",
+            label: "Sales & Invoices",
+            description:
+              "Revenue audit ledger, A4 tax invoices & stock reconciliation",
+            icon: FiClipboard,
+            badge: invoices.length,
+          },
+        ],
+      },
+    ];
+
+    if (isAdmin) {
+      groups.push({
+        title: "Administration",
+        items: [
+          {
+            id: "customers",
+            label: "Customers",
+            description:
+              "Registered client profiles, delivery addresses & lifetime spend",
+            icon: FiUsers,
+          },
+          {
+            id: "coupons",
+            label: "Coupons & Offers",
+            description:
+              "Promotional discount codes, first-order rules & campaign status",
+            icon: FiTag,
+          },
+          {
+            id: "employees",
+            label: "Employees",
+            description:
+              "Sales team directory, access PINs, sales attribution & commissions",
+            icon: FiBriefcase,
+            badge: members.length,
+          },
+          {
+            id: "reports",
+            label: "Reports & Finance",
+            description:
+              "P&L margin analytics, UAE 5% VAT return, brand performance & payables",
+            icon: FiBarChart2,
+          },
+          {
+            id: "audits",
+            label: "Audit Logs",
+            description:
+              "Immutable trail of stock edits, pricing changes, voids & staff activity",
+            icon: FiActivity,
+            badge: auditLogs.length,
+            alertCount: criticalAuditCount,
+          },
+        ],
+      });
+
+      groups.push({
+        title: "System",
+        items: [
+          {
+            id: "settings",
+            label: "System & Settings",
+            description:
+              "Workspace preferences, Firebase sync & Google Shopping / SEO feeds",
+            icon: FiSettings,
+          },
+        ],
+      });
+    }
+
+    return groups;
+  }, [
+    isAdmin,
+    stock.length,
+    stockAlertCount,
+    onlineOrders.length,
+    pendingOrdersCount,
+    rfqs.length,
+    pendingRfqsCount,
+    imeiRecords.length,
+    openRmaCount,
+    purchases.length,
+    landedSheets.length,
+    invoices.length,
+    members.length,
+    auditLogs.length,
+    criticalAuditCount,
+  ]);
+
+  // Derive safe active tab without cascading effect state updates
+  const currentTab =
+    !isAdmin && ADMIN_ONLY_TABS.includes(activeTab) ? "stock" : activeTab;
+
+  const activeNavItem = useMemo(() => {
+    for (const group of navGroups) {
+      const found = group.items.find((item) => item.id === currentTab);
+      if (found) return found;
+    }
+    return navGroups[0]?.items[0];
+  }, [navGroups, currentTab]);
+
+  const handleSelectTab = useCallback((tabId) => {
+    setActiveTab(tabId);
+    setViewingInvoice(null);
+  }, []);
+
+  const handleConvertRfqToPos = useCallback((prefill) => {
+    setPosPrefill(prefill);
+    setActiveTab("billing");
+    setViewingInvoice(null);
+  }, []);
 
   if (!isAuthenticated) {
     return <PortalLogin />;
@@ -100,203 +515,201 @@ const PortalPage = () => {
 
   const isConnected = isFirebaseConfigured();
 
-  const tabs = [
-    { id: "stock", label: "Stock Manager", icon: FiPackage },
-    { id: "purchases", label: "Purchase Records", icon: FiTruck },
-    { id: "billing", label: "Billing & POS", icon: FiFileText },
-    { id: "invoices", label: "Sales & Invoices Audit", icon: FiClipboard },
-  ];
-
-  if (isAdmin) {
-    tabs.push({ id: "customers", label: "Customers", icon: FiUsers });
-    tabs.push({ id: "coupons", label: "Coupons & Offers", icon: FiTag });
-    tabs.push({ id: "settings", label: "System & Settings", icon: FiSettings });
-  }
-
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans text-left">
-      {/* 🧭 TOP PORTAL NAVIGATION BAR */}
-      <header className="sticky top-0 z-30 bg-slate-950/90 backdrop-blur-md border-b border-slate-800 px-4 sm:px-8 py-3.5 flex items-center justify-between gap-4">
-        
-        {/* Left: Branding & Role */}
-        <div className="flex items-center gap-3">
-          <Link
-            to="/"
-            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
-            title="Return to Public Website"
-          >
-            <FiArrowLeft className="text-lg" />
-          </Link>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex font-sans text-left transition-colors duration-200">
+      {/* Desktop Collapsible Sidebar + Mobile Burger Drawer */}
+      <PortalSidebar
+        navGroups={navGroups}
+        activeTab={currentTab}
+        onSelectTab={handleSelectTab}
+        isCollapsed={sidebarCollapsed}
+        onToggleCollapse={toggleSidebarCollapsed}
+        mobileOpen={mobileMenuOpen}
+        onCloseMobile={() => setMobileMenuOpen(false)}
+        currentUser={currentUser}
+        role={role}
+        isAdmin={isAdmin}
+        isConnected={isConnected}
+        onLogout={logout}
+      />
 
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-base sm:text-lg font-black tracking-tight text-white flex items-center gap-1.5">
-                E-ALL <span className="text-sky-400 text-xs sm:text-sm font-semibold uppercase px-2 py-0.5 rounded-md bg-sky-500/10 border border-sky-500/20">Portal</span>
-              </span>
+      {/* Main Column: Sticky Header + Full-Width Content Canvas */}
+      <div className="flex-1 min-w-0 flex flex-col min-h-screen">
+        <PortalHeader
+          activeItem={activeNavItem}
+          onOpenMobileMenu={() => setMobileMenuOpen(true)}
+          mobileMenuOpen={mobileMenuOpen}
+          isConnected={isConnected}
+          loading={loading}
+          onRefresh={loadData}
+          onLogout={logout}
+        />
 
-              {/* Real-time Cloud Connection Indicator */}
-              {isConnected ? (
-                <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[11px] font-medium border border-emerald-500/20">
-                  <FiCheckCircle className="text-xs" />
-                  <span>Firestore Live</span>
-                </span>
-              ) : (
-                <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 text-[11px] font-medium border border-amber-500/20">
-                  <FiInfo className="text-xs" />
-                  <span>Local Mode</span>
-                </span>
-              )}
-            </div>
-            <p className="text-[11px] text-slate-400">
-              Inventory, Real-Time POS &amp; Tax Invoicing Engine
-            </p>
+        <main className="flex-1 w-full p-4 sm:p-5 lg:p-6">
+          <div className="w-full">
+            {/* Invoice Viewer Overlay / Full Modal */}
+            {viewingInvoice && (
+              <InvoiceDocument
+                invoice={viewingInvoice}
+                onClose={() => setViewingInvoice(null)}
+              />
+            )}
+
+            {/* Stock Manager */}
+            {currentTab === "stock" && (
+              <StockTable
+                stock={stock}
+                invoices={invoices}
+                purchases={purchases}
+                onStockChanged={loadData}
+                onStockUpdated={loadData}
+                isAdmin={isAdmin}
+              />
+            )}
+
+            {/* Online Storefront Orders & Fulfillment */}
+            {currentTab === "orders" && (
+              <OnlineOrdersManagement
+                orders={onlineOrders}
+                loading={loading}
+                onOrdersUpdated={loadData}
+                onViewInvoice={(ord) => setViewingInvoice(ord)}
+                currentUser={currentUser}
+              />
+            )}
+
+            {/* B2B Wholesale Quotes / RFQs */}
+            {currentTab === "rfqs" && (
+              <B2BRfqManagement
+                rfqs={rfqs}
+                onRfqsUpdated={loadData}
+                onConvertToPOS={handleConvertRfqToPos}
+                currentUser={currentUser}
+                isAdmin={isAdmin}
+              />
+            )}
+
+            {/* IMEI / Serial Number & Warranty Registry */}
+            {currentTab === "warranty" && (
+              <WarrantyImeiManagement
+                records={imeiRecords}
+                stock={stock}
+                purchases={purchases}
+                invoices={invoices}
+                onRecordsUpdated={loadData}
+                onViewInvoice={(inv) => setViewingInvoice(inv)}
+                currentUser={currentUser}
+                isAdmin={isAdmin}
+              />
+            )}
+
+            {/* Purchase Records */}
+            {currentTab === "purchases" && (
+              <PurchaseManagement
+                stock={stock}
+                purchases={purchases}
+                onPurchasesUpdated={loadData}
+                currentUser={currentUser}
+                isAdmin={isAdmin}
+              />
+            )}
+
+            {/* Landed Cost Calculator & 1-Piece Price Lookup */}
+            {currentTab === "landed_cost" && (
+              <LandedCostCalculator
+                stock={stock}
+                sheets={landedSheets}
+                onDataUpdated={loadData}
+                currentUser={currentUser}
+                isAdmin={isAdmin}
+              />
+            )}
+
+            {/* Billing & POS */}
+            {currentTab === "billing" && (
+              <BillingPOS
+                key={posPrefill?.rfqId || "pos-default"}
+                stock={stock}
+                customers={customers}
+                posContacts={posContacts}
+                invoices={invoices}
+                rfqs={rfqs}
+                coupons={coupons}
+                imeiRecords={imeiRecords}
+                prefillCustomer={posPrefill}
+                onClearPrefill={() => setPosPrefill(null)}
+                onContactsUpdated={loadData}
+                onInvoiceCreated={(newInv) => {
+                  loadData();
+                  setViewingInvoice(newInv);
+                }}
+              />
+            )}
+
+            {/* Sales & Invoices Audit */}
+            {currentTab === "invoices" && (
+              <InvoiceAudit
+                invoices={invoices}
+                stock={stock}
+                onViewInvoice={(inv) => setViewingInvoice(inv)}
+                onInvoicesUpdated={loadData}
+                isAdmin={isAdmin}
+              />
+            )}
+
+            {/* Customers (Admin Only) */}
+            {currentTab === "customers" && isAdmin && <CustomerManagement />}
+
+            {/* Coupons & Offers (Admin Only) */}
+            {currentTab === "coupons" && isAdmin && <CouponManagement />}
+
+            {/* Employees & Sales Performance (Admin Only) */}
+            {currentTab === "employees" && isAdmin && (
+              <EmployeeManagement
+                invoices={invoices}
+                onViewInvoice={(inv) => setViewingInvoice(inv)}
+              />
+            )}
+
+            {/* Reports & Financial Analytics (Admin Only) */}
+            {currentTab === "reports" && isAdmin && (
+              <ReportsAnalytics
+                stock={stock}
+                invoices={invoices}
+                purchases={purchases}
+              />
+            )}
+
+            {/* Activity & Audit Logs (Admin Only) */}
+            {currentTab === "audits" && isAdmin && (
+              <AuditLogs
+                logs={auditLogs}
+                loading={loading}
+                onRefresh={loadData}
+              />
+            )}
+
+            {/* System & Settings (Admin Only) */}
+            {currentTab === "settings" && isAdmin && (
+              <PortalSettings
+                onConfigUpdated={loadData}
+                sidebarCollapsed={sidebarCollapsed}
+                onToggleSidebar={toggleSidebarCollapsed}
+                onOpenEmployees={() => handleSelectTab("employees")}
+              />
+            )}
           </div>
-        </div>
-
-        {/* Right: User Info & Actions */}
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={loadData}
-            disabled={loading}
-            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition disabled:opacity-50"
-            title="Refresh Live Data"
-          >
-            <FiRefreshCw className={`text-base ${loading ? "animate-spin" : ""}`} />
-          </button>
-
-          <div className="hidden sm:flex flex-col text-right">
-            <span className="text-xs font-bold text-white flex items-center justify-end gap-1">
-              {isAdmin ? <FiShield className="text-sky-400" /> : <FiUserCheck className="text-emerald-400" />}
-              {currentUser?.name}
-            </span>
-            <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
-              {role === "admin" ? "Master Admin" : "Sales Executive"}
-            </span>
-          </div>
-
-          <button
-            type="button"
-            onClick={logout}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-xs font-semibold transition"
-          >
-            <FiLogOut className="text-sm" />
-            <span className="hidden sm:inline">Lock PIN</span>
-          </button>
-        </div>
-      </header>
-
-      {/* 📑 TAB NAVIGATION STRIP */}
-      <nav className="bg-slate-950 border-b border-slate-800/80 px-4 sm:px-8 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => {
-                setActiveTab(tab.id);
-                setViewingInvoice(null);
-              }}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
-                isActive
-                  ? "bg-sky-600 text-white shadow-md shadow-sky-600/30"
-                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
-              }`}
-            >
-              <Icon className="text-sm" />
-              <span>{tab.label}</span>
-              {tab.id === "stock" && (
-                <span className="text-[10px] bg-black/30 px-1.5 py-0.5 rounded-full font-mono">
-                  {stock.length}
-                </span>
-              )}
-              {tab.id === "purchases" && (
-                <span className="text-[10px] bg-black/30 px-1.5 py-0.5 rounded-full font-mono">
-                  {purchases.length}
-                </span>
-              )}
-              {tab.id === "invoices" && (
-                <span className="text-[10px] bg-black/30 px-1.5 py-0.5 rounded-full font-mono">
-                  {invoices.length}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </nav>
-
-      {/* 💻 MAIN PORTAL CONTENT AREA */}
-      <main className="flex-1 p-4 sm:p-6 lg:p-8 bg-slate-900 text-slate-900">
-        {/* INVOICE VIEWER OVERLAY / FULL MODAL */}
-        {viewingInvoice && (
-          <InvoiceDocument
-            invoice={viewingInvoice}
-            onClose={() => setViewingInvoice(null)}
-          />
-        )}
-
-        {/* TAB 1: STOCK MANAGER */}
-        {activeTab === "stock" && (
-          <StockTable
-            stock={stock}
-            invoices={invoices}
-            purchases={purchases}
-            onStockUpdated={loadData}
-            isAdmin={isAdmin}
-          />
-        )}
-
-        {/* TAB: PURCHASE RECORDS (Procurement) */}
-        {activeTab === "purchases" && (
-          <PurchaseManagement
-            stock={stock}
-            purchases={purchases}
-            onPurchasesUpdated={loadData}
-            currentUser={currentUser}
-            isAdmin={isAdmin}
-          />
-        )}
-
-        {/* TAB 2: BILLING & POS */}
-        {activeTab === "billing" && (
-          <BillingPOS
-            stock={stock}
-            onInvoiceCreated={(newInv) => {
-              loadData();
-              setViewingInvoice(newInv);
-            }}
-            currentUser={currentUser}
-          />
-        )}
-
-        {/* TAB 3: INVOICES & SALES AUDIT */}
-        {activeTab === "invoices" && (
-          <InvoiceAudit
-            invoices={invoices}
-            onViewInvoice={(inv) => setViewingInvoice(inv)}
-            onInvoicesUpdated={loadData}
-            isAdmin={isAdmin}
-          />
-        )}
-
-        {/* TAB 4: CUSTOMERS (Admin Only - Hidden for Salesperson) */}
-        {activeTab === "customers" && isAdmin && (
-          <CustomerManagement />
-        )}
-
-        {/* TAB 5: COUPONS & OFFERS (Admin Only) */}
-        {activeTab === "coupons" && isAdmin && (
-          <CouponManagement />
-        )}
-
-        {/* TAB 6: SYSTEM SETTINGS (Admin Only) */}
-        {activeTab === "settings" && isAdmin && (
-          <PortalSettings onConfigUpdated={loadData} />
-        )}
-      </main>
+        </main>
+      </div>
     </div>
+  );
+};
+
+const PortalPage = () => {
+  return (
+    <PortalThemeProvider>
+      <PortalContent />
+    </PortalThemeProvider>
   );
 };
 

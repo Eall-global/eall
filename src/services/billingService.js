@@ -8,6 +8,8 @@ import {
   deleteDoc,
 } from "../lib/firebaseClient";
 import { fetchStock, updateStockQuantity } from "./stockService";
+import { logAuditEvent } from "./auditService";
+import { markImeisSoldForInvoice } from "./warrantyService";
 
 const INVOICES_STORAGE_KEY = "eall_billing_invoices";
 const COLLECTION_NAME = "invoices";
@@ -59,7 +61,12 @@ export const fetchInvoices = async () => {
             customerPhone: inv.customerPhone || "",
             customerEmail: inv.customerEmail || "",
             customerTrn: inv.customerTrn || "",
+            customerAddress: inv.customerAddress || inv.shippingAddress || "",
             paymentMethod: inv.paymentMethod || "Cash",
+            paymentReference: inv.paymentReference || "",
+            couponCode: inv.couponCode || "",
+            cashTendered: Number(inv.cashTendered) || 0,
+            changeDue: Number(inv.changeDue) || 0,
             items: typeof inv.items === "string" ? JSON.parse(inv.items) : (inv.items || []),
             subtotal: Number(inv.subtotal) || 0,
             vatRate: Number(inv.vatRate ?? 5),
@@ -96,8 +103,13 @@ export const createInvoice = async ({
   customerPhone,
   customerEmail = "",
   customerTrn = "",
+  customerAddress = "",
   paymentMethod = "Cash",
-  items, // array of { sku, name, brand, quantity, unitPrice, total }
+  paymentReference = "",
+  couponCode = "",
+  cashTendered = 0,
+  changeDue = 0,
+  items, // array of { sku, name, brand, quantity, unitPrice, total, serials?, warrantyMonths? }
   vatRate = 5,
   discount = 0,
   notes = "",
@@ -125,7 +137,20 @@ export const createInvoice = async ({
   }
 
   // 2. Compute totals
-  const subtotal = items.reduce((acc, i) => acc + i.unitPrice * i.quantity, 0);
+  const normalizedItems = items.map((i) => ({
+    sku: i.sku,
+    name: i.name,
+    brand: i.brand || "",
+    unitPrice: Number(i.unitPrice) || 0,
+    quantity: Number(i.quantity) || 1,
+    total: (Number(i.unitPrice) || 0) * (Number(i.quantity) || 1),
+    serials: Array.isArray(i.serials)
+      ? i.serials.map((s) => String(s || "").trim().toUpperCase()).filter(Boolean)
+      : [],
+    warrantyMonths: Number(i.warrantyMonths ?? 12),
+  }));
+
+  const subtotal = normalizedItems.reduce((acc, i) => acc + i.total, 0);
   const discountedSubtotal = Math.max(0, subtotal - (Number(discount) || 0));
   const vatAmount = (discountedSubtotal * Number(vatRate)) / 100;
   const totalAmount = discountedSubtotal + vatAmount;
@@ -142,8 +167,13 @@ export const createInvoice = async ({
     customerPhone: customerPhone.trim(),
     customerEmail: customerEmail.trim(),
     customerTrn: customerTrn.trim(),
+    customerAddress: customerAddress.trim(),
     paymentMethod,
-    items,
+    paymentReference: paymentReference.trim(),
+    couponCode: couponCode.trim().toUpperCase(),
+    cashTendered: Number(cashTendered) || 0,
+    changeDue: Number(changeDue) || 0,
+    items: normalizedItems,
     subtotal,
     vatRate: Number(vatRate),
     vatAmount,
@@ -156,10 +186,39 @@ export const createInvoice = async ({
   };
 
   // 4. Deduct stock for all items
-  for (const item of items) {
+  for (const item of normalizedItems) {
     const currentQty = stockMap.get(item.sku)?.quantity || 0;
     const newQty = Math.max(0, currentQty - item.quantity);
     await updateStockQuantity(item.sku, newQty);
+  }
+
+  // 4b. Activate warranty & mark bound IMEI / Serial units as Sold
+  const serialEntries = normalizedItems.flatMap((item) => {
+    const stockItem = stockMap.get(item.sku);
+    return (item.serials || []).map((serialNumber) => ({
+      serialNumber,
+      sku: item.sku,
+      productName: item.name,
+      brand: item.brand || stockItem?.brand || "General",
+      costPrice: Number(stockItem?.costPrice) || 0,
+      warrantyMonths: item.warrantyMonths ?? 12,
+    }));
+  });
+
+  if (serialEntries.length > 0) {
+    try {
+      await markImeisSoldForInvoice({
+        serialEntries,
+        invoiceNo,
+        customerName: newInvoice.customerName,
+        customerPhone: newInvoice.customerPhone,
+        customerEmail: newInvoice.customerEmail,
+        soldAt: now,
+        soldBy: createdBy,
+      });
+    } catch (err) {
+      console.warn("Could not bind IMEIs to warranty registry:", err.message);
+    }
   }
 
   // 5. Save invoice to Google Firebase Firestore
@@ -177,6 +236,20 @@ export const createInvoice = async ({
   const localList = getLocalInvoices();
   const updatedLocal = [newInvoice, ...localList];
   saveLocalInvoices(updatedLocal);
+
+  logAuditEvent({
+    module: "invoices",
+    action: "create",
+    severity: "info",
+    targetId: invoiceNo,
+    targetLabel: `${invoiceNo} • ${newInvoice.customerName}`,
+    summary: `Issued POS invoice ${invoiceNo} for ${newInvoice.customerName} (AED ${totalAmount.toFixed(2)}, ${paymentMethod})`,
+    changes: [
+      { field: "Items", before: "—", after: `${items.length} line(s)` },
+      { field: "Payment", before: "—", after: paymentMethod },
+      { field: "Grand Total", before: "—", after: `AED ${totalAmount.toFixed(2)}` },
+    ],
+  });
 
   return newInvoice;
 };
@@ -280,6 +353,46 @@ export const updateInvoice = async (invoiceNo, {
   );
   saveLocalInvoices(updatedList);
 
+  const invoiceChanges = [];
+  if (Number(existing.totalAmount) !== Number(totalAmount)) {
+    invoiceChanges.push({
+      field: "Grand Total",
+      before: `AED ${Number(existing.totalAmount).toFixed(2)}`,
+      after: `AED ${Number(totalAmount).toFixed(2)}`,
+    });
+  }
+  if (Number(existing.discount || 0) !== Number(discount || 0)) {
+    invoiceChanges.push({
+      field: "Discount",
+      before: `AED ${Number(existing.discount || 0).toFixed(2)}`,
+      after: `AED ${Number(discount || 0).toFixed(2)}`,
+    });
+  }
+  if (existing.paymentMethod !== updatedInvoice.paymentMethod) {
+    invoiceChanges.push({
+      field: "Payment Method",
+      before: existing.paymentMethod,
+      after: updatedInvoice.paymentMethod,
+    });
+  }
+  if ((existing.items || []).length !== (items || []).length) {
+    invoiceChanges.push({
+      field: "Line Items",
+      before: `${(existing.items || []).length} item(s)`,
+      after: `${(items || []).length} item(s)`,
+    });
+  }
+
+  logAuditEvent({
+    module: "invoices",
+    action: "update",
+    severity: "warning",
+    targetId: invoiceNo,
+    targetLabel: `${invoiceNo} • ${updatedInvoice.customerName}`,
+    summary: `Edited invoice ${invoiceNo} & reconciled inventory stock`,
+    changes: invoiceChanges,
+  });
+
   return updatedInvoice;
 };
 
@@ -318,6 +431,19 @@ export const deleteInvoice = async (invoiceNo) => {
   const localList = getLocalInvoices();
   const updatedList = localList.filter((i) => i.invoiceNo !== invoiceNo);
   saveLocalInvoices(updatedList);
+
+  logAuditEvent({
+    module: "invoices",
+    action: "void",
+    severity: "critical",
+    targetId: invoiceNo,
+    targetLabel: `${invoiceNo} • ${target.customerName}`,
+    summary: `Voided & deleted invoice ${invoiceNo} (AED ${Number(target.totalAmount).toFixed(2)}) and restored ${(target.items || []).length} SKU(s) to stock`,
+    changes: [
+      { field: "Status", before: "Active", after: "Voided / Deleted" },
+      { field: "Amount Reversed", before: `AED ${Number(target.totalAmount).toFixed(2)}`, after: "AED 0.00" },
+    ],
+  });
 
   return updatedList;
 };

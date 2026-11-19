@@ -15,14 +15,16 @@ export const buildInvoicePDF = (rawInvoice) => {
     customerPhone: rawInvoice.customerPhone || rawInvoice.phone || "N/A",
     customerEmail: rawInvoice.customerEmail || rawInvoice.email || "",
     customerTrn: rawInvoice.customerTrn || "",
+    customerAddress: rawInvoice.customerAddress || rawInvoice.shippingAddress || "",
     paymentMethod: rawInvoice.paymentMethodName || rawInvoice.paymentMethod || "Cash",
+    paymentReference: rawInvoice.paymentReference || rawInvoice.waveTransactionId || "",
     createdBy: rawInvoice.createdBy || "Website Online Order",
     notes: rawInvoice.notes || "",
     createdAt: rawInvoice.createdAt || new Date().toISOString(),
     subtotal: Number(rawInvoice.subtotal ?? rawInvoice.totalAmount ?? rawInvoice.total ?? 0),
     vatRate: Number(rawInvoice.vatRate ?? 5),
     vatAmount: Number(rawInvoice.vatAmount ?? 0),
-    discount: Number(rawInvoice.discount ?? 0),
+    discount: Number(rawInvoice.discount ?? rawInvoice.discountAmount ?? 0),
     totalAmount: Number(rawInvoice.totalAmount ?? rawInvoice.total ?? 0),
     items: (rawInvoice.items || []).map((item) => {
       const qty = Number(item.quantity) || 1;
@@ -32,6 +34,7 @@ export const buildInvoicePDF = (rawInvoice) => {
         sku: item.sku || "N/A",
         name: item.name || item.title || "Item",
         brand: item.brand || "",
+        serials: Array.isArray(item.serials) ? item.serials.filter(Boolean) : [],
         quantity: qty,
         unitPrice,
         total,
@@ -52,7 +55,6 @@ export const buildInvoicePDF = (rawInvoice) => {
 
   // Colors
   const navy = [15, 23, 42]; // #0f172a
-  const skyBlue = [2, 132, 199]; // #0284c7
   const slateText = [51, 65, 85]; // #334155
   const slateMuted = [100, 116, 139]; // #64748b
   const lightGray = [248, 250, 252]; // #f8fafc
@@ -103,7 +105,13 @@ export const buildInvoicePDF = (rawInvoice) => {
   });
 
   doc.text(`Date: ${invoiceDate}   |   Time: ${invoiceTime}`, rightX, rightHeaderY + 16.5, { align: "right" });
-  doc.text(`Issued By: ${invoice.createdBy}   |   Payment: ${invoice.paymentMethod}`, rightX, rightHeaderY + 20.5, { align: "right" });
+  doc.text(
+    `Issued By: ${invoice.createdBy}   |   Payment: ${invoice.paymentMethod}` +
+      (invoice.paymentReference ? ` (Ref: ${invoice.paymentReference})` : ""),
+    rightX,
+    rightHeaderY + 20.5,
+    { align: "right" }
+  );
 
   // Horizontal Divider Line
   doc.setDrawColor(...borderGray);
@@ -111,10 +119,11 @@ export const buildInvoicePDF = (rawInvoice) => {
   doc.line(margin, 41, rightX, 41);
 
   // 3. CUSTOMER DETAILS CARD
+  const customerBoxHeight = invoice.customerAddress ? 24 : 20;
   doc.setFillColor(...lightGray);
   doc.setDrawColor(...borderGray);
   doc.setLineWidth(0.2);
-  doc.roundedRect(margin, 44, contentWidth, 20, 1.5, 1.5, "FD");
+  doc.roundedRect(margin, 44, contentWidth, customerBoxHeight, 1.5, 1.5, "FD");
 
   // Left Column - Bill To
   doc.setFont("helvetica", "bold");
@@ -131,6 +140,16 @@ export const buildInvoicePDF = (rawInvoice) => {
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...slateText);
   doc.text(`Phone: ${invoice.customerPhone}` + (invoice.customerEmail ? `   |   Email: ${invoice.customerEmail}` : ""), margin + 4, 57.5);
+
+  if (invoice.customerAddress) {
+    doc.setFontSize(7);
+    doc.setTextColor(...slateMuted);
+    const trimmedAddr =
+      invoice.customerAddress.length > 82
+        ? `${invoice.customerAddress.slice(0, 79)}...`
+        : invoice.customerAddress;
+    doc.text(`Address: ${trimmedAddr}`, margin + 4, 62);
+  }
 
   // Right Column - TRN / Tax Status
   doc.setFont("helvetica", "bold");
@@ -161,14 +180,16 @@ export const buildInvoicePDF = (rawInvoice) => {
   const tableRows = invoice.items.map((item, index) => [
     index + 1,
     item.sku,
-    item.name + (item.brand ? ` (${item.brand})` : ""),
+    item.name +
+      (item.brand ? ` (${item.brand})` : "") +
+      (item.serials?.length ? `\nIMEI/SN: ${item.serials.join(", ")}` : ""),
     item.quantity,
     item.unitPrice.toLocaleString("en-AE", { minimumFractionDigits: 2 }),
     item.total.toLocaleString("en-AE", { minimumFractionDigits: 2 }),
   ]);
 
   autoTable(doc, {
-    startY: 67,
+    startY: 44 + customerBoxHeight + 3,
     margin: { left: margin, right: margin },
     head: [["#", "SKU Code", "Item & Description", "Qty", "Unit Price (AED)", "Total (AED)"]],
     body: tableRows,

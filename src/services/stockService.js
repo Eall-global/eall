@@ -10,6 +10,7 @@ import {
 } from "../lib/firebaseClient";
 import { products as catalogProducts } from "../data/products/index";
 import { expandToFlatSkus } from "../utils/productVariant";
+import { logAuditEvent } from "./auditService";
 
 
 const STORAGE_KEY = "eall_inventory_stock";
@@ -267,9 +268,11 @@ export const adjustStockDelta = async (sku, delta) => {
  */
 export const updateProductDetails = async (
   sku,
-  { name, brand, category, price, quantity, costPrice, margin, originalPrice, minAlert, image }
+  { name, brand, category, price, quantity, costPrice, margin, originalPrice, minAlert, image, skipAudit = false }
 ) => {
   const db = getFirebaseDb();
+  const current = getLocalStock();
+  const previous = current.find((item) => item.sku === sku);
 
   const cPrice = costPrice !== undefined ? Number(costPrice) : undefined;
   const mMargin = margin !== undefined ? Number(margin) : undefined;
@@ -304,7 +307,6 @@ export const updateProductDetails = async (
     }
   }
 
-  const current = getLocalStock();
   const updated = current.map((item) =>
     item.sku === sku
       ? {
@@ -327,6 +329,47 @@ export const updateProductDetails = async (
       : item
   );
   saveLocalStock(updated);
+
+  if (!skipAudit && previous) {
+    const nextItem = updated.find((i) => i.sku === sku);
+    const changes = [];
+    if (nextItem) {
+      if (previous.name !== nextItem.name) {
+        changes.push({ field: "Product Name", before: previous.name, after: nextItem.name });
+      }
+      if (Number(previous.costPrice || 0) !== Number(nextItem.costPrice || 0)) {
+        changes.push({ field: "Cost Price", before: `AED ${Number(previous.costPrice || 0).toFixed(2)}`, after: `AED ${Number(nextItem.costPrice || 0).toFixed(2)}` });
+      }
+      if (Number(previous.margin || 0) !== Number(nextItem.margin || 0)) {
+        changes.push({ field: "Margin", before: `AED ${Number(previous.margin || 0).toFixed(2)}`, after: `AED ${Number(nextItem.margin || 0).toFixed(2)}` });
+      }
+      if (Number(previous.price || 0) !== Number(nextItem.price || 0)) {
+        changes.push({ field: "Selling Price", before: `AED ${Number(previous.price || 0).toFixed(2)}`, after: `AED ${Number(nextItem.price || 0).toFixed(2)}` });
+      }
+      if (Number(previous.quantity || 0) !== Number(nextItem.quantity || 0)) {
+        changes.push({ field: "Stock Quantity", before: `${previous.quantity} units`, after: `${nextItem.quantity} units` });
+      }
+      if (Number(previous.minAlert || 3) !== Number(nextItem.minAlert || 3)) {
+        changes.push({ field: "Min Alert", before: previous.minAlert, after: nextItem.minAlert });
+      }
+    }
+
+    if (changes.length > 0) {
+      const sensitive = changes.some((c) =>
+        ["Selling Price", "Cost Price", "Stock Quantity"].includes(c.field)
+      );
+      logAuditEvent({
+        module: "stock",
+        action: "update",
+        severity: sensitive ? "warning" : "info",
+        targetId: sku,
+        targetLabel: nextItem?.name || sku,
+        summary: `Updated ${nextItem?.name || sku} (${changes.map((c) => c.field).join(", ")})`,
+        changes,
+      });
+    }
+  }
+
   return updated;
 };
 
@@ -381,6 +424,20 @@ export const addCustomProduct = async ({
   const current = getLocalStock();
   const updated = [newProduct, ...current.filter((i) => i.sku !== cleanSku)];
   saveLocalStock(updated);
+
+  logAuditEvent({
+    module: "stock",
+    action: "create",
+    severity: "info",
+    targetId: cleanSku,
+    targetLabel: newProduct.name,
+    summary: `Added custom SKU ${cleanSku} (${newProduct.brand} • AED ${sPrice.toFixed(2)})`,
+    changes: [
+      { field: "Cost Price", before: "—", after: `AED ${cPrice.toFixed(2)}` },
+      { field: "Selling Price", before: "—", after: `AED ${sPrice.toFixed(2)}` },
+    ],
+  });
+
   return updated;
 };
 
@@ -441,5 +498,13 @@ export const syncCatalogToStock = async () => {
   }
 
   saveLocalStock(seed);
-  return { added: seed.length, total: seed.length };
+  logAuditEvent({
+    module: "stock",
+    action: "sync",
+    severity: "info",
+    targetId: "catalog_sync",
+    targetLabel: "Catalog Sync",
+    summary: `Synchronized ${seed.length} catalog SKUs to stock database`,
+  });
+  return { added: seed.length, total: seed.length, synced: seed.length, success: true };
 };

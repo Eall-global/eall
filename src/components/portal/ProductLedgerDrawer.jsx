@@ -151,32 +151,32 @@ const ProductLedgerDrawer = ({
     <div className="fixed inset-0 z-50 flex justify-end text-left font-sans">
       {/* Backdrop overlay */}
       <div
-        className="fixed inset-0 bg-slate-950/75 backdrop-blur-xs transition-opacity cursor-pointer"
+        className="fixed inset-0 bg-slate-950/60 dark:bg-slate-950/75 backdrop-blur-[2px] transition-opacity cursor-pointer"
         onClick={onClose}
         aria-label="Close backdrop"
       />
 
       {/* Slide-over Drawer Panel */}
       <aside
-        className="relative z-10 w-full sm:w-[540px] md:w-[600px] lg:w-[640px] bg-slate-900 border-l border-slate-800 text-slate-100 flex flex-col h-full shadow-2xl overflow-hidden animate-in slide-in-from-right duration-200"
+        className="relative z-10 w-full sm:w-[540px] md:w-[600px] lg:w-[640px] bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 flex flex-col h-full shadow-2xl overflow-hidden animate-in slide-in-from-right duration-200"
         role="dialog"
         aria-modal="true"
         aria-labelledby="product-drawer-title"
       >
         {/* 🧭 DRAWER HEADER */}
-        <div className="p-4 sm:p-6 bg-slate-950 border-b border-slate-800 flex items-center justify-between gap-3 shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="p-2 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20">
+        <div className="p-4 sm:p-6 bg-slate-50/90 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-2.5">
+            <span className="p-2 rounded-xl bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400 border border-sky-200/80 dark:border-sky-500/20">
               <FiPackage className="text-lg" />
             </span>
             <div>
               <h2
                 id="product-drawer-title"
-                className="text-base sm:text-lg font-black tracking-tight text-white flex items-center gap-2"
+                className="text-base sm:text-lg font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-2"
               >
                 Stock &amp; Sales Ledger
               </h2>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 Inwards, Outwards &amp; Live Closing Balance
               </p>
             </div>
@@ -190,7 +190,7 @@ const ProductLedgerDrawer = ({
                   onClose();
                   onOpenEdit(product);
                 }}
-                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition cursor-pointer"
+                className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition cursor-pointer"
               >
                 Edit Master
               </button>
@@ -198,7 +198,7 @@ const ProductLedgerDrawer = ({
             <button
               type="button"
               onClick={onClose}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
+              className="p-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
               title="Close Drawer (Esc)"
             >
               <FiX className="text-xl" />
@@ -207,10 +207,10 @@ const ProductLedgerDrawer = ({
         </div>
 
         {/* 📜 SCROLLABLE DRAWER BODY */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 bg-white dark:bg-slate-900">
           {/* PRODUCT HERO CARD */}
-          <div className="p-4 bg-slate-800/80 rounded-2xl border border-slate-700/80 flex items-center gap-4">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-white p-2 border border-slate-700 shrink-0 flex items-center justify-center overflow-hidden">
+          <div className="p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 flex items-center gap-4">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-white p-2 border border-slate-200 dark:border-slate-700 shrink-0 flex items-center justify-center overflow-hidden">
               <img
                 src={product.image || "/logo.png"}
                 alt={product.name}
@@ -223,19 +223,19 @@ const ProductLedgerDrawer = ({
 
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap mb-1">
-                <span className="px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-400 border border-sky-500/20 text-[11px] font-bold">
+                <span className="px-2 py-0.5 rounded-md bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400 border border-sky-200/80 dark:border-sky-500/20 text-[11px] font-bold">
                   {product.brand}
                 </span>
-                <span className="text-xs text-slate-400 font-medium">
+                <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
                   {product.category}
                 </span>
                 <span
                   className={`ml-auto inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
                     isOutOfStock
-                      ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                      ? "bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20"
                       : isLowStock
-                      ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                      : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                      ? "bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20"
+                      : "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20"
                   }`}
                 >
                   {isOutOfStock ? (
@@ -254,11 +254,11 @@ const ProductLedgerDrawer = ({
                 </span>
               </div>
 
-              <h3 className="font-extrabold text-white text-sm sm:text-base leading-snug line-clamp-2">
+              <h3 className="font-extrabold text-slate-900 dark:text-white text-sm sm:text-base leading-snug line-clamp-2">
                 {product.name}
               </h3>
-              <p className="text-xs font-mono text-slate-400 mt-1">
-                SKU: <span className="text-slate-200 font-bold">{product.sku}</span>
+              <p className="text-xs font-mono text-slate-500 dark:text-slate-400 mt-1">
+                SKU: <span className="text-slate-800 dark:text-slate-200 font-bold">{product.sku}</span>
               </p>
             </div>
           </div>
@@ -266,102 +266,102 @@ const ProductLedgerDrawer = ({
           {/* 📊 4 EXECUTIVE KPI SUMMARY CARDS */}
           <div className="grid grid-cols-2 gap-3 sm:gap-4">
             {/* 1. CLOSING BALANCE */}
-            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 shadow-sm flex flex-col justify-between min-h-[118px]">
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 shadow-2xs flex flex-col justify-between min-h-[118px]">
               <div>
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center justify-between">
                   Closing Balance
-                  <FiPackage className="text-sky-400" />
+                  <FiPackage className="text-sky-600 dark:text-sky-400" />
                 </p>
                 <div className="mt-2 flex items-baseline gap-1.5">
-                  <span className="text-2xl sm:text-3xl font-black text-white font-mono">
+                  <span className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white font-mono">
                     {currentQty}
                   </span>
-                  <span className="text-xs text-slate-400 font-semibold">units</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">units</span>
                 </div>
               </div>
-              <div className="mt-2.5 pt-2 border-t border-slate-900 text-[11px] text-slate-500 font-sans">
+              <div className="mt-2.5 pt-2 border-t border-slate-200/70 dark:border-slate-900 text-[11px] text-slate-500 font-sans">
                 Live available stock for sales
               </div>
             </div>
 
             {/* 2. REVENUE / SELLING PRICE */}
-            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 shadow-sm flex flex-col justify-between min-h-[118px]">
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 shadow-2xs flex flex-col justify-between min-h-[118px]">
               <div>
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center justify-between">
                   Selling Price
-                  <FiDollarSign className="text-emerald-400" />
+                  <FiDollarSign className="text-emerald-600 dark:text-emerald-400" />
                 </p>
-                <div className="mt-2 flex items-baseline gap-1 text-emerald-400">
+                <div className="mt-2 flex items-baseline gap-1 text-emerald-700 dark:text-emerald-400">
                   <span className="text-xl sm:text-2xl font-black font-mono">
                     <AedPrice amount={sellingPrice} />
                   </span>
                 </div>
               </div>
-              <div className="mt-2.5 pt-2 border-t border-slate-900 text-[11px] text-slate-400 font-mono flex items-center gap-1.5 flex-wrap">
+              <div className="mt-2.5 pt-2 border-t border-slate-200/70 dark:border-slate-900 text-[11px] text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1.5 flex-wrap">
                 <span className="inline-flex items-baseline gap-1">
                   <span className="text-slate-500 font-sans">Cost:</span>
-                  <AedPrice amount={cost} className="text-slate-300 font-semibold" />
+                  <AedPrice amount={cost} className="text-slate-700 dark:text-slate-300 font-semibold" />
                 </span>
-                <span className="text-slate-700 font-sans">•</span>
+                <span className="text-slate-300 dark:text-slate-700 font-sans">•</span>
                 <span className="inline-flex items-baseline gap-1">
                   <span className="text-slate-500 font-sans">Margin:</span>
-                  <span className="text-emerald-400 font-semibold inline-flex items-baseline">
-                    +<AedPrice amount={margin} className="text-emerald-400" />
+                  <span className="text-emerald-700 dark:text-emerald-400 font-semibold inline-flex items-baseline">
+                    +<AedPrice amount={margin} className="text-emerald-700 dark:text-emerald-400" />
                   </span>
                 </span>
               </div>
             </div>
 
             {/* 3. INWARDS (PURCHASED) */}
-            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 shadow-sm flex flex-col justify-between min-h-[118px]">
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 shadow-2xs flex flex-col justify-between min-h-[118px]">
               <div>
-                <p className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider flex items-center justify-between">
+                <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider flex items-center justify-between">
                   Inwards (Purchases)
-                  <FiArrowDownLeft className="text-emerald-400" />
+                  <FiArrowDownLeft className="text-emerald-600 dark:text-emerald-400" />
                 </p>
                 <div className="mt-2 flex items-baseline gap-1.5">
-                  <span className="text-xl sm:text-2xl font-black text-emerald-400 font-mono">
+                  <span className="text-xl sm:text-2xl font-black text-emerald-700 dark:text-emerald-400 font-mono">
                     +{totalInwardUnits}
                   </span>
-                  <span className="text-xs text-slate-400 font-semibold">units</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">units</span>
                 </div>
               </div>
-              <div className="mt-2.5 pt-2 border-t border-slate-900 text-[11px] text-slate-400 font-mono flex items-baseline gap-1.5">
+              <div className="mt-2.5 pt-2 border-t border-slate-200/70 dark:border-slate-900 text-[11px] text-slate-500 dark:text-slate-400 font-mono flex items-baseline gap-1.5">
                 <span className="text-slate-500 font-sans">Total Spend:</span>
-                <AedPrice amount={totalInwardValue} className="text-slate-300 font-semibold" />
+                <AedPrice amount={totalInwardValue} className="text-slate-700 dark:text-slate-300 font-semibold" />
               </div>
             </div>
 
             {/* 4. OUTWARDS (SOLD) */}
-            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 shadow-sm flex flex-col justify-between min-h-[118px]">
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 shadow-2xs flex flex-col justify-between min-h-[118px]">
               <div>
-                <p className="text-[11px] font-bold text-sky-400 uppercase tracking-wider flex items-center justify-between">
+                <p className="text-[11px] font-bold text-sky-700 dark:text-sky-400 uppercase tracking-wider flex items-center justify-between">
                   Outwards (Sales)
-                  <FiArrowUpRight className="text-sky-400" />
+                  <FiArrowUpRight className="text-sky-600 dark:text-sky-400" />
                 </p>
                 <div className="mt-2 flex items-baseline gap-1.5">
-                  <span className="text-xl sm:text-2xl font-black text-sky-400 font-mono">
+                  <span className="text-xl sm:text-2xl font-black text-sky-700 dark:text-sky-400 font-mono">
                     -{totalOutwardUnits}
                   </span>
-                  <span className="text-xs text-slate-400 font-semibold">units</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">units</span>
                 </div>
               </div>
-              <div className="mt-2.5 pt-2 border-t border-slate-900 text-[11px] text-slate-400 font-mono flex items-baseline gap-1.5">
+              <div className="mt-2.5 pt-2 border-t border-slate-200/70 dark:border-slate-900 text-[11px] text-slate-500 dark:text-slate-400 font-mono flex items-baseline gap-1.5">
                 <span className="text-slate-500 font-sans">Sales Value:</span>
-                <AedPrice amount={totalOutwardValue} className="text-slate-300 font-semibold" />
+                <AedPrice amount={totalOutwardValue} className="text-slate-700 dark:text-slate-300 font-semibold" />
               </div>
             </div>
           </div>
 
           {/* 📑 LEDGER SUB-TABS */}
-          <div className="border-b border-slate-800 flex items-center gap-2">
+          <div className="border-b border-slate-200 dark:border-slate-800 flex items-center gap-2">
             <button
               type="button"
               onClick={() => setActiveTab("all")}
               className={`pb-2.5 px-3 text-xs font-bold transition border-b-2 cursor-pointer ${
                 activeTab === "all"
-                  ? "border-sky-500 text-sky-400"
-                  : "border-transparent text-slate-400 hover:text-slate-200"
+                  ? "border-sky-600 dark:border-sky-500 text-sky-700 dark:text-sky-400"
+                  : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
               }`}
             >
               All Movements ({allMovements.length})
@@ -371,8 +371,8 @@ const ProductLedgerDrawer = ({
               onClick={() => setActiveTab("sales")}
               className={`pb-2.5 px-3 text-xs font-bold transition border-b-2 cursor-pointer ${
                 activeTab === "sales"
-                  ? "border-sky-500 text-sky-400"
-                  : "border-transparent text-slate-400 hover:text-slate-200"
+                  ? "border-sky-600 dark:border-sky-500 text-sky-700 dark:text-sky-400"
+                  : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
               }`}
             >
               Sales Outward ({productSales.length})
@@ -382,8 +382,8 @@ const ProductLedgerDrawer = ({
               onClick={() => setActiveTab("purchases")}
               className={`pb-2.5 px-3 text-xs font-bold transition border-b-2 cursor-pointer ${
                 activeTab === "purchases"
-                  ? "border-emerald-500 text-emerald-400"
-                  : "border-transparent text-slate-400 hover:text-slate-200"
+                  ? "border-emerald-600 dark:border-emerald-500 text-emerald-700 dark:text-emerald-400"
+                  : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
               }`}
             >
               Purchases Inward ({productPurchases.length})
@@ -393,14 +393,14 @@ const ProductLedgerDrawer = ({
           {/* 📋 CHRONOLOGICAL MOVEMENTS LIST */}
           <div className="space-y-3">
             {displayedMovements.length === 0 ? (
-              <div className="py-12 px-4 rounded-2xl bg-slate-950/60 border border-slate-800 text-center text-slate-400">
-                <FiClock className="text-3xl mx-auto mb-2 text-slate-600" />
-                <p className="text-xs font-bold text-slate-300">
+              <div className="py-12 px-4 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800 text-center text-slate-500 dark:text-slate-400">
+                <FiClock className="text-3xl mx-auto mb-2 text-slate-300 dark:text-slate-600" />
+                <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
                   No {activeTab === "sales" ? "sales records" : activeTab === "purchases" ? "procurement purchases" : "inventory movements"} found.
                 </p>
                 <p className="text-[11px] text-slate-500 mt-1 max-w-xs mx-auto">
                   {activeTab === "purchases" || activeTab === "all"
-                    ? "Add inward stock via the 'Purchase Records' tab to populate this ledger."
+                    ? "Add inward stock via the 'Purchase Records' section to populate this ledger."
                     : "Products sold via Billing POS will automatically appear here."}
                 </p>
               </div>
@@ -418,7 +418,7 @@ const ProductLedgerDrawer = ({
                 return (
                   <div
                     key={`${item.refNo}-${idx}`}
-                    className="p-3.5 sm:p-4 rounded-2xl bg-slate-950 border border-slate-800/90 hover:border-slate-700 transition flex flex-col gap-2.5"
+                    className="p-3.5 sm:p-4 rounded-2xl bg-slate-50/70 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800/90 hover:border-slate-300 dark:hover:border-slate-700 transition flex flex-col gap-2.5"
                   >
                     {/* Top Row: Type Badge + Ref + Date */}
                     <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -426,8 +426,8 @@ const ProductLedgerDrawer = ({
                         <span
                           className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider ${
                             isInward
-                              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                              : "bg-sky-500/10 text-sky-400 border border-sky-500/20"
+                              ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20"
+                              : "bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400 border border-sky-200 dark:border-sky-500/20"
                           }`}
                         >
                           {isInward ? (
@@ -441,28 +441,28 @@ const ProductLedgerDrawer = ({
                           )}
                         </span>
 
-                        <span className="font-mono text-xs font-bold text-white">
+                        <span className="font-mono text-xs font-bold text-slate-900 dark:text-white">
                           #{item.refNo}
                         </span>
                       </div>
 
-                      <span className="text-[11px] text-slate-400 font-medium">
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
                         {formattedDate}
                       </span>
                     </div>
 
                     {/* Middle Row: Party (Customer / Supplier) */}
-                    <div className="flex items-center justify-between gap-2 text-xs pt-1 border-t border-slate-900">
-                      <div className="flex items-center gap-1.5 text-slate-300">
+                    <div className="flex items-center justify-between gap-2 text-xs pt-1 border-t border-slate-200/70 dark:border-slate-900">
+                      <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
                         {isInward ? (
-                          <FiTruck className="text-emerald-400 shrink-0" />
+                          <FiTruck className="text-emerald-600 dark:text-emerald-400 shrink-0" />
                         ) : (
-                          <FiUser className="text-sky-400 shrink-0" />
+                          <FiUser className="text-sky-600 dark:text-sky-400 shrink-0" />
                         )}
-                        <span className="font-semibold text-slate-200">
+                        <span className="font-semibold text-slate-700 dark:text-slate-200">
                           {isInward ? "Supplier:" : "Customer:"}
                         </span>
-                        <span className="font-medium text-white truncate max-w-[200px]">
+                        <span className="font-medium text-slate-900 dark:text-white truncate max-w-[200px]">
                           {item.party}
                         </span>
                         {item.partySub && (
@@ -472,24 +472,24 @@ const ProductLedgerDrawer = ({
                         )}
                       </div>
 
-                      <span className="text-[11px] text-slate-400">
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400">
                         {item.paymentMethod}
                       </span>
                     </div>
 
                     {/* Bottom Row: Quantity, Unit Value, Total Value */}
-                    <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-3 text-xs font-mono">
+                    <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-3 text-xs font-mono">
                       <div>
                         <span className="text-[10px] text-slate-500 uppercase block font-sans font-bold">
                           Quantity
                         </span>
                         <span
                           className={`font-black text-sm ${
-                            isInward ? "text-emerald-400" : "text-sky-400"
+                            isInward ? "text-emerald-700 dark:text-emerald-400" : "text-sky-700 dark:text-sky-400"
                           }`}
                         >
                           {isInward ? `+${item.quantity}` : `-${item.quantity}`}{" "}
-                          <span className="text-[10px] font-sans font-normal text-slate-400">
+                          <span className="text-[10px] font-sans font-normal text-slate-500 dark:text-slate-400">
                             units
                           </span>
                         </span>
@@ -499,7 +499,7 @@ const ProductLedgerDrawer = ({
                         <span className="text-[10px] text-slate-500 uppercase block font-sans font-bold">
                           Unit {isInward ? "Cost" : "Price"}
                         </span>
-                        <span className="text-slate-300 font-bold">
+                        <span className="text-slate-700 dark:text-slate-300 font-bold">
                           <AedPrice amount={item.unitPrice} />
                         </span>
                       </div>
@@ -508,7 +508,7 @@ const ProductLedgerDrawer = ({
                         <span className="text-[10px] text-slate-500 uppercase block font-sans font-bold">
                           Total Value
                         </span>
-                        <span className="text-white font-extrabold text-sm">
+                        <span className="text-slate-900 dark:text-white font-extrabold text-sm">
                           <AedPrice amount={item.totalValue} />
                         </span>
                       </div>
@@ -521,10 +521,10 @@ const ProductLedgerDrawer = ({
         </div>
 
         {/* 🔻 FOOTER ACTIONS */}
-        <div className="p-4 bg-slate-950 border-t border-slate-800 flex items-center justify-between gap-3 shrink-0">
-          <div className="text-xs text-slate-400">
+        <div className="p-4 bg-slate-50/90 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 shrink-0">
+          <div className="text-xs text-slate-500 dark:text-slate-400">
             Current Closing Stock:{" "}
-            <strong className="text-white font-mono font-bold">
+            <strong className="text-slate-900 dark:text-white font-mono font-bold">
               {currentQty} units
             </strong>
           </div>
@@ -532,7 +532,7 @@ const ProductLedgerDrawer = ({
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition cursor-pointer"
+            className="px-5 py-2 rounded-xl bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-white text-xs font-bold transition cursor-pointer"
           >
             Close
           </button>

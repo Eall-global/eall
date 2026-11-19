@@ -11,6 +11,7 @@ import {
   setDoc,
   deleteDoc,
 } from "../lib/firebaseClient";
+import { logAuditEvent } from "./auditService";
 
 const COUPONS_STORAGE_KEY = "eall_active_coupons";
 
@@ -97,6 +98,7 @@ export const saveCoupon = async (couponData) => {
   };
 
   const current = await fetchCoupons();
+  const existing = current.find((c) => c.code === code);
   const updated = [coupon, ...current.filter((c) => c.code !== code)];
   localStorage.setItem(COUPONS_STORAGE_KEY, JSON.stringify(updated));
 
@@ -108,6 +110,32 @@ export const saveCoupon = async (couponData) => {
       console.warn("Could not save coupon to Firestore:", e);
     }
   }
+
+  logAuditEvent({
+    module: "coupons",
+    action: existing ? (existing.isActive !== coupon.isActive ? "status_change" : "update") : "create",
+    severity: "info",
+    targetId: code,
+    targetLabel: code,
+    summary: existing
+      ? `Updated coupon ${code} (${coupon.isActive ? "Active" : "Inactive"})`
+      : `Created coupon ${code} (${coupon.discountPercent > 0 ? `${coupon.discountPercent}% OFF` : `AED ${coupon.discountFlat} OFF`})`,
+    changes: existing
+      ? [
+          {
+            field: "Status",
+            before: existing.isActive ? "Active" : "Inactive",
+            after: coupon.isActive ? "Active" : "Inactive",
+          },
+        ]
+      : [
+          {
+            field: "Discount",
+            before: "—",
+            after: coupon.discountPercent > 0 ? `${coupon.discountPercent}%` : `AED ${coupon.discountFlat}`,
+          },
+        ],
+  });
 
   return coupon;
 };
@@ -128,6 +156,16 @@ export const deleteCoupon = async (couponId) => {
       console.warn("Could not delete coupon from Firestore:", e);
     }
   }
+
+  logAuditEvent({
+    module: "coupons",
+    action: "delete",
+    severity: "warning",
+    targetId: couponId,
+    targetLabel: couponId,
+    summary: `Deleted promotional coupon "${couponId}"`,
+    changes: [{ field: "Coupon", before: couponId, after: "Deleted" }],
+  });
 };
 
 /**
