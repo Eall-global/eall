@@ -28,6 +28,7 @@ import {
   parsePurchaseFile,
   parsePastedPurchaseText,
   downloadPurchaseImportTemplate,
+  findBestImageMatch,
   generateCleanSku,
   inferBrandFromName,
   inferCategoryFromName,
@@ -87,6 +88,7 @@ const PurchaseManagement = ({
   const [selectedSku, setSelectedSku] = useState("");
   const [addQty, setAddQty] = useState(1);
   const [addUnitCost, setAddUnitCost] = useState("");
+  const [addSellingPrice, setAddSellingPrice] = useState("");
 
   // Mode 2: Unlisted / New SKU Builder
   const [customName, setCustomName] = useState("");
@@ -262,6 +264,7 @@ const PurchaseManagement = ({
     setSelectedSku("");
     setAddQty(1);
     setAddUnitCost("");
+    setAddSellingPrice("");
     setCustomName("");
     setCustomSku("");
     setCustomBrand("");
@@ -301,15 +304,21 @@ const PurchaseManagement = ({
       (po.items || []).map((item) => {
         const qty = Math.max(1, parseInt(item.quantity, 10) || 1);
         const cost = Math.max(0, Number(item.unitCost) || 0);
+        const stockMatch = stock.find(
+          (s) => String(s.sku || "").toUpperCase() === String(item.sku || "").toUpperCase()
+        );
         return {
           sku: item.sku,
           name: item.name,
           brand: item.brand || "General",
           category: item.category || "Mobile Devices",
-          image: item.image || "/logo.png",
+          image:
+            item.image && item.image !== "/logo.png"
+              ? item.image
+              : stockMatch?.image || "/logo.png",
           quantity: qty,
           unitCost: cost,
-          sellingPrice: Number(item.sellingPrice) || 0,
+          sellingPrice: Number(item.sellingPrice) || Number(stockMatch?.price) || 0,
           totalCost: Number((qty * cost).toFixed(2)),
           isUnlisted: Boolean(item.isUnlisted),
         };
@@ -324,6 +333,7 @@ const PurchaseManagement = ({
     setSelectedSku(prod.sku);
     setCatalogQuery(`${prod.name} (${prod.sku})`);
     setAddUnitCost(prod.costPrice || "");
+    setAddSellingPrice(prod.price || "");
     setCatalogDropdownOpen(false);
   };
 
@@ -335,15 +345,24 @@ const PurchaseManagement = ({
         if (!cleanSku) continue;
         const qty = Math.max(1, parseInt(inc.quantity, 10) || 1);
         const unitCost = Math.max(0, Number(inc.unitCost) || 0);
+        const sellingPrice = Math.max(0, Number(inc.sellingPrice) || 0);
         const existingIdx = next.findIndex((x) => x.sku === cleanSku);
 
         if (existingIdx >= 0) {
           const updatedQty = next[existingIdx].quantity + qty;
           const nextCost = unitCost > 0 ? unitCost : next[existingIdx].unitCost;
+          const nextSelling =
+            sellingPrice > 0 ? sellingPrice : next[existingIdx].sellingPrice || 0;
+          const nextImage =
+            inc.image && inc.image !== "/logo.png"
+              ? inc.image
+              : next[existingIdx].image || "/logo.png";
           next[existingIdx] = {
             ...next[existingIdx],
+            image: nextImage,
             quantity: updatedQty,
             unitCost: nextCost,
+            sellingPrice: nextSelling,
             totalCost: Number((updatedQty * nextCost).toFixed(2)),
           };
         } else {
@@ -353,9 +372,10 @@ const PurchaseManagement = ({
             brand: inc.brand || "General",
             category: inc.category || "Mobile Devices",
             image: inc.image || "/logo.png",
+            imageMatched: Boolean(inc.imageMatched),
             quantity: qty,
             unitCost,
-            sellingPrice: Math.max(0, Number(inc.sellingPrice) || 0),
+            sellingPrice,
             totalCost: Number((qty * unitCost).toFixed(2)),
             isUnlisted: Boolean(inc.isUnlisted),
           });
@@ -372,6 +392,7 @@ const PurchaseManagement = ({
 
     const qty = Math.max(1, parseInt(addQty, 10) || 1);
     const unitCost = Math.max(0, parseFloat(addUnitCost) || 0);
+    const sellingPrice = Math.max(0, parseFloat(addSellingPrice) || 0);
 
     mergeItemsIntoLineItems([
       {
@@ -382,6 +403,7 @@ const PurchaseManagement = ({
         image: found.image,
         quantity: qty,
         unitCost,
+        sellingPrice,
         isUnlisted: false,
       },
     ]);
@@ -390,6 +412,7 @@ const PurchaseManagement = ({
     setCatalogQuery("");
     setAddQty(1);
     setAddUnitCost("");
+    setAddSellingPrice("");
   };
 
   // Mode 2: Add Unlisted / New SKU
@@ -408,7 +431,10 @@ const PurchaseManagement = ({
     const unitCost = Math.max(0, parseFloat(customUnitCost) || 0);
     const sellingPrice = Math.max(0, parseFloat(customSellingPrice) || 0);
 
-    const existsInCatalog = stock.some((s) => s.sku.toUpperCase() === finalSku);
+    const exactMatch = stock.find((s) => s.sku.toUpperCase() === finalSku);
+    const resolvedImage =
+      exactMatch?.image ||
+      findBestImageMatch(finalSku, trimmedName, inferredBrand, stock);
 
     setErrorMessage("");
     mergeItemsIntoLineItems([
@@ -417,11 +443,12 @@ const PurchaseManagement = ({
         name: trimmedName,
         brand: inferredBrand,
         category: customCategory || inferCategoryFromName(trimmedName),
-        image: "/logo.png",
+        image: resolvedImage,
+        imageMatched: !exactMatch && resolvedImage !== "/logo.png",
         quantity: qty,
         unitCost,
         sellingPrice,
-        isUnlisted: !existsInCatalog,
+        isUnlisted: !exactMatch,
       },
     ]);
 
@@ -433,7 +460,7 @@ const PurchaseManagement = ({
     setCustomSellingPrice("");
   };
 
-  // Inline Editing of ANY Line Item (Qty, Unit Cost, Name)
+  // Inline Editing of ANY Line Item (Qty, Unit Cost, Selling Price, Name, SKU)
   const handleUpdateLineItem = (idx, field, rawValue) => {
     setLineItems((prev) =>
       prev.map((item, i) => {
@@ -453,6 +480,13 @@ const PurchaseManagement = ({
             unitCost: cost,
             totalCost: Number((item.quantity * cost).toFixed(2)),
           };
+        }
+        if (field === "sellingPrice") {
+          const sell = Math.max(0, parseFloat(rawValue) || 0);
+          return { ...item, sellingPrice: sell };
+        }
+        if (field === "sku") {
+          return { ...item, sku: String(rawValue || "").toUpperCase() };
         }
         if (field === "name") {
           return { ...item, name: rawValue };
@@ -522,6 +556,10 @@ const PurchaseManagement = ({
         if (field === "unitCost") {
           const c = Math.max(0, parseFloat(value) || 0);
           return { ...row, unitCost: c, totalCost: Number((row.quantity * c).toFixed(2)) };
+        }
+        if (field === "sellingPrice") {
+          const sp = Math.max(0, parseFloat(value) || 0);
+          return { ...row, sellingPrice: sp };
         }
         if (field === "sku") {
           return { ...row, sku: String(value || "").toUpperCase() };
@@ -655,6 +693,7 @@ const PurchaseManagement = ({
   const selectedImportCount = importPreviewRows.filter((r) => r.selected).length;
   const matchedImportCount = importPreviewRows.filter((r) => !r.isUnlisted).length;
   const unlistedImportCount = importPreviewRows.filter((r) => r.isUnlisted).length;
+  const imageMatchedImportCount = importPreviewRows.filter((r) => r.imageMatched).length;
 
   return (
     <div className="space-y-4 sm:space-y-5 text-left font-sans">
@@ -928,7 +967,7 @@ const PurchaseManagement = ({
       {/* ================================================================= */}
       {showModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-6 w-full max-w-3xl shadow-2xl my-4 text-left border border-slate-200/80 dark:border-slate-800 max-h-[92vh] flex flex-col">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-6 w-full max-w-4xl shadow-2xl my-4 text-left border border-slate-200/80 dark:border-slate-800 max-h-[92vh] flex flex-col">
             {/* Modal Header */}
             <div className="flex items-start justify-between pb-3 border-b border-slate-100 dark:border-slate-800 shrink-0 gap-3">
               <div>
@@ -1097,7 +1136,7 @@ const PurchaseManagement = ({
                 {/* MODE 1: SEARCHABLE CATALOG PICKER */}
                 {entryMode === "catalog" && (
                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700">
-                    <div className="sm:col-span-6 relative">
+                    <div className="sm:col-span-4 relative">
                       <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
                         Search &amp; Select Catalog Product *
                       </label>
@@ -1122,6 +1161,7 @@ const PurchaseManagement = ({
                               setCatalogQuery("");
                               setSelectedSku("");
                               setAddUnitCost("");
+                              setAddSellingPrice("");
                             }}
                             className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
                           >
@@ -1205,6 +1245,21 @@ const PurchaseManagement = ({
                         value={addUnitCost}
                         onChange={(e) => setAddUnitCost(e.target.value)}
                         className="w-full py-1.5 px-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg text-xs font-mono text-right"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                        Sell Price (<AedSymbol />)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="Keep"
+                        value={addSellingPrice}
+                        onChange={(e) => setAddSellingPrice(e.target.value)}
+                        className="w-full py-1.5 px-2 bg-sky-50/60 dark:bg-sky-500/10 border border-sky-200/80 dark:border-sky-500/30 text-sky-900 dark:text-sky-200 rounded-lg text-xs font-mono text-right"
                       />
                     </div>
 
@@ -1393,7 +1448,7 @@ const PurchaseManagement = ({
                             : "Drop Excel (.xlsx), CSV, or Supplier PDF Invoice here"}
                         </p>
                         <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                          Auto-matches catalog SKUs &amp; flags new unlisted items for review before saving
+                          Preserves exact uploaded SKU, Name &amp; Selling Price • Auto-matches product images from catalog
                         </p>
                       </div>
 
@@ -1473,12 +1528,19 @@ const PurchaseManagement = ({
                             <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">
                               {importFileLabel}
                             </span>
-                            <span className="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/25 text-[10px] font-bold">
-                              {matchedImportCount} Catalog Matched
-                            </span>
+                            {matchedImportCount > 0 && (
+                              <span className="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/25 text-[10px] font-bold">
+                                {matchedImportCount} Exact SKU
+                              </span>
+                            )}
                             {unlistedImportCount > 0 && (
                               <span className="px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/25 text-[10px] font-bold">
-                                {unlistedImportCount} New Unlisted
+                                {unlistedImportCount} New SKU{unlistedImportCount === 1 ? "" : "s"}
+                              </span>
+                            )}
+                            {imageMatchedImportCount > 0 && (
+                              <span className="px-2 py-0.5 rounded-full bg-sky-50 dark:bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-500/25 text-[10px] font-bold">
+                                {imageMatchedImportCount} Image{imageMatchedImportCount === 1 ? "" : "s"} Matched
                               </span>
                             )}
                           </div>
@@ -1496,109 +1558,167 @@ const PurchaseManagement = ({
                           )}
                         </div>
 
-                        <div className="max-h-56 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-800">
-                          {importPreviewRows.map((row) => (
-                            <div
-                              key={row.rowId}
-                              className={`p-2 grid grid-cols-12 gap-1.5 items-center text-[11px] ${
-                                row.selected
-                                  ? "bg-white dark:bg-slate-900"
-                                  : "bg-slate-50 dark:bg-slate-800/40 opacity-50"
-                              }`}
-                            >
-                              <div className="col-span-1 flex justify-center">
-                                <input
-                                  type="checkbox"
-                                  checked={row.selected}
-                                  onChange={(e) =>
-                                    handleUpdatePreviewRow(
-                                      row.rowId,
-                                      "selected",
-                                      e.target.checked
-                                    )
-                                  }
-                                  className="cursor-pointer"
-                                />
-                              </div>
+                        <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                          <div className="hidden sm:grid grid-cols-12 gap-1.5 px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 text-[9.5px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                            <div className="col-span-5 pl-6">Product &amp; SKU (Exact)</div>
+                            <div className="col-span-1 text-center">Qty</div>
+                            <div className="col-span-2 text-right">Cost (<AedSymbol />)</div>
+                            <div className="col-span-2 text-right">Sell (<AedSymbol />)</div>
+                            <div className="col-span-2 text-right">Line Total</div>
+                          </div>
 
-                              <div className="col-span-5 min-w-0 space-y-0.5">
-                                <div className="flex items-center gap-1">
-                                  <span
-                                    className={`px-1.5 py-0.2 rounded text-[9px] font-extrabold shrink-0 ${
-                                      row.isUnlisted
-                                        ? "bg-amber-100 text-amber-800"
-                                        : "bg-emerald-100 text-emerald-800"
-                                    }`}
-                                  >
-                                    {row.isUnlisted ? "NEW" : "MATCH"}
-                                  </span>
+                          <div className="max-h-60 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+                            {importPreviewRows.map((row) => (
+                              <div
+                                key={row.rowId}
+                                className={`p-2 grid grid-cols-12 gap-1.5 items-center text-[11px] ${
+                                  row.selected
+                                    ? "bg-white dark:bg-slate-900"
+                                    : "bg-slate-50 dark:bg-slate-800/40 opacity-50"
+                                }`}
+                              >
+                                <div className="col-span-12 sm:col-span-5 flex items-center gap-2 min-w-0">
                                   <input
-                                    type="text"
-                                    value={row.name}
+                                    type="checkbox"
+                                    checked={row.selected}
                                     onChange={(e) =>
                                       handleUpdatePreviewRow(
                                         row.rowId,
-                                        "name",
+                                        "selected",
+                                        e.target.checked
+                                      )
+                                    }
+                                    className="cursor-pointer shrink-0"
+                                  />
+                                  <div
+                                    className={`w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-800 border flex items-center justify-center p-0.5 shrink-0 ${
+                                      row.imageMatched
+                                        ? "border-sky-300 dark:border-sky-500/50"
+                                        : "border-slate-200 dark:border-slate-700"
+                                    }`}
+                                    title={
+                                      row.imageMatched
+                                        ? "Image auto-matched from similar catalog product"
+                                        : "Product thumbnail"
+                                    }
+                                  >
+                                    <img
+                                      src={row.image || "/logo.png"}
+                                      alt={row.name}
+                                      className="w-full h-full object-contain rounded"
+                                      onError={(e) => {
+                                        e.currentTarget.src = "/logo.png";
+                                      }}
+                                    />
+                                  </div>
+                                  <div className="min-w-0 flex-1 space-y-0.5">
+                                    <div className="flex items-center gap-1">
+                                      <span
+                                        className={`px-1.5 py-0.2 rounded text-[9px] font-extrabold shrink-0 ${
+                                          row.isUnlisted
+                                            ? "bg-amber-100 text-amber-800"
+                                            : "bg-emerald-100 text-emerald-800"
+                                        }`}
+                                      >
+                                        {row.isUnlisted ? "NEW" : "EXACT"}
+                                      </span>
+                                      <input
+                                        type="text"
+                                        value={row.name}
+                                        onChange={(e) =>
+                                          handleUpdatePreviewRow(
+                                            row.rowId,
+                                            "name",
+                                            e.target.value
+                                          )
+                                        }
+                                        className="w-full bg-transparent font-bold text-slate-900 dark:text-white outline-none focus:bg-slate-50 dark:focus:bg-slate-800 rounded px-1 truncate"
+                                      />
+                                    </div>
+                                    <input
+                                      type="text"
+                                      value={row.sku}
+                                      onChange={(e) =>
+                                        handleUpdatePreviewRow(
+                                          row.rowId,
+                                          "sku",
+                                          e.target.value
+                                        )
+                                      }
+                                      className="w-full bg-transparent font-mono text-[10px] text-slate-400 outline-none focus:bg-slate-50 dark:focus:bg-slate-800 rounded px-1"
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="col-span-3 sm:col-span-1">
+                                  <span className="sm:hidden text-[9px] font-bold text-slate-400 block mb-0.5">
+                                    Qty
+                                  </span>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={row.quantity}
+                                    onChange={(e) =>
+                                      handleUpdatePreviewRow(
+                                        row.rowId,
+                                        "quantity",
                                         e.target.value
                                       )
                                     }
-                                    className="w-full bg-transparent font-bold text-slate-900 dark:text-white outline-none focus:bg-slate-50 dark:focus:bg-slate-800 rounded px-1 truncate"
+                                    aria-label="Quantity"
+                                    className="w-full py-1 px-1 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono font-bold text-center text-slate-900 dark:text-white"
                                   />
                                 </div>
-                                <input
-                                  type="text"
-                                  value={row.sku}
-                                  onChange={(e) =>
-                                    handleUpdatePreviewRow(
-                                      row.rowId,
-                                      "sku",
-                                      e.target.value
-                                    )
-                                  }
-                                  className="w-full bg-transparent font-mono text-[10px] text-slate-400 outline-none focus:bg-slate-50 dark:focus:bg-slate-800 rounded px-1"
-                                />
-                              </div>
 
-                              <div className="col-span-2">
-                                <input
-                                  type="number"
-                                  min="1"
-                                  value={row.quantity}
-                                  onChange={(e) =>
-                                    handleUpdatePreviewRow(
-                                      row.rowId,
-                                      "quantity",
-                                      e.target.value
-                                    )
-                                  }
-                                  aria-label="Quantity"
-                                  className="w-full py-1 px-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono font-bold text-center text-slate-900 dark:text-white"
-                                />
-                              </div>
+                                <div className="col-span-3 sm:col-span-2">
+                                  <span className="sm:hidden text-[9px] font-bold text-slate-400 block mb-0.5">
+                                    Cost
+                                  </span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={row.unitCost}
+                                    onChange={(e) =>
+                                      handleUpdatePreviewRow(
+                                        row.rowId,
+                                        "unitCost",
+                                        e.target.value
+                                      )
+                                    }
+                                    aria-label="Unit Cost"
+                                    className="w-full py-1 px-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono text-right text-slate-900 dark:text-white"
+                                  />
+                                </div>
 
-                              <div className="col-span-2">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={row.unitCost}
-                                  onChange={(e) =>
-                                    handleUpdatePreviewRow(
-                                      row.rowId,
-                                      "unitCost",
-                                      e.target.value
-                                    )
-                                  }
-                                  aria-label="Unit Cost"
-                                  className="w-full py-1 px-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono text-right text-slate-900 dark:text-white"
-                                />
-                              </div>
+                                <div className="col-span-3 sm:col-span-2">
+                                  <span className="sm:hidden text-[9px] font-bold text-sky-600 block mb-0.5">
+                                    Sell
+                                  </span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    placeholder="Auto"
+                                    value={row.sellingPrice || ""}
+                                    onChange={(e) =>
+                                      handleUpdatePreviewRow(
+                                        row.rowId,
+                                        "sellingPrice",
+                                        e.target.value
+                                      )
+                                    }
+                                    aria-label="Selling Price"
+                                    className="w-full py-1 px-1.5 rounded-lg bg-sky-50/70 dark:bg-sky-500/10 border border-sky-200/80 dark:border-sky-500/30 font-mono font-semibold text-right text-sky-800 dark:text-sky-300"
+                                  />
+                                </div>
 
-                              <div className="col-span-2 text-right font-mono font-bold text-slate-800 dark:text-slate-200 truncate">
-                                <AedPrice amount={row.totalCost} />
+                                <div className="col-span-3 sm:col-span-2 text-right font-mono font-bold text-slate-800 dark:text-slate-200 truncate">
+                                  <AedPrice amount={row.totalCost} />
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
 
                         <div className="flex items-center justify-between gap-2 pt-1">
@@ -1625,56 +1745,84 @@ const PurchaseManagement = ({
                 )}
 
                 {/* =========================================================== */}
-                {/* INLINE-EDITABLE LINE ITEMS LIST (Edit Qty & Cost Directly!) */}
+                {/* INLINE-EDITABLE LINE ITEMS LIST (Qty, Cost & Selling Price) */}
                 {/* =========================================================== */}
                 {lineItems.length > 0 && (
                   <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden text-xs">
                     {/* Table Column Labels */}
                     <div className="hidden sm:grid grid-cols-12 gap-2 px-3 py-2 bg-slate-50/90 dark:bg-slate-800/70 border-b border-slate-200/80 dark:border-slate-700 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                      <div className="col-span-5">Product &amp; SKU</div>
+                      <div className="col-span-4">Product &amp; SKU</div>
                       <div className="col-span-2 text-center">Inward Qty</div>
                       <div className="col-span-2 text-right">
                         Unit Cost (<AedSymbol />)
                       </div>
-                      <div className="col-span-2 text-right">Line Total</div>
-                      <div className="col-span-1 text-right"></div>
+                      <div className="col-span-2 text-right">
+                        Sell Price (<AedSymbol />)
+                      </div>
+                      <div className="col-span-2 text-right pr-7">Line Total</div>
                     </div>
 
-                    <div className="divide-y divide-slate-200/80 dark:divide-slate-800 max-h-60 overflow-y-auto">
+                    <div className="divide-y divide-slate-200/80 dark:divide-slate-800 max-h-64 overflow-y-auto">
                       {lineItems.map((item, idx) => (
                         <div
                           key={`${item.sku}-${idx}`}
                           className="p-2.5 grid grid-cols-1 sm:grid-cols-12 gap-2 items-center"
                         >
-                          {/* Product Name & SKU */}
-                          <div className="sm:col-span-5 min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              {item.isUnlisted && (
-                                <span className="px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 text-[9.5px] font-extrabold shrink-0">
-                                  NEW SKU
-                                </span>
-                              )}
-                              {item.isUnlisted ? (
-                                <input
-                                  type="text"
-                                  value={item.name}
-                                  onChange={(e) =>
-                                    handleUpdateLineItem(idx, "name", e.target.value)
-                                  }
-                                  className="w-full font-bold text-slate-900 dark:text-white bg-transparent border-b border-dashed border-amber-300 focus:border-sky-600 outline-none truncate"
-                                />
-                              ) : (
-                                <p className="font-bold text-slate-900 dark:text-white truncate">
-                                  {item.name}
-                                </p>
-                              )}
+                          {/* Thumbnail + Product Name & SKU */}
+                          <div className="sm:col-span-4 flex items-center gap-2.5 min-w-0">
+                            <div
+                              className={`w-9 h-9 rounded-lg bg-slate-50 dark:bg-slate-800 border flex items-center justify-center p-0.5 shrink-0 ${
+                                item.imageMatched
+                                  ? "border-sky-300 dark:border-sky-500/50"
+                                  : "border-slate-200 dark:border-slate-700"
+                              }`}
+                              title={
+                                item.imageMatched
+                                  ? "Image auto-matched from similar catalog product"
+                                  : "Product photo"
+                              }
+                            >
+                              <img
+                                src={item.image || "/logo.png"}
+                                alt={item.name}
+                                className="w-full h-full object-contain rounded"
+                                onError={(e) => {
+                                  e.currentTarget.src = "/logo.png";
+                                }}
+                              />
                             </div>
-                            <p className="text-[10px] font-mono text-slate-400 dark:text-slate-500 mt-0.5">
-                              {item.sku} • {item.brand}
-                            </p>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5">
+                                {item.isUnlisted && (
+                                  <span className="px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 text-[9px] font-extrabold shrink-0">
+                                    NEW
+                                  </span>
+                                )}
+                                {item.isUnlisted ? (
+                                  <input
+                                    type="text"
+                                    value={item.name}
+                                    onChange={(e) =>
+                                      handleUpdateLineItem(idx, "name", e.target.value)
+                                    }
+                                    className="w-full font-bold text-slate-900 dark:text-white bg-transparent border-b border-dashed border-amber-300 focus:border-sky-600 outline-none truncate"
+                                  />
+                                ) : (
+                                  <p
+                                    className="font-bold text-slate-900 dark:text-white truncate"
+                                    title={item.name}
+                                  >
+                                    {item.name}
+                                  </p>
+                                )}
+                              </div>
+                              <p className="text-[10px] font-mono text-slate-400 dark:text-slate-500 mt-0.5 truncate">
+                                {item.sku} • {item.brand}
+                              </p>
+                            </div>
                           </div>
 
-                          {/* Editable Qty + Unit Cost + Line Total + Delete */}
+                          {/* Editable Qty + Unit Cost + Sell Price + Line Total + Delete */}
                           <div className="grid grid-cols-12 sm:contents gap-2 items-center">
                             <div className="col-span-4 sm:col-span-2">
                               <span className="sm:hidden text-[9.5px] font-bold uppercase text-slate-400 block mb-0.5">
@@ -1709,19 +1857,45 @@ const PurchaseManagement = ({
                               />
                             </div>
 
-                            <div className="col-span-3 sm:col-span-2 text-right font-mono font-black text-slate-900 dark:text-white truncate">
-                              <AedPrice amount={item.totalCost} />
+                            <div className="col-span-4 sm:col-span-2">
+                              <span className="sm:hidden text-[9.5px] font-bold uppercase text-sky-600 block mb-0.5">
+                                Sell Price
+                              </span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                placeholder="Auto +20%"
+                                value={item.sellingPrice || ""}
+                                onChange={(e) =>
+                                  handleUpdateLineItem(
+                                    idx,
+                                    "sellingPrice",
+                                    e.target.value
+                                  )
+                                }
+                                aria-label={`Selling price for ${item.name}`}
+                                className="w-full py-1 px-2 rounded-lg bg-sky-50/70 dark:bg-sky-500/10 border border-sky-200/80 dark:border-sky-500/30 font-mono font-bold text-sky-800 dark:text-sky-300 text-right outline-none focus:border-sky-600"
+                              />
                             </div>
 
-                            <div className="col-span-1 flex justify-end">
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveLineItem(idx)}
-                                className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-500/15 transition cursor-pointer"
-                                title="Remove item"
-                              >
-                                <FiTrash2 className="text-sm" />
-                              </button>
+                            <div className="col-span-12 sm:col-span-2 flex items-center justify-between sm:justify-end gap-1.5 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800">
+                              <span className="sm:hidden text-[10px] font-bold uppercase text-slate-400">
+                                Line Total
+                              </span>
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="font-mono font-black text-slate-900 dark:text-white truncate">
+                                  <AedPrice amount={item.totalCost} />
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveLineItem(idx)}
+                                  className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-500/15 transition cursor-pointer shrink-0"
+                                  title="Remove item"
+                                >
+                                  <FiTrash2 className="text-sm" />
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -1862,22 +2036,43 @@ const PurchaseManagement = ({
                 {(viewingPurchase.items || []).map((item) => (
                   <div
                     key={item.sku}
-                    className="p-3 flex items-center justify-between gap-2 bg-white dark:bg-slate-950/50"
+                    className="p-3 flex items-center justify-between gap-2.5 bg-white dark:bg-slate-950/50"
                   >
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <p className="font-bold text-slate-900 dark:text-white truncate">
-                          {item.name}
-                        </p>
-                        {item.isUnlisted && (
-                          <span className="px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 text-[9px] font-extrabold shrink-0">
-                            NEW SKU
-                          </span>
-                        )}
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <img
+                        src={item.image || "/logo.png"}
+                        alt={item.name}
+                        className="w-9 h-9 rounded-lg object-contain bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-0.5 shrink-0"
+                        onError={(e) => {
+                          e.currentTarget.src = "/logo.png";
+                        }}
+                      />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-bold text-slate-900 dark:text-white truncate">
+                            {item.name}
+                          </p>
+                          {item.isUnlisted && (
+                            <span className="px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 text-[9px] font-extrabold shrink-0">
+                              NEW SKU
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <p className="text-[10px] text-slate-400 dark:text-slate-500 font-mono truncate">
+                            {item.sku}
+                          </p>
+                          {Number(item.sellingPrice) > 0 && (
+                            <span className="px-1.5 py-0.2 rounded bg-sky-50 dark:bg-sky-500/15 text-sky-700 dark:text-sky-300 text-[9.5px] font-mono font-bold shrink-0">
+                              Sell:{" "}
+                              <AedPrice
+                                amount={item.sellingPrice}
+                                symbol={viewingPurchase.currencySymbol || undefined}
+                              />
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <p className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">
-                        {item.sku}
-                      </p>
                     </div>
 
                     <div className="text-right font-mono shrink-0">
@@ -1885,7 +2080,7 @@ const PurchaseManagement = ({
                         +{Number(item.quantity).toLocaleString()} units
                       </span>
                       <span className="text-[10px] text-slate-400 dark:text-slate-500 block">
-                        @{" "}
+                        Cost @{" "}
                         <AedPrice
                           amount={item.unitCost}
                           symbol={viewingPurchase.currencySymbol || undefined}

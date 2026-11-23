@@ -181,7 +181,8 @@ const ensureAndInwardItem = async ({
 }) => {
   const code = String(locationCode || "AE").toUpperCase();
   const isCountryBranch = code !== "AE" && code !== "ALL";
-  const stockItem = stockMap.get(item.sku);
+  const skuKey = String(item.sku || "").trim().toUpperCase();
+  const stockItem = stockMap.get(skuKey);
   const unitCost = Math.max(0, Number(item.unitCost) || 0);
 
   if (!stockItem) {
@@ -196,7 +197,7 @@ const ensureAndInwardItem = async ({
     const defaultMargin = Math.max(0, Number((defaultSell - unitCost).toFixed(2)));
 
     await addCustomProduct({
-      sku: item.sku,
+      sku: skuKey,
       name: item.name,
       brand: item.brand || "General",
       category: item.category || "Mobile Devices",
@@ -209,7 +210,7 @@ const ensureAndInwardItem = async ({
     });
 
     if (isCountryBranch) {
-      await updateLocationStock(item.sku, code, {
+      await updateLocationStock(skuKey, code, {
         quantity: initialQty,
         costLocal: unitCost,
         priceLocal: defaultSell,
@@ -217,10 +218,30 @@ const ensureAndInwardItem = async ({
         skipAudit: true,
       });
     }
+    stockMap.set(skuKey, {
+      sku: skuKey,
+      name: item.name,
+      brand: item.brand || "General",
+      category: item.category || "Mobile Devices",
+      image: item.image || "/logo.png",
+      quantity: isCountryBranch ? 0 : initialQty,
+      costPrice: isCountryBranch ? 0 : unitCost,
+      price: isCountryBranch ? 0 : defaultSell,
+      locations: isCountryBranch
+        ? {
+            [code]: {
+              quantity: initialQty,
+              costLocal: unitCost,
+              priceLocal: defaultSell,
+            },
+          }
+        : {},
+    });
     return { createdNew: true };
   }
 
-  // Existing SKU -> reconcile stock quantity by delta and update costPrice
+  // Existing SKU -> reconcile stock quantity by delta and update costPrice / sellingPrice
+  const targetSku = stockItem.sku;
   if (isCountryBranch) {
     const prevEntry = getLocationStockEntry(stockItem, code);
     const nextQty = Math.max(0, (Number(prevEntry.quantity) || 0) + qtyDelta);
@@ -234,28 +255,52 @@ const ensureAndInwardItem = async ({
     if (item.sellingPrice > 0) {
       payload.priceLocal = item.sellingPrice;
     }
-    await updateLocationStock(item.sku, code, payload);
+    await updateLocationStock(targetSku, code, payload);
+    stockMap.set(skuKey, {
+      ...stockItem,
+      locations: {
+        ...(stockItem.locations || {}),
+        [code]: {
+          ...prevEntry,
+          quantity: nextQty,
+          costLocal: payload.costLocal ?? prevEntry.costLocal,
+          priceLocal: payload.priceLocal ?? prevEntry.priceLocal,
+        },
+      },
+    });
   } else {
     const nextQty = Math.max(0, (Number(stockItem.quantity) || 0) + qtyDelta);
-    if (updateProductCost && unitCost > 0) {
+    if ((updateProductCost && unitCost > 0) || item.sellingPrice > 0) {
+      const nextCost =
+        updateProductCost && unitCost > 0
+          ? unitCost
+          : Number(stockItem.costPrice) || 0;
       const existingPrice = Number(stockItem.price) || 0;
       const nextPrice =
         item.sellingPrice > 0
           ? item.sellingPrice
           : existingPrice > 0
           ? existingPrice
-          : Math.round(unitCost * 1.2);
-      const nextMargin = Math.max(0, Number((nextPrice - unitCost).toFixed(2)));
+          : Math.round(nextCost * 1.2);
+      const nextMargin = Math.max(0, Number((nextPrice - nextCost).toFixed(2)));
 
-      await updateProductDetails(item.sku, {
+      await updateProductDetails(targetSku, {
         quantity: nextQty,
-        costPrice: unitCost,
+        costPrice: nextCost,
         margin: nextMargin,
         price: nextPrice,
         skipAudit: true,
       });
+      stockMap.set(skuKey, {
+        ...stockItem,
+        quantity: nextQty,
+        costPrice: nextCost,
+        margin: nextMargin,
+        price: nextPrice,
+      });
     } else if (qtyDelta !== 0) {
-      await updateStockQuantity(item.sku, nextQty, "AE");
+      await updateStockQuantity(targetSku, nextQty, "AE");
+      stockMap.set(skuKey, { ...stockItem, quantity: nextQty });
     }
   }
 
@@ -298,7 +343,9 @@ export const createPurchaseRecord = async ({
 
   // Reconcile stock & auto-create unlisted products
   const currentStock = await fetchStock();
-  const stockMap = new Map(currentStock.map((s) => [s.sku, s]));
+  const stockMap = new Map(
+    currentStock.map((s) => [String(s.sku || "").trim().toUpperCase(), s])
+  );
   let newlyCreatedSkus = 0;
 
   for (const item of cleanItems) {
@@ -396,7 +443,9 @@ export const updatePurchaseRecord = async (
 
   const locCode = String(existing.locationCode || "AE").toUpperCase();
   const currentStock = await fetchStock();
-  const stockMap = new Map(currentStock.map((s) => [s.sku, s]));
+  const stockMap = new Map(
+    currentStock.map((s) => [String(s.sku || "").trim().toUpperCase(), s])
+  );
 
   // Map previous quantities by SKU
   const oldQtyMap = new Map();
@@ -437,7 +486,7 @@ export const updatePurchaseRecord = async (
         const prevQty = isBranch
           ? Number(getLocationStockEntry(stockItem, locCode).quantity) || 0
           : Number(stockItem.quantity) || 0;
-        await updateStockQuantity(sku, Math.max(0, prevQty + delta), locCode);
+        await updateStockQuantity(stockItem.sku, Math.max(0, prevQty + delta), locCode);
       }
     }
   }
@@ -511,17 +560,20 @@ export const deletePurchaseRecord = async (purchaseNo, reverseStock = true) => {
 
   if (reverseStock) {
     const currentStock = await fetchStock();
-    const stockMap = new Map(currentStock.map((s) => [s.sku, s]));
+    const stockMap = new Map(
+    currentStock.map((s) => [String(s.sku || "").trim().toUpperCase(), s])
+  );
 
     for (const item of target.items || []) {
-      const stockItem = stockMap.get(item.sku);
+      const skuKey = String(item.sku || "").trim().toUpperCase();
+      const stockItem = stockMap.get(skuKey);
       if (stockItem) {
         const qtyToReverse = Number(item.quantity) || 0;
         const prevQty = isBranch
           ? Number(getLocationStockEntry(stockItem, targetLoc).quantity) || 0
           : Number(stockItem.quantity) || 0;
         const newQty = Math.max(0, prevQty - qtyToReverse);
-        await updateStockQuantity(item.sku, newQty, targetLoc);
+        await updateStockQuantity(stockItem.sku, newQty, targetLoc);
       }
     }
   }

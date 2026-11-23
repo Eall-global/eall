@@ -63,9 +63,9 @@ const HEADER_ALIASES = {
   name: [
     "product name",
     "item name",
+    "item description",
     "product",
     "description",
-    "item description",
     "item",
     "model",
     "particulars",
@@ -77,9 +77,9 @@ const HEADER_ALIASES = {
   brand: ["brand", "make", "manufacturer", "oem", "vendor brand"],
   category: ["category", "department", "dept", "type", "group"],
   quantity: [
-    "qty",
-    "quantity",
     "inward qty",
+    "quantity",
+    "qty",
     "pcs",
     "pieces",
     "units",
@@ -88,39 +88,42 @@ const HEADER_ALIASES = {
     "delivered",
     "shipped",
   ],
-  unitCost: [
-    "unit cost",
-    "unit price",
-    "cost price",
-    "buy price",
-    "purchase price",
-    "rate",
-    "cost",
-    "price",
-    "net price",
-    "fob",
-    "unit rate",
+  // IMPORTANT: sellingPrice MUST be checked BEFORE unitCost so "Selling Price (AED)"
+  // is never swallowed by unitCost's generic "price" alias!
+  sellingPrice: [
+    "selling price",
+    "sell price",
+    "sale price",
+    "retail price",
+    "retail",
+    "mrp",
+    "rrp",
+    "list price",
   ],
   totalCost: [
     "total cost",
     "line total",
     "total amount",
     "total price",
-    "amount",
     "ext price",
     "extended price",
     "subtotal",
+    "amount",
     "value",
     "total",
   ],
-  sellingPrice: [
-    "selling price",
-    "sell price",
-    "retail price",
-    "retail",
-    "mrp",
-    "rrp",
-    "list price",
+  unitCost: [
+    "unit cost",
+    "unit price",
+    "cost price",
+    "buy price",
+    "purchase price",
+    "unit rate",
+    "net price",
+    "cost",
+    "rate",
+    "fob",
+    "price",
   ],
 };
 
@@ -582,7 +585,7 @@ export const extractLinesFromPdfBuffer = async (arrayBuffer) => {
 };
 
 /* ========================================================================= */
-/* 4. CATALOG MATCHING & INVOICE METADATA EXTRACTION                         */
+/* 4. STRICT CATALOG MATCHING + SMART IMAGE MATCHING & METADATA              */
 /* ========================================================================= */
 const normalizeKey = (s = "") =>
   String(s || "")
@@ -596,50 +599,167 @@ const tokenize = (s = "") =>
     .split(/\s+/)
     .filter((t) => t.length >= 2);
 
+const SPEC_NOISE_TOKENS = new Set([
+  "ds",
+  "ss",
+  "sl",
+  "wea",
+  "wea1",
+  "ssa",
+  "gcc",
+  "mea",
+  "eu",
+  "global",
+  "int",
+  "dual",
+  "sim",
+  "4g",
+  "5g",
+  "lte",
+  "mobile",
+  "devices",
+  "phone",
+]);
+
+const COLOR_TOKENS = new Set([
+  "black",
+  "charcoal",
+  "grey",
+  "gray",
+  "darkgrey",
+  "darkgray",
+  "blue",
+  "cyan",
+  "red",
+  "green",
+  "silver",
+  "white",
+  "gold",
+  "pink",
+  "purple",
+  "orange",
+  "yellow",
+  "titanium",
+  "burgundy",
+  "glacier",
+]);
+
+/**
+ * STRICT exact identity matcher:
+ * - If an explicit SKU is supplied in the sheet, ONLY match an exact SKU in catalog.
+ *   Never collapse regional/spec/color variants (e.g. NOKIA-106-WEA vs NOKIA-106-SSA)
+ *   into a generic catalog SKU.
+ * - If SKU is blank, ONLY match an exact normalized Product Name.
+ */
 export const matchItemToCatalog = (skuInput = "", nameInput = "", stock = []) => {
   const normSku = normalizeKey(skuInput);
   const normName = normalizeKey(nameInput);
 
-  // 1. Exact SKU match
   if (normSku) {
-    const exactSku = stock.find((s) => normalizeKey(s.sku) === normSku);
-    if (exactSku) return exactSku;
+    return stock.find((s) => normalizeKey(s.sku) === normSku) || null;
   }
 
-  // 2. Exact product name match
   if (normName) {
-    const exactName = stock.find((s) => normalizeKey(s.name) === normName);
-    if (exactName) return exactName;
-  }
-
-  // 3. Strong token similarity match (must match >= 75% of tokens & at least 2 tokens)
-  const queryTokens = tokenize(`${skuInput} ${nameInput}`);
-  if (queryTokens.length >= 2) {
-    let bestMatch = null;
-    let bestScore = 0;
-
-    for (const prod of stock) {
-      const prodTokens = new Set(tokenize(`${prod.sku} ${prod.name}`));
-      if (prodTokens.size === 0) continue;
-
-      let overlap = 0;
-      for (const qt of queryTokens) {
-        if (prodTokens.has(qt)) overlap++;
-      }
-      const recall = overlap / Math.min(queryTokens.length, prodTokens.size);
-      const precision = overlap / Math.max(queryTokens.length, prodTokens.size);
-      const score = recall * 0.65 + precision * 0.35;
-
-      if (overlap >= 2 && score >= 0.78 && score > bestScore) {
-        bestScore = score;
-        bestMatch = prod;
-      }
-    }
-
-    if (bestMatch) return bestMatch;
+    return stock.find((s) => normalizeKey(s.name) === normName) || null;
   }
 
   return null;
+};
+
+/**
+ * Smart similarity image matcher:
+ * Finds the closest product image from existing catalog listings based on
+ * brand, model number/tokens, and color hints — WITHOUT ever altering the
+ * uploaded SKU, Product Name, Brand, or Specs.
+ */
+export const findBestImageMatch = (
+  skuInput = "",
+  nameInput = "",
+  brandInput = "",
+  stock = []
+) => {
+  const queryTokens = tokenize(`${brandInput} ${nameInput} ${skuInput}`).filter(
+    (t) => !SPEC_NOISE_TOKENS.has(t) && !/^ta\d{3,4}$/i.test(t)
+  );
+  if (queryTokens.length === 0) return "/logo.png";
+
+  const querySet = new Set(queryTokens);
+  const queryNumbers = queryTokens.filter((t) => /^\d{2,4}[a-z]?$/.test(t));
+  const queryColors = queryTokens.filter((t) => COLOR_TOKENS.has(t));
+  const normBrand = String(brandInput || "").trim().toLowerCase();
+
+  let bestImage = "/logo.png";
+  let bestScore = 0;
+
+  for (const prod of stock) {
+    const img = prod.image;
+    if (!img || img === "/logo.png") continue;
+
+    const prodTokens = tokenize(`${prod.brand} ${prod.name} ${prod.sku}`);
+    const prodSet = new Set(prodTokens);
+    if (prodSet.size === 0) continue;
+
+    let score = 0;
+
+    // Brand match boost
+    const prodBrand = String(prod.brand || "").trim().toLowerCase();
+    if (normBrand && prodBrand && normBrand === prodBrand) {
+      score += 2.5;
+    }
+
+    // Core model number match (e.g. "100", "102", "105", "106", "110", "125", "130", "150")
+    let modelNumberHits = 0;
+    for (const numTok of queryNumbers) {
+      if (prodSet.has(numTok)) {
+        score += 4;
+        modelNumberHits++;
+      }
+    }
+
+    // General meaningful token overlap (e.g. "music", "power", "pro", "max", "classic")
+    let tokenHits = 0;
+    for (const qt of querySet) {
+      if (prodSet.has(qt)) {
+        tokenHits++;
+        if (!COLOR_TOKENS.has(qt) && !/^\d+$/.test(qt)) {
+          score += 1.8;
+        }
+      }
+    }
+
+    // Color preference boost (e.g. Charcoal / Blue / Grey / Black)
+    for (const col of queryColors) {
+      if (
+        prodSet.has(col) ||
+        ((col === "darkgrey" || col === "darkgray") &&
+          (prodSet.has("grey") || prodSet.has("gray") || prodSet.has("charcoal"))) ||
+        (col === "grey" && prodSet.has("gray"))
+      ) {
+        score += 1.5;
+      }
+    }
+
+    // Penalize conflicting model numbers (e.g. don't match Nokia 105 image to Nokia 125)
+    const prodNumbers = prodTokens.filter((t) => /^\d{2,4}[a-z]?$/.test(t));
+    if (
+      queryNumbers.length > 0 &&
+      prodNumbers.length > 0 &&
+      modelNumberHits === 0
+    ) {
+      continue;
+    }
+
+    // Require meaningful overlap (at least brand + model number, or >= 2 matching tokens)
+    const isValidMatch =
+      (modelNumberHits >= 1 && tokenHits >= 2) || tokenHits >= 3;
+
+    if (isValidMatch && score > bestScore) {
+      bestScore = score;
+      bestImage = img;
+    }
+  }
+
+  return bestImage;
 };
 
 const extractMetadataFromText = (text = "") => {
@@ -811,23 +931,30 @@ export const extractPurchaseFromGrid = (grid = [], stock = []) => {
     }
     if (Number.isNaN(safeUnitCost)) safeUnitCost = 0;
 
-    // Match against catalog stock
+    // STRICT exact catalog match for SKU/Name; smart similarity ONLY for image inheritance!
     const catalogMatch = matchItemToCatalog(rawSku, rawName, stock);
-    const finalName = catalogMatch ? catalogMatch.name : rawName || rawSku;
-    const finalBrand = catalogMatch
-      ? catalogMatch.brand
-      : rawBrand || inferBrandFromName(finalName);
-    const finalCategory = catalogMatch
-      ? catalogMatch.category
-      : rawCategory || inferCategoryFromName(finalName);
+    const finalName = rawName || catalogMatch?.name || rawSku;
+    const finalBrand =
+      rawBrand || catalogMatch?.brand || inferBrandFromName(finalName);
+    const finalCategory =
+      rawCategory || catalogMatch?.category || inferCategoryFromName(finalName);
     const finalSku = catalogMatch
       ? catalogMatch.sku
       : (rawSku || generateCleanSku(finalName, finalBrand, parsedItems.length + 1)).toUpperCase();
+
+    const resolvedImage =
+      catalogMatch?.image ||
+      findBestImageMatch(finalSku, finalName, finalBrand, stock);
 
     const unitCostFinal =
       safeUnitCost > 0
         ? Number(safeUnitCost.toFixed(2))
         : Number(catalogMatch?.costPrice || 0);
+
+    const sellingPriceFinal =
+      Number.isFinite(sellingPrice) && sellingPrice > 0
+        ? Number(sellingPrice.toFixed(2))
+        : Number(catalogMatch?.price || 0);
 
     parsedItems.push({
       rowId: `imp_${r}_${finalSku}_${parsedItems.length}`,
@@ -837,13 +964,11 @@ export const extractPurchaseFromGrid = (grid = [], stock = []) => {
       name: finalName,
       brand: finalBrand,
       category: finalCategory,
-      image: catalogMatch?.image || "/logo.png",
+      image: resolvedImage,
+      imageMatched: !catalogMatch && resolvedImage !== "/logo.png",
       quantity: safeQty,
       unitCost: unitCostFinal,
-      sellingPrice:
-        Number.isFinite(sellingPrice) && sellingPrice > 0
-          ? Number(sellingPrice.toFixed(2))
-          : Number(catalogMatch?.price || 0),
+      sellingPrice: sellingPriceFinal,
       totalCost: Number((safeQty * unitCostFinal).toFixed(2)),
     });
   }
