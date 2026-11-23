@@ -231,6 +231,14 @@ const BillingPOS = ({
         (s.brand || "").toLowerCase().includes(q)
       );
     });
+    matched.sort((a, b) => {
+      const aExactImei = imeiMatch && a.sku === imeiMatch.sku ? 1 : 0;
+      const bExactImei = imeiMatch && b.sku === imeiMatch.sku ? 1 : 0;
+      if (bExactImei !== aExactImei) return bExactImei - aExactImei;
+      const inStockDiff = (Number(b.quantity) > 0 ? 1 : 0) - (Number(a.quantity) > 0 ? 1 : 0);
+      if (inStockDiff !== 0) return inStockDiff;
+      return (Number(b.quantity) || 0) - (Number(a.quantity) || 0);
+    });
     return matched.slice(0, 8);
   }, [stock, searchQuery, inStockImeiLookup]);
 

@@ -57,6 +57,7 @@ const StockTable = ({
   const [brandFilter, setBrandFilter] = useState("All");
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All"); // All | in-stock | low-stock | out-of-stock
+  const [sortBy, setSortBy] = useState("in-stock-first");
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
 
@@ -78,7 +79,7 @@ const StockTable = ({
 
   // Pagination State & Ref (keyed to filters to avoid useEffect setState)
   const itemsPerPage = 10;
-  const filterKey = `${search}|${brandFilter}|${categoryFilter}|${statusFilter}`;
+  const filterKey = `${search}|${brandFilter}|${categoryFilter}|${statusFilter}|${sortBy}`;
   const [pageState, setPageState] = useState({ key: filterKey, page: 1 });
   const currentPage = pageState.key === filterKey ? pageState.page : 1;
   const setCurrentPage = (p) => setPageState({ key: filterKey, page: p });
@@ -113,14 +114,21 @@ const StockTable = ({
   };
 
   const brands = useMemo(() => {
-    const list = Array.from(
-      new Set(
-        stock
-          .map((s) => (s.brand ? String(s.brand).trim() : ""))
-          .filter(Boolean)
-      )
-    );
-    return list.sort((a, b) => a.localeCompare(b));
+    const byLower = new Map();
+    for (const s of stock) {
+      const clean = s.brand ? String(s.brand).trim() : "";
+      if (!clean) continue;
+      const key = clean.toLowerCase();
+      // Prefer mixed-case canonical brand (e.g. "Nokia" over "NOKIA") when both exist
+      if (
+        !byLower.has(key) ||
+        (byLower.get(key) === byLower.get(key).toUpperCase() &&
+          clean !== clean.toUpperCase())
+      ) {
+        byLower.set(key, clean);
+      }
+    }
+    return Array.from(byLower.values()).sort((a, b) => a.localeCompare(b));
   }, [stock]);
 
   const categories = useMemo(() => {
@@ -135,7 +143,7 @@ const StockTable = ({
   }, [stock]);
 
   const filteredStock = useMemo(() => {
-    return stock.filter((item) => {
+    const filtered = stock.filter((item) => {
       const itemBrand = (item.brand || "").trim();
       const itemCategory = (item.category || "").trim();
       const targetBrand = brandFilter.trim();
@@ -179,7 +187,54 @@ const StockTable = ({
 
       return true;
     });
-  }, [stock, search, brandFilter, categoryFilter, statusFilter]);
+
+    const alphaCompare = (a, b) =>
+      String(a.brand || "").localeCompare(String(b.brand || "")) ||
+      String(a.name || "").localeCompare(String(b.name || ""));
+
+    return [...filtered].sort((a, b) => {
+      const qtyA = Number(a.quantity) || 0;
+      const qtyB = Number(b.quantity) || 0;
+
+      if (sortBy === "name-asc") {
+        return alphaCompare(a, b);
+      }
+      if (sortBy === "stock-desc") {
+        return qtyB - qtyA || alphaCompare(a, b);
+      }
+      if (sortBy === "stock-asc") {
+        return qtyA - qtyB || alphaCompare(a, b);
+      }
+      if (sortBy === "price-desc") {
+        return (Number(b.price) || 0) - (Number(a.price) || 0) || alphaCompare(a, b);
+      }
+      if (sortBy === "updated-desc") {
+        const tA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+        const tB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+        return tB - tA || alphaCompare(a, b);
+      }
+
+      // Default: "in-stock-first"
+      // 1) In-stock items at active warehouse first (highest stock qty on top)
+      const inStockDiff = (qtyB > 0 ? 1 : 0) - (qtyA > 0 ? 1 : 0);
+      if (inStockDiff !== 0) return inStockDiff;
+      if (qtyA > 0 && qtyB > 0) {
+        return qtyB - qtyA || alphaCompare(a, b);
+      }
+
+      // 2) For country branches where local qty === 0, show items with Tier-1 Hub Supply available next
+      const hubA = Number(a.supplyHubStock?.total) || 0;
+      const hubB = Number(b.supplyHubStock?.total) || 0;
+      const hubDiff = (hubB > 0 ? 1 : 0) - (hubA > 0 ? 1 : 0);
+      if (hubDiff !== 0) return hubDiff;
+      if (hubA > 0 && hubB > 0) {
+        return hubB - hubA || alphaCompare(a, b);
+      }
+
+      // 3) Out-of-stock everywhere -> alphabetical by brand & name
+      return alphaCompare(a, b);
+    });
+  }, [stock, search, brandFilter, categoryFilter, statusFilter, sortBy]);
 
   // Two-column unified Filter menu definition (Filter | Options)
   const filterSections = useMemo(() => {
@@ -190,6 +245,34 @@ const StockTable = ({
     const outOfStockCount = stock.filter((s) => s.quantity === 0).length;
 
     return [
+      {
+        id: "sort",
+        label: "Sort By",
+        value: sortBy,
+        defaultValue: "in-stock-first",
+        onChange: setSortBy,
+        options: [
+          { value: "in-stock-first", label: "In Stock First (Default)" },
+          { value: "stock-desc", label: "Stock: High → Low" },
+          { value: "stock-asc", label: "Stock: Low → High" },
+          { value: "name-asc", label: "Alphabetical (A → Z)" },
+          { value: "price-desc", label: "Selling Price: High → Low" },
+          { value: "updated-desc", label: "Recently Updated" },
+        ],
+      },
+      {
+        id: "status",
+        label: "Status",
+        value: statusFilter,
+        defaultValue: "All",
+        onChange: setStatusFilter,
+        options: [
+          { value: "All", label: "All Statuses", count: stock.length },
+          { value: "in-stock", label: "In Stock", count: inStockCount },
+          { value: "low-stock", label: "Low Stock", count: lowStockCount },
+          { value: "out-of-stock", label: "Out of Stock", count: outOfStockCount },
+        ],
+      },
       {
         id: "brand",
         label: "Brand",
@@ -224,26 +307,14 @@ const StockTable = ({
           })),
         ],
       },
-      {
-        id: "status",
-        label: "Status",
-        value: statusFilter,
-        defaultValue: "All",
-        onChange: setStatusFilter,
-        options: [
-          { value: "All", label: "All Statuses", count: stock.length },
-          { value: "in-stock", label: "In Stock", count: inStockCount },
-          { value: "low-stock", label: "Low Stock", count: lowStockCount },
-          { value: "out-of-stock", label: "Out of Stock", count: outOfStockCount },
-        ],
-      },
     ];
-  }, [stock, brands, categories, brandFilter, categoryFilter, statusFilter]);
+  }, [stock, brands, categories, brandFilter, categoryFilter, statusFilter, sortBy]);
 
   const handleResetFilters = () => {
     setBrandFilter("All");
     setCategoryFilter("All");
     setStatusFilter("All");
+    setSortBy("in-stock-first");
   };
 
   // Pagination Calculations

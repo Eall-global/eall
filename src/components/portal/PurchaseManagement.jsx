@@ -231,20 +231,25 @@ const PurchaseManagement = ({
     };
   }, [purchases]);
 
-  // Fast searchable catalog matches inside modal
+  // Fast searchable catalog matches inside modal (in-stock SKUs first)
   const catalogMatches = useMemo(() => {
     const q = catalogQuery.trim().toLowerCase();
-    const list = !q
-      ? stock.slice(0, 12)
-      : stock
-          .filter(
-            (s) =>
-              (s.name || "").toLowerCase().includes(q) ||
-              (s.sku || "").toLowerCase().includes(q) ||
-              (s.brand || "").toLowerCase().includes(q)
-          )
-          .slice(0, 14);
-    return list;
+    const filtered = !q
+      ? stock
+      : stock.filter(
+          (s) =>
+            (s.name || "").toLowerCase().includes(q) ||
+            (s.sku || "").toLowerCase().includes(q) ||
+            (s.brand || "").toLowerCase().includes(q)
+        );
+    return [...filtered]
+      .sort((a, b) => {
+        const inStockDiff =
+          (Number(b.quantity) > 0 ? 1 : 0) - (Number(a.quantity) > 0 ? 1 : 0);
+        if (inStockDiff !== 0) return inStockDiff;
+        return (Number(b.quantity) || 0) - (Number(a.quantity) || 0);
+      })
+      .slice(0, !q ? 12 : 14);
   }, [stock, catalogQuery]);
 
   // Reset & Open Modal helpers
