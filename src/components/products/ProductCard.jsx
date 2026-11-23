@@ -1,12 +1,15 @@
 import { Link } from "react-router-dom";
-import { FiHeart } from "react-icons/fi";
+import { FiHeart, FiCheck, FiShield } from "react-icons/fi";
 import { MdOutlineAddShoppingCart } from "react-icons/md";
 import { useState, useMemo } from "react";
 import { getColorSwatch } from "../../utils/getColorSwatch";
 import { useWishlist } from "../../context/WishlistContext";
 import { useCart } from "../../context/CartContext";
-import { AedSymbol, AedPrice } from "../common/AedSymbol";
+import { useCountryOptional } from "../../context/CountryContext";
+import { DEFAULT_LOCATIONS, convertAedToLocalPrice } from "../../config/locationsConfig";
+import { AedPrice } from "../common/AedSymbol";
 import { buildVariantSku } from "../../utils/productVariant";
+import { estimateCatalogRetailPrice } from "../../context/CatalogContext";
 
 // ⚡ Helper: Sanitize & format verbose raw specifications into compact, elegant micro-pills
 const formatShortSpec = (text) => {
@@ -67,15 +70,10 @@ const formatShortSpec = (text) => {
 const ProductCard = ({ product }) => {
   const { isWishlisted, toggleWishlist } = useWishlist();
   const { addToCart } = useCart();
-
-  const availabilityBadgeText = product.availabilityBadge || product.availability || "Available on Request";
-  const availabilityClass = product.availabilityClass || (
-    product.availability === "In Stock"
-      ? "bg-green-100 text-green-700"
-      : product.availability === "Limited Stock"
-        ? "bg-yellow-100 text-yellow-700"
-        : "bg-blue-100 text-blue-700"
-  );
+  const countryCtx = useCountryOptional();
+  const activeCountry = countryCtx?.activeCountry || DEFAULT_LOCATIONS[0];
+  const countryPath = countryCtx?.countryPath || ((p) => p);
+  const [justAdded, setJustAdded] = useState(false);
 
   const defaultVariant =
     product.variants?.find((v) => v.isDefault) ?? product.variants?.[0];
@@ -90,12 +88,52 @@ const ProductCard = ({ product }) => {
         : product.storageOptions[0]
       : null);
 
+  const sellingPrice = useMemo(() => {
+    const raw =
+      product.livePrice !== undefined && Number(product.livePrice) > 0
+        ? Number(product.livePrice)
+        : Number(product.price) > 0
+        ? Number(product.price)
+        : startingStorage && Number(product.storagePricing?.[startingStorage]) > 0
+        ? Number(product.storagePricing[startingStorage])
+        : 0;
+    if (raw > 0) return raw;
+    return convertAedToLocalPrice(estimateCatalogRetailPrice(product), activeCountry, 0);
+  }, [product, startingStorage, activeCountry]);
+
+  const originalPrice = Number(product.originalPrice || 0);
+  const hasDiscount = originalPrice > sellingPrice && sellingPrice > 0;
+  const discountPct = hasDiscount
+    ? Math.round(((originalPrice - sellingPrice) / originalPrice) * 100)
+    : 0;
+  const hasStorageTiers =
+    (product.storageOptions && product.storageOptions.length > 0) ||
+    Boolean(product.storagePricing);
+  const isFromPrice = product.startingFromPrice === true || hasStorageTiers;
+
   const wishlisted = isWishlisted(product.slug || product.id);
 
   const handleWishlistClick = (e) => {
     e.preventDefault();
     e.stopPropagation();
     toggleWishlist(product);
+  };
+
+  const handleQuickAdd = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const targetSku = previewVariant
+      ? buildVariantSku(product.sku, previewVariant.colorSlug, startingStorage)
+      : product.sku;
+    addToCart(product, 1, {
+      color: previewVariant?.color || "",
+      storage: startingStorage || "",
+      sku: targetSku,
+      price: sellingPrice,
+      openDrawer: true,
+    });
+    setJustAdded(true);
+    window.setTimeout(() => setJustAdded(false), 1800);
   };
 
   // Up to 5 color swatches in preview
@@ -157,77 +195,99 @@ const ProductCard = ({ product }) => {
   }, [product]);
 
   return (
-    <Link to={`/products/${product.slug}`} className="block group h-full text-left">
-      <article className="group bg-white rounded-2xl border border-slate-200 hover:border-sky-300 hover:shadow-xl transition-all duration-300 h-full flex flex-col overflow-hidden cursor-pointer relative">
-
-        {/* 📸 PURE WHITE IMAGE CONTAINER WITH STRICT BOUNDS */}
-        <div className="relative bg-white h-44 sm:h-52 md:h-56 w-full flex items-center justify-center overflow-hidden">
-          <div className="w-full h-full flex items-center justify-center p-3 sm:p-4">
+    <Link to={countryPath(`/products/${product.slug}`)} className="block group h-full text-left">
+      <article className="group bg-white rounded-2xl border border-slate-200/90 hover:border-sky-300 hover:shadow-xl transition-all duration-300 h-full flex flex-col overflow-hidden cursor-pointer relative">
+        {/* STUDIO PRODUCT IMAGE CONTAINER */}
+        <div className="relative bg-slate-50/60 group-hover:bg-white border-b border-slate-100 h-40 sm:h-48 md:h-52 w-full flex items-center justify-center overflow-hidden transition-colors">
+          <div className="w-full h-full flex items-center justify-center px-3 pt-7 pb-7 sm:p-4">
             <img
               src={previewVariant?.image || product.image}
               alt={product.name}
-              className="max-h-28 sm:max-h-36 md:max-h-40 max-w-[80%] sm:max-w-[75%] w-auto h-auto object-contain transition-transform duration-500 group-hover:scale-105"
+              className="max-h-24 sm:max-h-34 md:max-h-38 max-w-[76%] sm:max-w-[78%] w-auto h-auto object-contain mix-blend-multiply transition-transform duration-500 group-hover:scale-106"
               onError={(e) => {
                 e.target.src = "/logo.png";
               }}
             />
           </div>
 
-          {/* NEW BADGE (Top-Left) */}
-          {product.isNewArrival && (
-            <span className="absolute top-0 left-0 bg-sky-700/15 text-sky-800 text-xs font-bold px-3 py-1.5 rounded-br-xl z-10">
-              NEW
-            </span>
-          )}
+          {/* TOP-LEFT MERCHANDISING BADGE */}
+          <div className="absolute top-2 left-2 sm:top-2.5 sm:left-2.5 flex flex-col gap-1 z-10">
+            {hasDiscount && discountPct > 0 ? (
+              <span className="bg-emerald-600 text-white text-[9.5px] sm:text-[10px] font-extrabold px-1.5 sm:px-2 py-0.5 rounded-md sm:rounded-lg shadow-2xs leading-tight">
+                Save {discountPct}%
+              </span>
+            ) : product.isNewArrival ? (
+              <span className="bg-sky-700 text-white text-[9.5px] sm:text-[10px] font-extrabold px-1.5 sm:px-2 py-0.5 rounded-md sm:rounded-lg shadow-2xs leading-tight">
+                NEW
+              </span>
+            ) : null}
+          </div>
 
-          {/* ❤️ WISHLIST / FAVORITE BUTTON (Top-Right) */}
+          {/* TOP-RIGHT WISHLIST HEART BUTTON */}
           <button
             type="button"
             onClick={handleWishlistClick}
-            className={`
-              absolute top-2.5 right-2.5 p-1.5 rounded-full transition-all duration-200 cursor-pointer z-10
-              ${wishlisted
-                ? "bg-rose-50 text-rose-600 scale-110"
-                : "text-slate-400 hover:text-rose-500 hover:bg-slate-50"
-              }
-            `}
+            className={`absolute top-2 right-2 sm:top-2.5 sm:right-2.5 w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer z-10 border ${
+              wishlisted
+                ? "bg-rose-50 border-rose-200 text-rose-600 scale-105"
+                : "bg-white/90 border-slate-200/80 text-slate-400 hover:text-rose-500 hover:border-rose-200 shadow-2xs"
+            }`}
             title={wishlisted ? "Remove from Wishlist" : "Add to Wishlist"}
           >
-            <FiHeart className={`text-base sm:text-lg ${wishlisted ? "fill-rose-600" : ""}`} />
+            <FiHeart className={`text-xs sm:text-sm ${wishlisted ? "fill-rose-600" : ""}`} />
           </button>
 
-          {/* 🏷️ FULL-WIDTH AVAILABILITY STRIP (Pinned at bottom of top half) */}
-          <div
-            className={`
-              absolute bottom-0 left-0 right-0 w-full text-center text-[10px] sm:text-xs font-semibold py-1.5 z-10
-              ${availabilityClass}
-            `}
-          >
-            {availabilityBadgeText}
+          {/* BOTTOM SINGLE-LINE WARRANTY & STORAGE ROW (Never wraps onto 2 lines) */}
+          <div className="absolute bottom-1.5 left-2 right-2 sm:bottom-2 sm:left-2.5 sm:right-2.5 flex items-center justify-between gap-1 pointer-events-none z-10">
+            {product.isLowStock ? (
+              <span className="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-md text-[9px] sm:text-[9.5px] font-bold bg-amber-50/95 text-amber-800 border border-amber-200/80 whitespace-nowrap leading-none">
+                ● {product.availabilityBadge || "Low Stock"}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-md text-[9px] sm:text-[9.5px] font-semibold bg-white/95 text-slate-600 border border-slate-200/80 whitespace-nowrap leading-none">
+                <FiShield className="text-emerald-600 text-[9.5px] shrink-0" />
+                <span className="sm:hidden">12M Warranty</span>
+                <span className="hidden sm:inline">Official Warranty</span>
+              </span>
+            )}
+
+            {startingStorage && (
+              <span className="inline-flex items-center text-[9px] sm:text-[9.5px] font-bold text-sky-800 bg-sky-50/95 border border-sky-200/80 px-1.5 py-0.5 rounded-md whitespace-nowrap shrink-0 leading-none">
+                {startingStorage}
+              </span>
+            )}
           </div>
         </div>
 
-        {/* 🏷️ CONTENT DETAILS */}
-        <div className="p-4 sm:p-5 flex flex-col flex-1 bg-white justify-between">
+        {/* CONTENT DETAILS (Aligned baseline across 2-col mobile & 6-col desktop grids) */}
+        <div className="p-2.5 sm:p-3.5 md:p-4 flex flex-col flex-1 bg-white justify-between">
           <div>
             {/* Brand Header */}
-            <p className="text-[10px] sm:text-xs uppercase tracking-wider text-sky-700 font-extrabold">
-              {product.brand}
-            </p>
+            <div className="flex items-center justify-between gap-1.5">
+              <p className="text-[9.5px] sm:text-[10px] uppercase tracking-wider text-sky-700 font-extrabold truncate">
+                {product.brand}
+              </p>
+              {product.subCategory && (
+                <span className="hidden sm:inline text-[9.5px] text-slate-400 font-medium truncate">
+                  {product.subCategory}
+                </span>
+              )}
+            </div>
 
-            {/* Product Name (Full Name with 2-line clamp) */}
-            <h3 className="mt-1 text-sm sm:text-base font-bold text-slate-900 line-clamp-2 leading-snug min-h-[2.4rem]">
+            {/* Product Name — Fixed 2-line height for strict horizontal alignment */}
+            <h3 className="mt-0.5 text-[12px] sm:text-[13px] font-bold text-slate-900 group-hover:text-sky-700 line-clamp-2 leading-[1.3] h-[2.05rem] sm:h-[2.2rem] transition-colors">
               {product.name}
             </h3>
 
-            {/* ⚡ MICRO KEY SPECS / FEATURES (Strictly Max 2 Pills on Mobile, Never Overlaps) */}
+            {/* MICRO KEY SPECS — Single tidy horizontal row on mobile (no vertical pill stack) */}
             {keyFeatures.length > 0 && (
-              <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+              <div className="mt-1.5 flex items-center gap-1 flex-nowrap sm:flex-wrap overflow-hidden">
                 {keyFeatures.map((feat, idx) => (
                   <span
                     key={idx}
-                    className={`inline-flex items-center text-[9.5px] sm:text-[10px] font-semibold text-slate-600 bg-slate-50 border border-slate-200/80 px-2 py-0.5 rounded-md truncate max-w-27.5 sm:max-w-32 leading-none ${idx >= 2 ? "hidden sm:inline-flex" : ""
-                      }`}
+                    className={`inline-flex items-center text-[9px] sm:text-[9.5px] font-semibold text-slate-600 bg-slate-50 border border-slate-200/80 px-1.5 py-0.5 rounded-md whitespace-nowrap truncate max-w-[48%] sm:max-w-28 leading-none ${
+                      idx >= 2 ? "hidden sm:inline-flex" : ""
+                    }`}
                     title={feat}
                   >
                     {feat}
@@ -236,126 +296,102 @@ const ProductCard = ({ product }) => {
               </div>
             )}
 
-            {/* COLOR SWATCHES (Compact Single Row) */}
-            {product.variants?.length > 0 && (
-              <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
-                {visibleVariants.map((variant) => (
-                  <button
-                    key={variant.colorSlug || variant.color}
-                    type="button"
-                    onMouseEnter={() => setPreviewVariant(variant)}
-                    onMouseLeave={() => setPreviewVariant(defaultVariant)}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setPreviewVariant(variant);
-                    }}
-                    title={variant.color}
-                    className={`
-                      h-3.5 w-3.5 sm:h-4 sm:w-4 rounded-full border transition-all cursor-pointer
-                      ${previewVariant?.colorSlug === variant.colorSlug
-                        ? "border-sky-600 ring-2 ring-sky-400/30 scale-110"
-                        : "border-slate-300 hover:border-sky-500"
-                      }
-                    `}
-                    style={{
-                      backgroundColor: getColorSwatch(variant.color),
-                    }}
-                  />
-                ))}
+            {/* COLOR SWATCHES — Consistent reserved row height */}
+            <div className="mt-2 flex items-center gap-1.5 flex-wrap min-h-[16px]">
+              {product.variants?.length > 0 && (
+                <>
+                  {visibleVariants.map((variant) => (
+                    <button
+                      key={variant.colorSlug || variant.color}
+                      type="button"
+                      onMouseEnter={() => setPreviewVariant(variant)}
+                      onMouseLeave={() => setPreviewVariant(defaultVariant)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setPreviewVariant(variant);
+                      }}
+                      title={variant.color}
+                      className={`h-3 w-3 sm:h-3.5 sm:w-3.5 rounded-full border transition-all cursor-pointer ${
+                        previewVariant?.colorSlug === variant.colorSlug
+                          ? "border-sky-600 ring-2 ring-sky-400/30 scale-110"
+                          : "border-slate-300 hover:border-sky-500"
+                      }`}
+                      style={{
+                        backgroundColor: getColorSwatch(variant.color),
+                      }}
+                    />
+                  ))}
 
-                {extraCount > 0 && (
-                  <span className="text-[10px] font-medium text-slate-400 pl-0.5">
-                    +{extraCount}
-                  </span>
-                )}
-              </div>
-            )}
+                  {extraCount > 0 && (
+                    <span className="text-[9.5px] font-medium text-slate-400 pl-0.5">
+                      +{extraCount}
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
           </div>
 
-          {/* 🏷️ LIVE PRICE & BOTTOM ACTION CTA */}
-          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
-            <div className="flex flex-col">
-              {(() => {
-                const sellingPrice = product.livePrice !== undefined ? Number(product.livePrice) : (product.price || 0);
-                const originalPrice = Number(product.originalPrice || 0);
-                const hasDiscount = originalPrice > sellingPrice && sellingPrice > 0;
-                const discountPct = hasDiscount ? Math.round(((originalPrice - sellingPrice) / originalPrice) * 100) : 0;
-                const hasStorageTiers = (product.storageOptions && product.storageOptions.length > 0) || Boolean(product.storagePricing);
-                const isFromPrice = product.startingFromPrice === true || hasStorageTiers;
-
-                if (sellingPrice <= 0) {
-                  return (
-                    <span className="text-[10px] sm:text-xs font-semibold text-slate-400 italic">
-                      Price on Request
-                    </span>
-                  );
-                }
-
-                return (
-                  <>
-                    <div className="flex items-baseline gap-1.5 flex-wrap">
-                      {isFromPrice && (
-                        <span className="text-[9px] sm:text-[10px] font-semibold text-slate-400 uppercase tracking-wide self-end mb-0.5">
-                          From
-                        </span>
-                      )}
-                      <AedPrice
-                        amount={sellingPrice}
-                        className="text-xs sm:text-sm font-black text-sky-950"
-                        symbolClassName="text-sky-700"
-                      />
-                      {hasDiscount && (
-                        <AedPrice
-                          amount={originalPrice}
-                          className="text-[10px] sm:text-[11px] font-normal text-slate-400 line-through"
-                          symbolClassName="text-slate-400"
-                        />
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                      {hasDiscount && discountPct > 0 && (
-                        <span className="inline-block text-[9.5px] font-bold text-emerald-600 font-sans">
-                          Save {discountPct}%
-                        </span>
-                      )}
-                      {startingStorage && (
-                        <span
-                          className="inline-flex items-center text-[9px] font-bold text-sky-800 bg-sky-50 border border-sky-200/80 px-1.5 py-0.5 rounded leading-none"
-                          title={`Starting price is for ${startingStorage}`}
-                        >
-                          {startingStorage}
-                        </span>
-                      )}
-                    </div>
-                  </>
-                );
-              })()}
+          {/* LIVE PRICE & ADD TO CART CTA */}
+          <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-end justify-between gap-1.5">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-baseline gap-1 flex-wrap">
+                {isFromPrice && (
+                  <span className="text-[8.5px] sm:text-[9px] font-bold text-slate-400 uppercase tracking-wide">
+                    From
+                  </span>
+                )}
+                <AedPrice
+                  amount={sellingPrice}
+                  className="text-[13px] sm:text-[15px] font-black text-slate-900 font-mono leading-tight"
+                  symbolClassName="text-sky-700 text-[10px] sm:text-[11px]"
+                />
+                {hasDiscount && (
+                  <AedPrice
+                    amount={originalPrice}
+                    className="hidden sm:inline-flex text-[10px] font-normal text-slate-400 line-through"
+                    symbolClassName="text-slate-400"
+                  />
+                )}
+              </div>
+              {(activeCountry.paymentMethods?.includes("tabby") ||
+                activeCountry.paymentMethods?.includes("tamara")) &&
+              (product.basePriceAed || sellingPrice) >= 300 ? (
+                <p className="text-[9px] sm:text-[9.5px] text-slate-500 font-medium truncate mt-0.5">
+                  4× {activeCountry.currencySymbol}{" "}
+                  {Math.round(sellingPrice / 4).toLocaleString()} • 0%
+                </p>
+              ) : (
+                <p className="text-[9px] sm:text-[9.5px] text-emerald-700 font-semibold truncate mt-0.5">
+                  Express Delivery
+                </p>
+              )}
             </div>
 
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const targetSku = previewVariant
-                    ? buildVariantSku(product.sku, previewVariant.colorSlug, startingStorage)
-                    : product.sku;
-                  addToCart(product, 1, {
-                    color: previewVariant?.color || "",
-                    storage: startingStorage || "",
-                    sku: targetSku,
-                    openDrawer: true,
-                  });
-                }}
-                className="p-2 rounded-xl bg-sky-50/80 hover:bg-sky-700 text-sky-700 hover:text-white border border-sky-300 hover:border-sky-700 transition shadow-2xs cursor-pointer flex items-center gap-1 text-xs font-bold"
-                title="Add to Cart"
-              >
-                <MdOutlineAddShoppingCart className="text-base" />
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleQuickAdd}
+              className={`h-8 w-8 sm:h-auto sm:w-auto sm:px-2.5 sm:py-2 rounded-lg sm:rounded-xl text-[11px] font-extrabold transition shadow-2xs cursor-pointer inline-flex items-center justify-center gap-1 shrink-0 ${
+                justAdded
+                  ? "bg-emerald-600 text-white"
+                  : "bg-slate-900 hover:bg-sky-700 text-white"
+              }`}
+              title="Add to Cart"
+              aria-label="Add to Cart"
+            >
+              {justAdded ? (
+                <>
+                  <FiCheck className="text-xs" />
+                  <span className="hidden sm:inline">Added</span>
+                </>
+              ) : (
+                <>
+                  <MdOutlineAddShoppingCart className="text-sm" />
+                  <span className="hidden sm:inline">Add</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
       </article>

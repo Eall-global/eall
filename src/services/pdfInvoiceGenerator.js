@@ -9,6 +9,15 @@ export const buildInvoicePDF = (rawInvoice) => {
   if (!rawInvoice) return null;
 
   // Safe normalization across POS invoices and Online Checkout orders
+  const curCode = rawInvoice.currency || "AED";
+  const curDecimals =
+    curCode === "KES" || curCode === "XOF" || curCode === "UGX" ? 0 : 2;
+  const fmtCur = (val) =>
+    `${curCode} ${Number(val || 0).toLocaleString("en-US", {
+      minimumFractionDigits: curDecimals,
+      maximumFractionDigits: curDecimals,
+    })}`;
+
   const invoice = {
     invoiceNo: rawInvoice.invoiceNo || rawInvoice.orderId || rawInvoice.id || "INV-001",
     customerName: rawInvoice.customerName || rawInvoice.fullName || "Customer",
@@ -107,7 +116,7 @@ export const buildInvoicePDF = (rawInvoice) => {
   doc.text(`Date: ${invoiceDate}   |   Time: ${invoiceTime}`, rightX, rightHeaderY + 16.5, { align: "right" });
   doc.text(
     `Issued By: ${invoice.createdBy}   |   Payment: ${invoice.paymentMethod}` +
-      (invoice.paymentReference ? ` (Ref: ${invoice.paymentReference})` : ""),
+    (invoice.paymentReference ? ` (Ref: ${invoice.paymentReference})` : ""),
     rightX,
     rightHeaderY + 20.5,
     { align: "right" }
@@ -181,8 +190,8 @@ export const buildInvoicePDF = (rawInvoice) => {
     index + 1,
     item.sku,
     item.name +
-      (item.brand ? ` (${item.brand})` : "") +
-      (item.serials?.length ? `\nIMEI/SN: ${item.serials.join(", ")}` : ""),
+    (item.brand ? ` (${item.brand})` : "") +
+    (item.serials?.length ? `\nIMEI/SN: ${item.serials.join(", ")}` : ""),
     item.quantity,
     item.unitPrice.toLocaleString("en-AE", { minimumFractionDigits: 2 }),
     item.total.toLocaleString("en-AE", { minimumFractionDigits: 2 }),
@@ -191,7 +200,7 @@ export const buildInvoicePDF = (rawInvoice) => {
   autoTable(doc, {
     startY: 44 + customerBoxHeight + 3,
     margin: { left: margin, right: margin },
-    head: [["#", "SKU Code", "Item & Description", "Qty", "Unit Price (AED)", "Total (AED)"]],
+    head: [["#", "SKU Code", "Item & Description", "Qty", `Unit Price (${curCode})`, `Total (${curCode})`]],
     body: tableRows,
     theme: "plain",
     headStyles: {
@@ -251,7 +260,7 @@ export const buildInvoicePDF = (rawInvoice) => {
   // Subtotal
   doc.text("Subtotal:", totalsX, finalY + 3);
   doc.setFont("courier", "bold");
-  doc.text(`AED ${invoice.subtotal.toLocaleString("en-AE", { minimumFractionDigits: 2 })}`, rightX, finalY + 3, { align: "right" });
+  doc.text(fmtCur(invoice.subtotal), rightX, finalY + 3, { align: "right" });
 
   let curY = finalY + 7;
 
@@ -261,16 +270,16 @@ export const buildInvoicePDF = (rawInvoice) => {
     doc.setTextColor(225, 29, 72); // Rose 600
     doc.text("Discount:", totalsX, curY);
     doc.setFont("courier", "bold");
-    doc.text(`- AED ${invoice.discount.toLocaleString("en-AE", { minimumFractionDigits: 2 })}`, rightX, curY, { align: "right" });
+    doc.text(`- ${fmtCur(invoice.discount)}`, rightX, curY, { align: "right" });
     curY += 4.5;
   }
 
-  // VAT (5%)
+  // VAT
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...slateText);
-  doc.text(`UAE VAT (${invoice.vatRate}%):`, totalsX, curY);
+  doc.text(`VAT (${invoice.vatRate}%):`, totalsX, curY);
   doc.setFont("courier", "bold");
-  doc.text(`AED ${invoice.vatAmount.toLocaleString("en-AE", { minimumFractionDigits: 2 })}`, rightX, curY, { align: "right" });
+  doc.text(fmtCur(invoice.vatAmount), rightX, curY, { align: "right" });
   curY += 5.5;
 
   // Grand Total Box
@@ -282,7 +291,7 @@ export const buildInvoicePDF = (rawInvoice) => {
   doc.text("Grand Total:", totalsX + 2, curY + 3.8);
   doc.setFont("courier", "bold");
   doc.setFontSize(9.5);
-  doc.text(`AED ${invoice.totalAmount.toLocaleString("en-AE", { minimumFractionDigits: 2 })}`, rightX - 2, curY + 3.8, { align: "right" });
+  doc.text(fmtCur(invoice.totalAmount), rightX - 2, curY + 3.8, { align: "right" });
 
   // 6. BOTTOM SIGNATURE LINES
   const bottomY = Math.max(curY + 22, 258);

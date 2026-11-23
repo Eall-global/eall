@@ -7,7 +7,11 @@ import {
   setDoc,
   deleteDoc,
 } from "../lib/firebaseClient";
-import { fetchStock, updateStockQuantity } from "./stockService";
+import {
+  fetchStock,
+  updateStockQuantity,
+  getLocationStockEntry,
+} from "./stockService";
 import { logAuditEvent } from "./auditService";
 import { markImeisSoldForInvoice } from "./warrantyService";
 
@@ -75,6 +79,12 @@ export const fetchInvoices = async () => {
             totalAmount: Number(inv.totalAmount) || 0,
             createdBy: inv.createdBy || "Staff",
             role: inv.role || "Salesperson",
+            countryCode: inv.countryCode || "AE",
+            currency: inv.currency || "AED",
+            currencySymbol: inv.currencySymbol || inv.currency || "AED",
+            hubName: inv.hubName || "Dubai Main Hub (HQ)",
+            legalEntityName: inv.legalEntityName || "Electronics All FZCO",
+            legalTaxId: inv.legalTaxId || "",
             notes: inv.notes || "",
             createdAt: inv.createdAt || new Date().toISOString(),
             updatedAt: inv.updatedAt || null,
@@ -115,12 +125,20 @@ export const createInvoice = async ({
   notes = "",
   createdBy = "Salesperson",
   role = "sales",
+  countryCode = "AE",
+  currency = "AED",
+  currencySymbol = "AED",
+  hubName = "Dubai Main Hub (HQ)",
+  legalEntityName = "Electronics All FZCO",
+  legalTaxId = "",
 }) => {
   if (!items || items.length === 0) {
     throw new Error("Invoice must contain at least one product item");
   }
 
-  // 1. Verify stock availability
+  const locCode = String(countryCode || "AE").toUpperCase();
+
+  // 1. Verify LOCAL stock availability at this branch/country
   const currentStock = await fetchStock();
   const stockMap = new Map(currentStock.map((s) => [s.sku, s]));
 
@@ -129,9 +147,10 @@ export const createInvoice = async ({
     if (!stockItem) {
       throw new Error(`Product ${item.name} (${item.sku}) is not in inventory`);
     }
-    if (stockItem.quantity < item.quantity) {
+    const locQty = getLocationStockEntry(stockItem, locCode).quantity;
+    if (locQty < item.quantity) {
       throw new Error(
-        `Insufficient stock for "${item.name}". Requested: ${item.quantity}, Available: ${stockItem.quantity}`
+        `Insufficient [${locCode}] local stock for "${item.name}". Requested: ${item.quantity}, Local On-Hand: ${locQty}`
       );
     }
   }
@@ -181,15 +200,21 @@ export const createInvoice = async ({
     totalAmount,
     createdBy,
     role,
+    countryCode: locCode,
+    currency: String(currency || "AED").toUpperCase(),
+    currencySymbol: currencySymbol || currency || "AED",
+    hubName,
+    legalEntityName,
+    legalTaxId,
     notes: notes.trim(),
     createdAt: now,
   };
 
-  // 4. Deduct stock for all items
+  // 4. Deduct LOCAL branch stock for all items
   for (const item of normalizedItems) {
-    const currentQty = stockMap.get(item.sku)?.quantity || 0;
-    const newQty = Math.max(0, currentQty - item.quantity);
-    await updateStockQuantity(item.sku, newQty);
+    const currentLocQty = getLocationStockEntry(stockMap.get(item.sku), locCode).quantity;
+    const newQty = Math.max(0, currentLocQty - item.quantity);
+    await updateStockQuantity(item.sku, newQty, locCode);
   }
 
   // 4b. Activate warranty & mark bound IMEI / Serial units as Sold

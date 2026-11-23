@@ -108,9 +108,9 @@ const ProductGridBreaker = () => {
       badgeIcon: SiApple,
       badgeText: "Official Apple Hardware & Accessories",
       badgeColor: "bg-white/10 text-white border-white/20",
-      title: "Official Apple iPhone 16 Pro, iPad & AirPods",
+      title: "Official Apple iPhone 18 Pro Max, iPad & AirPods",
       description:
-        "Experience the power of A18 Pro silicon, aerospace titanium design, and official international Apple warranty on every unit.",
+        "Experience the power of A20 Pro 2nm silicon, variable-aperture camera design, and official Apple warranty on every unit.",
       primaryCtaText: "Explore Apple Products",
       primaryCtaLink: "/brands/apple",
       primaryBtnClass: "bg-sky-600 hover:bg-sky-500 text-white font-bold",

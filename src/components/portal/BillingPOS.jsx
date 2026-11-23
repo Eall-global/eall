@@ -24,6 +24,7 @@ import {
   FiUserCheck,
   FiZap,
   FiHash,
+  FiRepeat,
 } from "react-icons/fi";
 import { createInvoice } from "../../services/billingService";
 import {
@@ -64,9 +65,21 @@ const BillingPOS = ({
   onContactsUpdated,
   prefillCustomer = null,
   onClearPrefill,
+  activeLocationCode = "AE",
+  activeLocationConfig = null,
+  onRequestTransfer,
 }) => {
   const { currentUser, members, role, isAdmin } = useStaffAuth();
   const searchInputRef = useRef(null);
+  const posLocCode = activeLocationCode === "ALL" ? "AE" : activeLocationCode;
+  const posCurrency = activeLocationConfig?.currency || "AED";
+  const posCurrencySymbol = activeLocationConfig?.currencySymbol || posCurrency;
+  const posLocale = activeLocationConfig?.locale || "en-AE";
+  const posDecimals = Number.isFinite(Number(activeLocationConfig?.decimals))
+    ? Number(activeLocationConfig.decimals)
+    : 2;
+  const posShortName = activeLocationConfig?.shortName || "UAE";
+  const posDefaultVat = Number(activeLocationConfig?.vatRate ?? 5);
 
   // Product Search & Quick Shelf
   const [searchQuery, setSearchQuery] = useState("");
@@ -120,8 +133,8 @@ const BillingPOS = ({
   const [couponInput, setCouponInput] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponFeedback, setCouponFeedback] = useState("");
-  const [applyVat, setApplyVat] = useState(true);
-  const vatRate = applyVat ? 5 : 0;
+  const [applyVat, setApplyVat] = useState(posDefaultVat > 0);
+  const vatRate = applyVat ? posDefaultVat : 0;
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -483,7 +496,7 @@ const BillingPOS = ({
     }
     if (Number(match.minOrderAmount || 0) > subtotal) {
       setCouponFeedback(
-        `Minimum order AED ${Number(match.minOrderAmount).toLocaleString()} required.`
+        `Minimum order ${posCurrencySymbol} ${Number(match.minOrderAmount).toLocaleString(posLocale)} required.`
       );
       return;
     }
@@ -639,6 +652,12 @@ const BillingPOS = ({
         notes,
         createdBy: salespersonName || currentUser?.name || "Sales Executive",
         role: role || "sales",
+        countryCode: posLocCode,
+        currency: posCurrency,
+        currencySymbol: posCurrencySymbol,
+        hubName: activeLocationConfig?.hubName || "Dubai Main Hub (HQ)",
+        legalEntityName: activeLocationConfig?.legalEntityName || "Electronics All FZCO",
+        legalTaxId: activeLocationConfig?.legalTaxId || "",
       });
 
       // Reset POS terminal cleanly
@@ -739,24 +758,29 @@ const BillingPOS = ({
 
             {/* Autocomplete Dropdown */}
             {searchResults.length > 0 && (
-              <div className="divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl max-h-64 overflow-y-auto bg-white dark:bg-slate-900 shadow-lg">
+              <div className="divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl max-h-72 overflow-y-auto bg-white dark:bg-slate-900 shadow-lg">
                 {searchResults.map((prod) => {
                   const isOutOfStock = prod.quantity <= 0;
                   const trackedImeis = inStockImeisBySku.get(prod.sku)?.length || 0;
+                  const hubStock = prod.supplyHubStock;
 
                   return (
-                    <button
+                    <div
                       key={prod.sku}
-                      type="button"
-                      disabled={isOutOfStock}
-                      onClick={() => handleAddItem(prod)}
-                      className="w-full flex items-center justify-between p-3 text-left hover:bg-sky-50/70 dark:hover:bg-slate-800/80 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+                      onClick={() => {
+                        if (!isOutOfStock) handleAddItem(prod);
+                      }}
+                      className={`w-full flex items-center justify-between p-3 text-left transition ${
+                        isOutOfStock
+                          ? "bg-slate-50/70 dark:bg-slate-900/60"
+                          : "hover:bg-sky-50/70 dark:hover:bg-slate-800/80 cursor-pointer"
+                      }`}
                     >
                       <div className="min-w-0 flex-1 pr-3">
-                        <p className="font-semibold text-slate-900 dark:text-white text-xs sm:text-sm truncate">
+                        <p className={`font-semibold text-xs sm:text-sm truncate ${isOutOfStock ? "text-slate-500 dark:text-slate-400" : "text-slate-900 dark:text-white"}`}>
                           {prod.name}
                         </p>
-                        <div className="flex items-center gap-2 mt-0.5">
+                        <div className="flex flex-wrap items-center gap-2 mt-0.5">
                           <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500">
                             {prod.sku} • {prod.brand}
                           </span>
@@ -765,26 +789,48 @@ const BillingPOS = ({
                               {trackedImeis} IMEI
                             </span>
                           )}
+                          {/* Read-Only Hub Stock Available Badge for Country POS */}
+                          {posLocCode !== "AE" && hubStock && (
+                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-200/70 dark:border-indigo-500/30">
+                              Hub Stock: 🇦🇪 AE {hubStock.AE} · 🇨🇳 CN {hubStock.CN} · 🇭🇰 HK {hubStock.HK}
+                            </span>
+                          )}
                         </div>
                       </div>
 
-                      <div className="text-right shrink-0">
-                        <p className="font-bold text-xs sm:text-sm font-mono text-slate-900 dark:text-white">
-                          AED {Number(prod.price).toLocaleString()}
-                        </p>
-                        <p
-                          className={`text-[10px] font-bold ${
-                            isOutOfStock
-                              ? "text-rose-600 dark:text-rose-400"
-                              : "text-emerald-700 dark:text-emerald-400"
-                          }`}
-                        >
-                          {isOutOfStock
-                            ? "Out of Stock"
-                            : `Stock: ${prod.quantity} units`}
-                        </p>
+                      <div className="text-right shrink-0 flex items-center gap-2">
+                        <div>
+                          <p className="font-bold text-xs sm:text-sm font-mono text-slate-900 dark:text-white">
+                            {posCurrencySymbol} {Number(prod.price).toLocaleString()}
+                          </p>
+                          <p
+                            className={`text-[10px] font-bold ${
+                              isOutOfStock
+                                ? "text-rose-600 dark:text-rose-400"
+                                : "text-emerald-700 dark:text-emerald-400"
+                            }`}
+                          >
+                            {isOutOfStock
+                              ? `0 Local (${posLocCode})`
+                              : `${posLocCode} Stock: ${prod.quantity}`}
+                          </p>
+                        </div>
+
+                        {isOutOfStock && onRequestTransfer && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onRequestTransfer(prod);
+                            }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[10.5px] font-bold cursor-pointer shrink-0 transition"
+                            title="Request stock transfer from Dubai / China / HK"
+                          >
+                            <FiRepeat className="text-xs" /> Request
+                          </button>
+                        )}
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -844,7 +890,7 @@ const BillingPOS = ({
                         Qty
                       </th>
                       <th className="py-2.5 px-3 text-right whitespace-nowrap min-w-[105px]">
-                        Total (AED)
+                        Total ({posCurrencySymbol})
                       </th>
                       <th className="py-2.5 px-2 text-center w-10"></th>
                     </tr>
@@ -880,6 +926,9 @@ const BillingPOS = ({
                           onUpdateQty={(delta) => handleUpdateQty(item.sku, delta)}
                           onUpdateWarranty={(m) => handleUpdateWarranty(item.sku, m)}
                           onRemoveItem={() => handleRemoveItem(item.sku)}
+                          currencySymbol={posCurrencySymbol}
+                          locale={posLocale}
+                          decimals={posDecimals}
                         />
                       );
                     })}
@@ -972,7 +1021,7 @@ const BillingPOS = ({
                             </p>
                             <div className="flex items-center justify-between gap-2 mt-1">
                               <span className="text-xs font-mono font-extrabold text-sky-800 dark:text-sky-300">
-                                AED {Number(prod.price).toLocaleString()}
+                                {posCurrencySymbol} {Number(prod.price).toLocaleString(posLocale)}
                               </span>
                               {inCart ? (
                                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-sky-600 text-white">
@@ -1073,8 +1122,8 @@ const BillingPOS = ({
                     </span>
                     {selectedContact.ordersCount > 0 && (
                       <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-300 shrink-0">
-                        {selectedContact.ordersCount} orders • AED{" "}
-                        {Math.round(selectedContact.totalSpent).toLocaleString()}
+                        {selectedContact.ordersCount} orders • {posCurrencySymbol}{" "}
+                        {Math.round(selectedContact.totalSpent).toLocaleString(posLocale)}
                       </span>
                     )}
                   </div>
@@ -1236,7 +1285,7 @@ const BillingPOS = ({
               <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/70 space-y-2 text-xs">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-semibold text-slate-600 dark:text-slate-300">
-                    Cash Tendered (AED):
+                    Cash Tendered ({posCurrencySymbol}):
                   </span>
                   <input
                     type="number"
@@ -1281,8 +1330,8 @@ const BillingPOS = ({
                       }`}
                     >
                       {parsedCashTendered >= grandTotal
-                        ? `Change: AED ${changeDue.toLocaleString("en-AE", { minimumFractionDigits: 2 })}`
-                        : `Short: AED ${(grandTotal - parsedCashTendered).toFixed(2)}`}
+                        ? `Change: ${posCurrencySymbol} ${changeDue.toLocaleString(posLocale, { minimumFractionDigits: posDecimals, maximumFractionDigits: posDecimals })}`
+                        : `Short: ${posCurrencySymbol} ${(grandTotal - parsedCashTendered).toFixed(posDecimals)}`}
                     </span>
                   )}
                 </div>
@@ -1347,11 +1396,11 @@ const BillingPOS = ({
               <div className="flex justify-between items-center text-slate-600 dark:text-slate-400">
                 <span>Subtotal:</span>
                 <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
-                  AED {subtotal.toLocaleString("en-AE", { minimumFractionDigits: 2 })}
+                  {posCurrencySymbol} {subtotal.toLocaleString(posLocale, { minimumFractionDigits: posDecimals, maximumFractionDigits: posDecimals })}
                 </span>
               </div>
 
-              {/* Discount with AED / % toggle */}
+              {/* Discount with Fixed / % toggle */}
               <div className="flex items-center justify-between text-slate-600 dark:text-slate-400 gap-2">
                 <div className="flex items-center gap-1.5">
                   <span>Discount:</span>
@@ -1368,7 +1417,7 @@ const BillingPOS = ({
                           : "text-slate-500"
                       }`}
                     >
-                      AED
+                      {posCurrencySymbol}
                     </button>
                     <button
                       type="button"
@@ -1406,7 +1455,7 @@ const BillingPOS = ({
               {appliedCoupon ? (
                 <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/25 text-xs text-emerald-700 dark:text-emerald-300">
                   <span className="inline-flex items-center gap-1.5 font-mono font-bold">
-                    <FiTag /> {appliedCoupon.code} (-AED {computedDiscountAed.toFixed(2)})
+                    <FiTag /> {appliedCoupon.code} (-{posCurrencySymbol} {computedDiscountAed.toFixed(posDecimals)})
                   </span>
                   <button
                     type="button"
@@ -1458,10 +1507,10 @@ const BillingPOS = ({
                     onChange={(e) => setApplyVat(e.target.checked)}
                     className="rounded text-sky-600 cursor-pointer"
                   />
-                  <span>Apply UAE VAT (5%)</span>
+                  <span>Apply {posShortName} VAT ({posDefaultVat}%)</span>
                 </label>
                 <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">
-                  AED {vatAmount.toLocaleString("en-AE", { minimumFractionDigits: 2 })}
+                  {posCurrencySymbol} {vatAmount.toLocaleString(posLocale, { minimumFractionDigits: posDecimals, maximumFractionDigits: posDecimals })}
                 </span>
               </div>
 
@@ -1469,7 +1518,7 @@ const BillingPOS = ({
               <div className="pt-3 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center text-base font-extrabold text-slate-900 dark:text-white">
                 <span>Grand Total:</span>
                 <span className="font-mono text-sky-800 dark:text-sky-300 text-lg">
-                  AED {grandTotal.toLocaleString("en-AE", { minimumFractionDigits: 2 })}
+                  {posCurrencySymbol} {grandTotal.toLocaleString(posLocale, { minimumFractionDigits: posDecimals, maximumFractionDigits: posDecimals })}
                 </span>
               </div>
             </div>
@@ -1556,9 +1605,10 @@ const BillingPOS = ({
                       </span>
                     </div>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                      {draft.items?.length || 0} item(s) • AED{" "}
-                      {Number(draft.totalPreview || 0).toLocaleString("en-AE", {
-                        minimumFractionDigits: 2,
+                      {draft.items?.length || 0} item(s) • {posCurrencySymbol}{" "}
+                      {Number(draft.totalPreview || 0).toLocaleString(posLocale, {
+                        minimumFractionDigits: posDecimals,
+                        maximumFractionDigits: posDecimals,
                       })}{" "}
                       • {new Date(draft.savedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                     </p>
@@ -1605,6 +1655,9 @@ const FragmentRow = ({
   onUpdateQty,
   onUpdateWarranty,
   onRemoveItem,
+  currencySymbol = "AED",
+  locale = "en-AE",
+  decimals = 2,
 }) => {
   return (
     <>
@@ -1676,9 +1729,10 @@ const FragmentRow = ({
         </td>
 
         <td className="py-3 px-3 text-right font-mono font-bold text-slate-900 dark:text-white text-xs sm:text-sm whitespace-nowrap">
-          AED{" "}
-          {(item.unitPrice * item.quantity).toLocaleString("en-AE", {
-            minimumFractionDigits: 2,
+          {currencySymbol}{" "}
+          {(item.unitPrice * item.quantity).toLocaleString(locale, {
+            minimumFractionDigits: decimals,
+            maximumFractionDigits: decimals,
           })}
         </td>
 

@@ -1,17 +1,12 @@
 import { useState, useEffect, useMemo } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   FiShoppingCart,
   FiUser,
-  FiMail,
-  FiPhone,
-  FiGlobe,
   FiMapPin,
   FiCheckCircle,
   FiArrowRight,
   FiShield,
-  FiCopy,
-  FiArrowLeft,
   FiCreditCard,
   FiPlus,
   FiEdit2,
@@ -23,31 +18,34 @@ import {
   FiTag,
   FiChevronDown,
   FiChevronUp,
+  FiChevronRight,
   FiPercent,
-  FiDollarSign,
+  FiSmartphone,
 } from "react-icons/fi";
-import { FaApplePay, FaCcVisa, FaCcMastercard, FaApple } from "react-icons/fa";
+import { FaApple } from "react-icons/fa";
 import { useCart } from "../../context/CartContext";
 import { useCustomerAuth } from "../../context/CustomerAuthContext";
+import { useCountry } from "../../context/CountryContext";
 import { adjustStockDelta } from "../../services/stockService";
 import { WAVE_PAYMENT_CONFIG } from "../../constants/paymentConfig";
 import { validateCouponCode, fetchCoupons } from "../../services/couponService";
 import OrderSuccessModal from "../../components/checkout/OrderSuccessModal";
-import { AedSymbol, AedPrice } from "../../components/common/AedSymbol";
+import { AedPrice } from "../../components/common/AedSymbol";
+import CountryFlag from "../../components/common/CountryFlag";
 
 const COUNTRIES = [
   "United Arab Emirates",
+  "Kenya",
   "Senegal",
+  "Uganda",
   "Côte d'Ivoire",
+  "Ghana",
+  "Saudi Arabia",
   "Mali",
   "Burkina Faso",
   "Gambia",
-  "Uganda",
-  "Ghana",
   "Nigeria",
-  "Kenya",
   "Tanzania",
-  "Saudi Arabia",
   "Oman",
 ];
 
@@ -62,7 +60,8 @@ const checkIsAppleDevice = () => {
 };
 
 const CheckoutPage = () => {
-  const { items, cartSubtotal, shippingFee, cartTotal, clearCart } = useCart();
+  const { items, cartSubtotal, shippingFee, clearCart } = useCart();
+  const { activeCountry, publicCountries, countryPath } = useCountry();
   const {
     user,
     isLoggedIn,
@@ -73,27 +72,51 @@ const CheckoutPage = () => {
     deleteAddress,
     addOrderToHistory,
   } = useCustomerAuth();
-  const navigate = useNavigate();
+
+  const countryOptions = useMemo(() => {
+    const names = new Set(COUNTRIES);
+    (publicCountries || []).forEach((c) => {
+      if (c?.name) names.add(c.name);
+    });
+    return Array.from(names);
+  }, [publicCountries]);
 
   // Detect Apple Device for Apple Pay conditional rendering
   const isApple = useMemo(() => checkIsAppleDevice(), []);
 
-  const [selectedPayment, setSelectedPayment] = useState(() => (checkIsAppleDevice() ? "apple_pay" : "wave"));
+  // Allowed payment methods for active country
+  const allowedMethods = useMemo(() => {
+    const list = Array.isArray(activeCountry.paymentMethods) && activeCountry.paymentMethods.length > 0
+      ? activeCountry.paymentMethods
+      : ["card", "cod", "wire"];
+    return list.filter((m) => (m === "apple_pay" ? isApple : true));
+  }, [activeCountry.paymentMethods, isApple]);
+
+  const [selectedPaymentRaw, setSelectedPayment] = useState(null);
+  const selectedPayment =
+    selectedPaymentRaw && allowedMethods.includes(selectedPaymentRaw)
+      ? selectedPaymentRaw
+      : allowedMethods[0] || "card";
+
   const [waveTransactionId, setWaveTransactionId] = useState("");
+  const [mobileMoneyPhone, setMobileMoneyPhone] = useState("");
+  const [mobileMoneyRef, setMobileMoneyRef] = useState("");
   const [copiedCode, setCopiedCode] = useState(false);
   const [placedOrder, setPlacedOrder] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Address State
+  // Guest & Logged-in Address State
+  const [guestAddresses, setGuestAddresses] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState(null);
   const [isEditingAddress, setIsEditingAddress] = useState(false);
   const [addressFormData, setAddressFormData] = useState({
     id: null,
     label: "Home",
     fullName: "",
+    email: "",
     phone: "",
-    country: "United Arab Emirates",
-    city: "Dubai",
+    country: activeCountry.name || "United Arab Emirates",
+    city: activeCountry.city || "Dubai",
     streetAddress: "",
     isDefault: false,
   });
@@ -122,8 +145,11 @@ const CheckoutPage = () => {
     fetchCoupons().then((list) => setAvailableCouponsList(list.filter((c) => c.isActive)));
   }, []);
 
-  // Derive saved addresses list (Max 5)
+  // Derive saved addresses list (Max 5) for logged-in user or guest session
   const savedAddresses = useMemo(() => {
+    if (!isLoggedIn) {
+      return guestAddresses;
+    }
     if (Array.isArray(user?.addresses) && user.addresses.length > 0) {
       return user.addresses.slice(0, 5);
     }
@@ -142,19 +168,18 @@ const CheckoutPage = () => {
       ];
     }
     return [];
-  }, [user]);
+  }, [user, isLoggedIn, guestAddresses]);
 
-  // Initial Selected Address
-  useEffect(() => {
-    if (savedAddresses.length > 0 && !selectedAddressId) {
-      const defaultAddr = savedAddresses.find((a) => a.isDefault) || savedAddresses[0];
-      setSelectedAddressId(defaultAddr.id);
-    }
-  }, [savedAddresses, selectedAddressId]);
-
+  // Derive effective selected address cleanly without synchronous setState in useEffect
   const activeAddress = useMemo(() => {
-    return savedAddresses.find((a) => a.id === selectedAddressId) || savedAddresses[0] || null;
+    if (selectedAddressId) {
+      const found = savedAddresses.find((a) => a.id === selectedAddressId);
+      if (found) return found;
+    }
+    return savedAddresses.find((a) => a.isDefault) || savedAddresses[0] || null;
   }, [savedAddresses, selectedAddressId]);
+
+  const effectiveSelectedAddressId = activeAddress?.id || null;
 
   // Recalculate Final Checkout Grand Total
   const finalPayableTotal = useMemo(() => {
@@ -162,54 +187,46 @@ const CheckoutPage = () => {
     return discounted + shippingFee;
   }, [cartSubtotal, discountAmount, shippingFee]);
 
-  // Auth Guard
-  if (!isLoggedIn) {
-    return (
-      <div className="min-h-screen bg-slate-50 pt-28 sm:pt-36 pb-16 px-4 text-center">
-        <div className="max-w-md mx-auto bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-4">
-          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-sky-50 text-sky-700 flex items-center justify-center mx-auto text-2xl sm:text-3xl">
-            <FiUser />
-          </div>
-          <h2 className="text-lg sm:text-xl font-bold text-slate-900">Sign In to Proceed to Checkout</h2>
-          <p className="text-xs text-slate-500 max-w-xs mx-auto">
-            Please log in or register with your delivery address to process your cart, save addresses, and apply discount vouchers.
-          </p>
-          <div className="pt-2 flex justify-center gap-3">
-            <button
-              type="button"
-              onClick={() => openAuthModal("login", "/checkout")}
-              className="px-5 py-2.5 bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold uppercase rounded-xl transition shadow-xs cursor-pointer"
-            >
-              Sign In
-            </button>
-            <button
-              type="button"
-              onClick={() => openAuthModal("register", "/checkout")}
-              className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold uppercase rounded-xl transition cursor-pointer"
-            >
-              Create Account
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   if (items.length === 0 && !placedOrder) {
     return (
-      <div className="min-h-screen bg-slate-50 pt-28 sm:pt-36 pb-16 px-4 text-center">
-        <div className="max-w-md mx-auto bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-4">
-          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto text-2xl sm:text-3xl">
-            <FiShoppingCart />
+      <div className="min-h-[calc(100vh-3.5rem)] xl:min-h-screen bg-slate-50 pt-[81px] sm:pt-[93px] xl:pt-[142px] pb-10 text-left">
+        <section className="bg-white border-b border-slate-200/80">
+          <div className="w-full px-3.5 sm:px-6 lg:px-8 py-3 sm:py-3.5">
+            <nav
+              aria-label="Breadcrumb"
+              className="flex items-center gap-1.5 text-[11px] sm:text-xs text-slate-500 font-medium"
+            >
+              <Link to={countryPath("/")} className="hover:text-sky-700 transition">
+                Home
+              </Link>
+              <FiChevronRight className="text-slate-300 text-xs" />
+              <Link to={countryPath("/cart")} className="hover:text-sky-700 transition">
+                Cart
+              </Link>
+              <FiChevronRight className="text-slate-300 text-xs" />
+              <span className="text-slate-900 font-bold">Checkout</span>
+            </nav>
           </div>
-          <h2 className="text-base sm:text-lg font-bold text-slate-900">Your cart is empty</h2>
-          <p className="text-xs text-slate-500">Please add items to your cart before checking out.</p>
-          <Link
-            to="/products"
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-sky-700 text-white font-bold text-xs uppercase rounded-xl hover:bg-sky-800 transition shadow-xs"
-          >
-            Browse Products
-          </Link>
+        </section>
+
+        <div className="px-3.5 sm:px-6 pt-6 text-center">
+          <div className="max-w-md mx-auto bg-white rounded-2xl sm:rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.03)] space-y-3.5">
+            <div className="w-14 h-14 rounded-2xl bg-sky-50 border border-sky-100 text-sky-700 flex items-center justify-center mx-auto text-2xl">
+              <FiShoppingCart />
+            </div>
+            <h2 className="text-[15px] sm:text-lg font-extrabold text-slate-900">
+              Your cart is empty
+            </h2>
+            <p className="text-xs text-slate-500">
+              Add items to your cart before proceeding to checkout.
+            </p>
+            <Link
+              to={countryPath("/products")}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-sky-700 text-white font-bold text-xs rounded-xl hover:bg-sky-800 transition shadow-xs"
+            >
+              Start Shopping
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -222,8 +239,8 @@ const CheckoutPage = () => {
       label: "Home",
       fullName: user?.fullName || "",
       phone: user?.phone || "",
-      country: user?.country || "United Arab Emirates",
-      city: user?.city || "Dubai",
+      country: activeCountry.name || user?.country || "United Arab Emirates",
+      city: activeCountry.city || user?.city || "Dubai",
       streetAddress: "",
       isDefault: savedAddresses.length === 0,
     });
@@ -257,9 +274,24 @@ const CheckoutPage = () => {
     setIsSavingAddress(true);
     setAddressSaveError("");
     try {
-      const saved = await saveAddress(addressFormData);
-      if (saved?.id) {
-        setSelectedAddressId(saved.id);
+      if (isLoggedIn) {
+        const saved = await saveAddress(addressFormData);
+        if (saved?.id) {
+          setSelectedAddressId(saved.id);
+        }
+      } else {
+        const guestAddr = {
+          ...addressFormData,
+          id: addressFormData.id || `guest_addr_${Date.now()}`,
+          isDefault: true,
+        };
+        setGuestAddresses((prev) => {
+          const exists = prev.some((a) => a.id === guestAddr.id);
+          return exists
+            ? prev.map((a) => (a.id === guestAddr.id ? guestAddr : a))
+            : [guestAddr, ...prev];
+        });
+        setSelectedAddressId(guestAddr.id);
       }
       setIsEditingAddress(false);
     } catch (err) {
@@ -305,7 +337,7 @@ const CheckoutPage = () => {
         setDiscountAmount(0);
         setCouponMessage({ type: "error", text: result.message });
       }
-    } catch (err) {
+    } catch {
       setCouponMessage({ type: "error", text: "Failed to validate coupon code." });
     } finally {
       setIsValidatingCoupon(false);
@@ -344,56 +376,77 @@ const CheckoutPage = () => {
     const paymentMethodNames = {
       apple_pay: "Apple Pay",
       card: "Debit / Credit Card",
+      mpesa: "M-Pesa (Safaricom Kenya)",
       wave: "Wave Money Transfer",
+      orange_money: "Orange Money",
+      mtn_momo: "MTN Mobile Money (MoMo)",
+      airtel_money: "Airtel Money",
       tabby: "Tabby (Pay in 4)",
       tamara: "Tamara (Pay in 6)",
       cod: "Cash on Delivery",
       wire: "Direct Wire / Bank Transfer",
     };
 
+    const isMobileMoney = ["wave", "mpesa", "orange_money", "mtn_momo", "airtel_money"].includes(
+      selectedPayment
+    );
+
     const newOrder = {
       orderId,
-      customerId: user.uid || user.id,
-      customerName: deliveryDetails.fullName || user.fullName || "Customer",
-      email: user.email,
-      phone: deliveryDetails.phone || user.phone || "",
-      country: deliveryDetails.country || "United Arab Emirates",
-      city: deliveryDetails.city || "Dubai",
+      countryCode: activeCountry.code,
+      currency: activeCountry.currency,
+      vatRate: activeCountry.vatRate,
+      hubName: activeCountry.hubName,
+      customerId: user?.uid || user?.id || `guest_${Date.now()}`,
+      customerName: deliveryDetails.fullName || user?.fullName || "Guest Customer",
+      email: user?.email || deliveryDetails.email || addressFormData.email || "",
+      phone: deliveryDetails.phone || user?.phone || "",
+      country: deliveryDetails.country || activeCountry.name || "United Arab Emirates",
+      city: deliveryDetails.city || activeCountry.city || "Dubai",
       shippingAddress: deliveryDetails.streetAddress,
       addressLabel: deliveryDetails.label || "Home",
       paymentMethod: selectedPayment,
       paymentMethodName: paymentMethodNames[selectedPayment] || selectedPayment,
       waveTransactionId: selectedPayment === "wave" ? waveTransactionId.trim() : null,
+      mobileMoneyPhone: isMobileMoney && selectedPayment !== "wave" ? mobileMoneyPhone.trim() : null,
+      mobileMoneyRef: isMobileMoney && selectedPayment !== "wave" ? mobileMoneyRef.trim() : null,
       appliedCoupon: appliedCoupon ? appliedCoupon.code : null,
       discountAmount: discountAmount,
       items: [...items],
       subtotal: cartSubtotal,
       shippingFee: shippingFee,
       total: finalPayableTotal,
-      status: selectedPayment === "wave" ? "Awaiting Wave Verification" : "Order Placed",
+      status:
+        selectedPayment === "wave"
+          ? "Awaiting Wave Verification"
+          : isMobileMoney
+          ? `Awaiting ${paymentMethodNames[selectedPayment]} Confirmation`
+          : "Order Placed",
       createdAt: new Date().toISOString(),
     };
 
-    // 1. If coupon was applied, record in user's usedCoupons list in Firestore
-    if (appliedCoupon) {
-      const currentUsed = Array.isArray(user.usedCoupons) ? [...user.usedCoupons] : [];
-      if (!currentUsed.includes(appliedCoupon.code)) {
+    // 1. If logged-in customer, update usedCoupons and ordersCount in Firestore profile
+    if (isLoggedIn && user) {
+      if (appliedCoupon) {
+        const currentUsed = Array.isArray(user.usedCoupons) ? [...user.usedCoupons] : [];
+        if (!currentUsed.includes(appliedCoupon.code)) {
+          await updateProfile({
+            usedCoupons: [...currentUsed, appliedCoupon.code],
+            ordersCount: (user.ordersCount || 0) + 1,
+          });
+        }
+      } else {
         await updateProfile({
-          usedCoupons: [...currentUsed, appliedCoupon.code],
           ordersCount: (user.ordersCount || 0) + 1,
         });
       }
-    } else {
-      await updateProfile({
-        ordersCount: (user.ordersCount || 0) + 1,
-      });
     }
 
-    // 2. Adjust Stock Delta
+    // 2. Adjust Stock Delta (country-scoped)
     for (const item of items) {
       if (item.sku) {
         try {
-          await adjustStockDelta(item.sku, -(item.quantity || 1));
+          await adjustStockDelta(item.sku, -(item.quantity || 1), activeCountry.code);
         } catch (err) {
           console.warn(`Stock delta error for ${item.sku}:`, err);
         }
@@ -409,153 +462,211 @@ const CheckoutPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/80 pt-24 sm:pt-28 lg:pt-32 pb-24 sm:pb-16 px-4 sm:px-6 lg:px-8 text-left">
-      <div className="max-w-5xl mx-auto space-y-6">
-
-        {/* TOP BAR */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/80 pb-4">
-          <div>
-            <Link
-              to="/cart"
-              className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-sky-700 font-semibold mb-1 transition"
+    <div className="min-h-[calc(100vh-3.5rem)] xl:min-h-screen bg-slate-50 pt-[81px] sm:pt-[93px] xl:pt-[142px] pb-24 lg:pb-14 text-left">
+      {/* ================================================================= */}
+      {/* UNIFIED BREADCRUMB BAR (Consistent with Shop, Brands & Cart)      */}
+      {/* ================================================================= */}
+      <section className="bg-white border-b border-slate-200/80">
+        <div className="w-full px-3.5 sm:px-6 lg:px-8 py-3 sm:py-3.5 xl:py-5 space-y-0 xl:space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <nav
+              aria-label="Breadcrumb"
+              className="flex items-center gap-1.5 text-[11px] sm:text-xs text-slate-500 font-medium min-w-0"
             >
-              <FiArrowLeft /> Back to Cart
-            </Link>
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 flex items-center gap-2">
-              <FiShield className="text-emerald-600 shrink-0" /> Checkout
-            </h1>
+              <Link
+                to={countryPath("/")}
+                className="hover:text-sky-700 transition shrink-0"
+              >
+                Home
+              </Link>
+              <FiChevronRight className="text-slate-300 shrink-0 text-xs" />
+              <Link
+                to={countryPath("/cart")}
+                className="hover:text-sky-700 transition shrink-0"
+              >
+                Cart
+              </Link>
+              <FiChevronRight className="text-slate-300 shrink-0 text-xs" />
+              <span className="text-slate-900 font-bold truncate">
+                Checkout
+              </span>
+            </nav>
+
+            <div className="flex items-center gap-2 shrink-0">
+              {!isLoggedIn ? (
+                <button
+                  type="button"
+                  onClick={() => openAuthModal("login", countryPath("/checkout"))}
+                  className="xl:hidden inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-50 border border-sky-200/80 text-sky-700 text-[11px] font-bold cursor-pointer"
+                >
+                  <FiUser className="text-xs" />
+                  <span>Sign In</span>
+                </button>
+              ) : (
+                <span className="xl:hidden inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-700 text-[10.5px] font-bold">
+                  <FiShield className="text-[11px]" />
+                  <span>SSL Secure</span>
+                </span>
+              )}
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 text-xs text-slate-700 bg-white px-3.5 py-1.5 rounded-xl border border-slate-200 shadow-2xs self-start sm:self-auto">
-            <FiUser className="text-sky-700 shrink-0" />
-            <span>LoggedIn as <strong className="text-slate-900">{user?.fullName || user?.email}</strong></span>
+          {/* Desktop Title & Account Status Row (xl+) */}
+          <div className="hidden xl:flex items-center justify-between gap-4">
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+              <FiShield className="text-emerald-600 shrink-0" />
+              <span>Secure Checkout</span>
+            </h1>
+
+            {isLoggedIn ? (
+              <div className="flex items-center gap-2 text-xs text-slate-700 bg-slate-50 px-3.5 py-1.5 rounded-xl border border-slate-200/80">
+                <FiUser className="text-sky-700 shrink-0" />
+                <span>
+                  Signed in as{" "}
+                  <strong className="text-slate-900">
+                    {user?.fullName || user?.email}
+                  </strong>
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 text-xs text-slate-700 bg-slate-50 px-3.5 py-1.5 rounded-xl border border-slate-200/80">
+                <span className="inline-flex items-center gap-1.5 font-semibold text-slate-700">
+                  <FiUser className="text-emerald-600 shrink-0" />
+                  Express Guest Checkout
+                </span>
+                <span className="text-slate-300">|</span>
+                <button
+                  type="button"
+                  onClick={() => openAuthModal("login", countryPath("/checkout"))}
+                  className="font-bold text-sky-700 hover:underline cursor-pointer"
+                >
+                  Sign In to Account →
+                </button>
+              </div>
+            )}
           </div>
         </div>
+      </section>
 
+      <div className="w-full max-w-6xl mx-auto px-3.5 sm:px-6 lg:px-8 pt-4 sm:pt-6">
         {/* CHECKOUT FORM & SUMMARY GRID */}
-        <form onSubmit={handlePlaceOrder} className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
+        <form onSubmit={handlePlaceOrder} className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
 
           {/* LEFT COLUMN: ADDRESS & PAYMENT OPTIONS */}
-          <div className="lg:col-span-7 space-y-5">
+          <div className="lg:col-span-7 space-y-4">
 
-            {/* STEP 1: SAVED ADDRESS SLIDER & MANAGER */}
-            <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-2xs space-y-4">
+            {/* STEP 1: DELIVERY ADDRESS */}
+            <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-slate-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.03)] space-y-3.5">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div className="flex items-center gap-2.5">
                   <div className="w-6 h-6 rounded-full bg-slate-900 text-white font-bold text-xs flex items-center justify-center shrink-0">
                     1
                   </div>
-                  <div>
-                    <h2 className="text-sm sm:text-base font-bold text-slate-900">
-                      Delivery Address
-                    </h2>
-                  </div>
+                  <h2 className="text-sm sm:text-base font-extrabold text-slate-900">
+                    Delivery Address
+                  </h2>
                 </div>
 
                 {!isEditingAddress && savedAddresses.length < 5 && (
                   <button
                     type="button"
                     onClick={handleOpenAddAddress}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 text-xs font-bold transition cursor-pointer shrink-0"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-50 hover:bg-sky-100 border border-sky-200/80 text-sky-700 text-[11.5px] font-bold transition cursor-pointer shrink-0"
                   >
-                    <FiPlus className="text-sm" />
+                    <FiPlus className="text-xs" />
                     <span>Add New</span>
                   </button>
                 )}
               </div>
 
-              {/* 🏠 SAVED ADDRESS CARDS SLIDER */}
+              {/* SAVED ADDRESS CARDS (Clean Full-Width Stack on Mobile | 2-Col on sm+, Zero Scrollbar) */}
               {!isEditingAddress && savedAddresses.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-stretch gap-3 overflow-x-auto pb-2 snap-x scrollbar-thin">
-                    {savedAddresses.map((addr) => {
-                      const isSelected = selectedAddressId === addr.id;
-                      return (
-                        <div
-                          key={addr.id}
-                          onClick={() => setSelectedAddressId(addr.id)}
-                          className={`min-w-[260px] sm:min-w-[280px] max-w-[320px] p-4 rounded-2xl border-2 transition cursor-pointer flex flex-col justify-between shrink-0 snap-start ${isSelected
-                              ? "bg-sky-50/70 border-sky-600 shadow-xs ring-1 ring-sky-500/20"
-                              : "bg-white border-slate-200 hover:border-slate-300"
-                            }`}
-                        >
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-1.5">
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-800 text-[10.5px] font-bold uppercase tracking-wider">
-                                  {addr.label === "Work" || addr.label === "Office" ? (
-                                    <FiBriefcase className="text-slate-500 text-xs" />
-                                  ) : (
-                                    <FiHome className="text-slate-500 text-xs" />
-                                  )}
-                                  {addr.label || "Address"}
-                                </span>
-                                {addr.isDefault && (
-                                  <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[9.5px] font-extrabold">
-                                    Default
-                                  </span>
+                <div
+                  className={`grid gap-2.5 ${
+                    savedAddresses.length > 1
+                      ? "grid-cols-1 sm:grid-cols-2"
+                      : "grid-cols-1"
+                  }`}
+                >
+                  {savedAddresses.map((addr) => {
+                    const isSelected = effectiveSelectedAddressId === addr.id;
+                    return (
+                      <div
+                        key={addr.id}
+                        onClick={() => setSelectedAddressId(addr.id)}
+                        className={`p-3.5 sm:p-4 rounded-2xl border transition cursor-pointer flex flex-col justify-between ${
+                          isSelected
+                            ? "bg-sky-50/50 border-sky-600 ring-1 ring-sky-500/20"
+                            : "bg-white border-slate-200 hover:border-slate-300"
+                        }`}
+                      >
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-800 text-[10px] font-bold uppercase tracking-wider">
+                                {addr.label === "Work" || addr.label === "Office" ? (
+                                  <FiBriefcase className="text-slate-500 text-xs" />
+                                ) : (
+                                  <FiHome className="text-slate-500 text-xs" />
                                 )}
-                              </div>
-
-                              <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${isSelected ? "border-sky-600 bg-sky-600 text-white" : "border-slate-300 bg-white"
-                                }`}>
-                                {isSelected && <FiCheck className="text-[10px]" />}
-                              </div>
+                                {addr.label || "Address"}
+                              </span>
+                              {addr.isDefault && (
+                                <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[9.5px] font-extrabold">
+                                  Default
+                                </span>
+                              )}
                             </div>
 
-                            <div>
-                              <h4 className="font-bold text-slate-900 text-xs truncate">
-                                {addr.fullName}
-                              </h4>
-                              <p className="text-[11px] text-slate-500 font-mono mt-0.5">
-                                {addr.phone}
-                              </p>
-                              <p className="text-[11px] text-slate-700 line-clamp-2 mt-1 leading-relaxed">
-                                {addr.streetAddress}
-                              </p>
-                              <p className="text-[10.5px] text-slate-400 mt-0.5 font-medium">
-                                {[addr.city, addr.country].filter(Boolean).join(", ")}
-                              </p>
+                            <div
+                              className={`w-4.5 h-4.5 rounded-full border flex items-center justify-center shrink-0 ${
+                                isSelected
+                                  ? "border-sky-600 bg-sky-600 text-white"
+                                  : "border-slate-300 bg-white"
+                              }`}
+                            >
+                              {isSelected && <FiCheck className="text-[10px]" />}
                             </div>
                           </div>
 
-                          <div className="flex items-center justify-between pt-3 mt-3 border-t border-slate-100/80 text-xs">
+                          <div>
+                            <h4 className="font-bold text-slate-900 text-xs sm:text-[13px] truncate">
+                              {addr.fullName}
+                            </h4>
+                            <p className="text-[11px] text-slate-500 font-mono mt-0.5">
+                              {addr.phone}
+                            </p>
+                            <p className="text-[11.5px] text-slate-700 line-clamp-2 mt-1 leading-relaxed">
+                              {addr.streetAddress}
+                            </p>
+                            <p className="text-[10.5px] text-slate-400 mt-0.5 font-medium">
+                              {[addr.city, addr.country].filter(Boolean).join(", ")}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-2.5 mt-2.5 border-t border-slate-100 text-xs">
+                          <button
+                            type="button"
+                            onClick={(e) => handleOpenEditAddress(addr, e)}
+                            className="inline-flex items-center gap-1 text-sky-700 hover:text-sky-900 font-semibold cursor-pointer text-[11.5px]"
+                          >
+                            <FiEdit2 className="text-xs" /> Edit
+                          </button>
+
+                          {savedAddresses.length > 1 && (
                             <button
                               type="button"
-                              onClick={(e) => handleOpenEditAddress(addr, e)}
-                              className="inline-flex items-center gap-1 text-slate-500 hover:text-sky-700 font-semibold cursor-pointer text-[11px]"
+                              onClick={(e) => handleDeleteAddress(addr.id, e)}
+                              className="inline-flex items-center gap-1 text-slate-400 hover:text-rose-600 font-medium cursor-pointer text-[11.5px]"
                             >
-                              <FiEdit2 className="text-xs" /> Edit
+                              <FiTrash2 className="text-xs" /> Delete
                             </button>
-
-                            {savedAddresses.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={(e) => handleDeleteAddress(addr.id, e)}
-                                className="inline-flex items-center gap-1 text-slate-400 hover:text-rose-600 font-medium cursor-pointer text-[11px]"
-                              >
-                                <FiTrash2 className="text-xs" /> Delete
-                              </button>
-                            )}
-                          </div>
+                          )}
                         </div>
-                      );
-                    })}
-
-                    {savedAddresses.length < 5 && (
-                      <button
-                        type="button"
-                        onClick={handleOpenAddAddress}
-                        className="min-w-[170px] p-4 rounded-2xl border-2 border-dashed border-slate-200 hover:border-sky-500 hover:bg-sky-50/40 transition flex flex-col items-center justify-center gap-1.5 text-slate-500 hover:text-sky-700 cursor-pointer shrink-0 snap-start"
-                      >
-                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600">
-                          <FiPlus className="text-base" />
-                        </div>
-                        <span className="text-xs font-bold">Add Address</span>
-                        <span className="text-[10px] text-slate-400">({savedAddresses.length}/5 used)</span>
-                      </button>
-                    )}
-                  </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 
@@ -643,7 +754,7 @@ const CheckoutPage = () => {
                         onChange={(e) => setAddressFormData({ ...addressFormData, country: e.target.value })}
                         className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 outline-none focus:border-sky-600"
                       >
-                        {COUNTRIES.map((c) => (
+                        {countryOptions.map((c) => (
                           <option key={c} value={c}>{c}</option>
                         ))}
                       </select>
@@ -713,21 +824,21 @@ const CheckoutPage = () => {
               )}
             </div>
 
-            {/* STEP 2: NOON-STYLE "PAY WITH" METHODS */}
-            <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-2xs space-y-3.5">
+            {/* STEP 2: PAYMENT METHODS */}
+            <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-slate-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.03)] space-y-3.5">
               <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3">
                 <div className="w-6 h-6 rounded-full bg-slate-900 text-white font-bold text-xs flex items-center justify-center shrink-0">
                   2
                 </div>
-                <h2 className="text-sm sm:text-base font-bold text-slate-900">
+                <h2 className="text-sm sm:text-base font-extrabold text-slate-900">
                   Pay with
                 </h2>
               </div>
 
               <div className="space-y-2 text-xs">
 
-                {/* 🍏 1. APPLE PAY (CONDITIONAL: ONLY SHOWN IF ON APPLE DEVICE) */}
-                {isApple && (
+                {/* 🍏 1. APPLE PAY (CONDITIONAL: APPLE DEVICE + SUPPORTED MARKET) */}
+                {isApple && allowedMethods.includes("apple_pay") && (
                   <div
                     onClick={() => setSelectedPayment("apple_pay")}
                     className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-3 ${selectedPayment === "apple_pay"
@@ -749,235 +860,448 @@ const CheckoutPage = () => {
                   </div>
                 )}
 
-                {/* 💳 2. DEBIT / CREDIT CARD */}
-                <div
-                  onClick={() => setSelectedPayment("card")}
-                  className={`p-3.5 rounded-2xl border transition cursor-pointer flex flex-col gap-2.5 ${selectedPayment === "card"
-                      ? "bg-sky-50/80 border-sky-600 shadow-2xs ring-1 ring-sky-600/20"
-                      : "bg-white border-slate-200/90 hover:border-slate-300"
-                    }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="px-2 py-1 rounded-lg bg-slate-100 text-slate-700 font-bold text-xs flex items-center gap-1">
-                        <FiCreditCard className="text-sm" />
-                        <span className="font-mono text-[10px]">CARD</span>
+                {/* 📱 REGIONAL MOBILE MONEY: M-PESA (KENYA) */}
+                {allowedMethods.includes("mpesa") && (
+                  <div
+                    onClick={() => setSelectedPayment("mpesa")}
+                    className={`p-3.5 rounded-2xl border transition cursor-pointer flex flex-col gap-2.5 ${selectedPayment === "mpesa"
+                        ? "bg-emerald-50/70 border-emerald-600 shadow-2xs ring-1 ring-emerald-600/20"
+                        : "bg-white border-slate-200/90 hover:border-slate-300"
+                      }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-black text-[11px] flex items-center gap-1">
+                          <FiSmartphone className="text-xs" /> M-PESA
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-900 text-xs sm:text-sm">
+                              Safaricom M-Pesa (STK Push / Paybill)
+                            </span>
+                            <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[9px] font-extrabold">
+                              Instant KE
+                            </span>
+                          </div>
+                          <p className="text-[10.5px] text-slate-500">
+                            Pay directly in KES via M-Pesa Express prompt or Paybill
+                          </p>
+                        </div>
                       </div>
-                      <span className="font-bold text-slate-900 text-xs sm:text-sm">Debit / Credit Card</span>
+
+                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${selectedPayment === "mpesa" ? "border-emerald-600 bg-emerald-600 text-white" : "border-slate-300 bg-white"
+                        }`}>
+                        {selectedPayment === "mpesa" && <FiCheck className="text-[10px]" />}
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-bold text-sky-700 hover:underline">+ Add New</span>
-                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedPayment === "card" ? "border-sky-600 bg-sky-600 text-white" : "border-slate-300 bg-white"
+                    {selectedPayment === "mpesa" && (
+                      <div className="pt-2 border-t border-emerald-200/70 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          placeholder="M-Pesa Phone (+254 7XX XXX XXX)"
+                          value={mobileMoneyPhone}
+                          onChange={(e) => setMobileMoneyPhone(e.target.value)}
+                          className="w-full p-2 bg-white border border-emerald-200 rounded-xl text-xs font-mono font-semibold text-slate-900"
+                        />
+                        <input
+                          type="text"
+                          placeholder="M-Pesa Ref / Confirmation Code (Optional)"
+                          value={mobileMoneyRef}
+                          onChange={(e) => setMobileMoneyRef(e.target.value.toUpperCase())}
+                          className="w-full p-2 bg-white border border-emerald-200 rounded-xl text-xs font-mono font-semibold text-slate-900"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 🌊 WAVE MONEY TRANSFER (SENEGAL / CÔTE D'IVOIRE) */}
+                {allowedMethods.includes("wave") && (
+                  <div
+                    onClick={() => setSelectedPayment("wave")}
+                    className={`p-3.5 rounded-2xl border transition cursor-pointer flex flex-col gap-2.5 ${selectedPayment === "wave"
+                        ? "bg-sky-50/80 border-sky-600 shadow-2xs ring-1 ring-sky-600/20"
+                        : "bg-white border-slate-200/90 hover:border-slate-300"
+                      }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="px-2 py-1 rounded-lg bg-sky-600 text-white font-black text-[10.5px] shrink-0">
+                          WAVE
+                        </span>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-900 text-xs sm:text-sm">Wave Money Transfer</span>
+                            <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[9px] font-extrabold">
+                              0% Fee
+                            </span>
+                          </div>
+                          <p className="text-[10.5px] text-slate-500">Direct mobile money transfer</p>
+                        </div>
+                      </div>
+
+                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${selectedPayment === "wave" ? "border-sky-600 bg-sky-600 text-white" : "border-slate-300 bg-white"
+                        }`}>
+                        {selectedPayment === "wave" && <FiCheck className="text-[10px]" />}
+                      </div>
+                    </div>
+
+                    {selectedPayment === "wave" && (
+                      <div className="pt-2 border-t border-sky-200/60 p-3 bg-linear-to-br from-sky-950 to-slate-900 text-white rounded-xl space-y-2.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <div>
+                            <span className="text-[9.5px] text-sky-200 uppercase font-bold block">Merchant Wave Phone</span>
+                            <span className="font-mono font-black text-white text-xs sm:text-sm">{WAVE_PAYMENT_CONFIG.merchantPhone}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleCopyCode}
+                            className="px-2.5 py-1 bg-sky-600 hover:bg-sky-500 text-white text-[10px] font-bold rounded-lg transition cursor-pointer"
+                          >
+                            {copiedCode ? "Copied" : "Copy Number"}
+                          </button>
+                        </div>
+
+                        <div>
+                          <label className="block text-[9.5px] font-bold uppercase text-sky-200 tracking-wider mb-1">
+                            Wave Transaction Reference ID (Optional)
+                          </label>
+                          <input
+                            type="text"
+                            value={waveTransactionId}
+                            onChange={(e) => setWaveTransactionId(e.target.value)}
+                            placeholder="e.g. WV-90218492"
+                            className="w-full p-2 bg-white/10 border border-white/20 rounded-xl text-xs text-white placeholder-slate-400 font-mono font-semibold focus:outline-none focus:border-sky-400"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 🟠 ORANGE MONEY (SENEGAL / CÔTE D'IVOIRE) */}
+                {allowedMethods.includes("orange_money") && (
+                  <div
+                    onClick={() => setSelectedPayment("orange_money")}
+                    className={`p-3.5 rounded-2xl border transition cursor-pointer flex flex-col gap-2.5 ${selectedPayment === "orange_money"
+                        ? "bg-orange-50/70 border-orange-500 shadow-2xs ring-1 ring-orange-500/20"
+                        : "bg-white border-slate-200/90 hover:border-slate-300"
+                      }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="px-2 py-1 rounded-lg bg-orange-500 text-white font-black text-[10.5px]">
+                          Orange
+                        </span>
+                        <div>
+                          <span className="font-bold text-slate-900 text-xs sm:text-sm">Orange Money</span>
+                          <p className="text-[10.5px] text-slate-500">
+                            Instant CFA wallet transfer in {activeCountry.name}
+                          </p>
+                        </div>
+                      </div>
+                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${selectedPayment === "orange_money" ? "border-orange-500 bg-orange-500 text-white" : "border-slate-300 bg-white"
+                        }`}>
+                        {selectedPayment === "orange_money" && <FiCheck className="text-[10px]" />}
+                      </div>
+                    </div>
+
+                    {selectedPayment === "orange_money" && (
+                      <div className="pt-2 border-t border-orange-200/70 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          placeholder="Orange Money Phone Number"
+                          value={mobileMoneyPhone}
+                          onChange={(e) => setMobileMoneyPhone(e.target.value)}
+                          className="w-full p-2 bg-white border border-orange-200 rounded-xl text-xs font-mono font-semibold text-slate-900"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Transaction Reference (Optional)"
+                          value={mobileMoneyRef}
+                          onChange={(e) => setMobileMoneyRef(e.target.value.toUpperCase())}
+                          className="w-full p-2 bg-white border border-orange-200 rounded-xl text-xs font-mono font-semibold text-slate-900"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 🟡 MTN MOBILE MONEY (UGANDA / GHANA) */}
+                {allowedMethods.includes("mtn_momo") && (
+                  <div
+                    onClick={() => setSelectedPayment("mtn_momo")}
+                    className={`p-3.5 rounded-2xl border transition cursor-pointer flex flex-col gap-2.5 ${selectedPayment === "mtn_momo"
+                        ? "bg-amber-50/80 border-amber-500 shadow-2xs ring-1 ring-amber-500/20"
+                        : "bg-white border-slate-200/90 hover:border-slate-300"
+                      }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="px-2 py-1 rounded-lg bg-amber-400 text-slate-950 font-black text-[10.5px]">
+                          MTN MoMo
+                        </span>
+                        <div>
+                          <span className="font-bold text-slate-900 text-xs sm:text-sm">MTN Mobile Money</span>
+                          <p className="text-[10.5px] text-slate-500">
+                            Pay securely in {activeCountry.currency} via MTN MoMo prompt
+                          </p>
+                        </div>
+                      </div>
+                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${selectedPayment === "mtn_momo" ? "border-amber-600 bg-amber-600 text-white" : "border-slate-300 bg-white"
+                        }`}>
+                        {selectedPayment === "mtn_momo" && <FiCheck className="text-[10px]" />}
+                      </div>
+                    </div>
+
+                    {selectedPayment === "mtn_momo" && (
+                      <div className="pt-2 border-t border-amber-200/70 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          placeholder="MTN MoMo Phone Number"
+                          value={mobileMoneyPhone}
+                          onChange={(e) => setMobileMoneyPhone(e.target.value)}
+                          className="w-full p-2 bg-white border border-amber-200 rounded-xl text-xs font-mono font-semibold text-slate-900"
+                        />
+                        <input
+                          type="text"
+                          placeholder="MoMo Transaction Ref (Optional)"
+                          value={mobileMoneyRef}
+                          onChange={(e) => setMobileMoneyRef(e.target.value.toUpperCase())}
+                          className="w-full p-2 bg-white border border-amber-200 rounded-xl text-xs font-mono font-semibold text-slate-900"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 🔴 AIRTEL MONEY (UGANDA) */}
+                {allowedMethods.includes("airtel_money") && (
+                  <div
+                    onClick={() => setSelectedPayment("airtel_money")}
+                    className={`p-3.5 rounded-2xl border transition cursor-pointer flex flex-col gap-2.5 ${selectedPayment === "airtel_money"
+                        ? "bg-rose-50/70 border-rose-500 shadow-2xs ring-1 ring-rose-500/20"
+                        : "bg-white border-slate-200/90 hover:border-slate-300"
+                      }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="px-2 py-1 rounded-lg bg-rose-600 text-white font-black text-[10.5px]">
+                          Airtel
+                        </span>
+                        <div>
+                          <span className="font-bold text-slate-900 text-xs sm:text-sm">Airtel Money</span>
+                          <p className="text-[10.5px] text-slate-500">
+                            Instant mobile wallet payment in {activeCountry.currency}
+                          </p>
+                        </div>
+                      </div>
+                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${selectedPayment === "airtel_money" ? "border-rose-600 bg-rose-600 text-white" : "border-slate-300 bg-white"
+                        }`}>
+                        {selectedPayment === "airtel_money" && <FiCheck className="text-[10px]" />}
+                      </div>
+                    </div>
+
+                    {selectedPayment === "airtel_money" && (
+                      <div className="pt-2 border-t border-rose-200/70 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          placeholder="Airtel Money Phone Number"
+                          value={mobileMoneyPhone}
+                          onChange={(e) => setMobileMoneyPhone(e.target.value)}
+                          className="w-full p-2 bg-white border border-rose-200 rounded-xl text-xs font-mono font-semibold text-slate-900"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Airtel Ref Code (Optional)"
+                          value={mobileMoneyRef}
+                          onChange={(e) => setMobileMoneyRef(e.target.value.toUpperCase())}
+                          className="w-full p-2 bg-white border border-rose-200 rounded-xl text-xs font-mono font-semibold text-slate-900"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 💳 DEBIT / CREDIT CARD */}
+                {allowedMethods.includes("card") && (
+                  <div
+                    onClick={() => setSelectedPayment("card")}
+                    className={`p-3.5 rounded-2xl border transition cursor-pointer flex flex-col gap-2.5 ${selectedPayment === "card"
+                        ? "bg-sky-50/80 border-sky-600 shadow-2xs ring-1 ring-sky-600/20"
+                        : "bg-white border-slate-200/90 hover:border-slate-300"
+                      }`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="px-2 py-1 rounded-lg bg-slate-100 text-slate-700 font-bold text-xs flex items-center gap-1">
+                          <FiCreditCard className="text-sm" />
+                          <span className="font-mono text-[10px]">CARD</span>
+                        </div>
+                        <span className="font-bold text-slate-900 text-xs sm:text-sm">Debit / Credit Card</span>
+                      </div>
+
+                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${selectedPayment === "card" ? "border-sky-600 bg-sky-600 text-white" : "border-slate-300 bg-white"
                         }`}>
                         {selectedPayment === "card" && <FiCheck className="text-[10px]" />}
                       </div>
                     </div>
-                  </div>
 
-                  {selectedPayment === "card" && (
-                    <div className="pt-2 border-t border-sky-200/60 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                      <input
-                        type="text"
-                        placeholder="Card Number (0000 0000 0000 0000)"
-                        value={cardDetails.number}
-                        onChange={(e) => setCardDetails({ ...cardDetails, number: e.target.value })}
-                        className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold"
-                      />
-                      <div className="flex gap-2">
+                    {selectedPayment === "card" && (
+                      <div className="pt-2 border-t border-sky-200/60 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                         <input
                           type="text"
-                          placeholder="MM/YY"
-                          value={cardDetails.expiry}
-                          onChange={(e) => setCardDetails({ ...cardDetails, expiry: e.target.value })}
-                          className="w-1/2 p-2 bg-white border border-slate-200 rounded-xl text-xs font-mono text-center"
+                          placeholder="Card Number (0000 0000 0000 0000)"
+                          value={cardDetails.number}
+                          onChange={(e) => setCardDetails({ ...cardDetails, number: e.target.value })}
+                          className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold"
                         />
-                        <input
-                          type="text"
-                          placeholder="CVV"
-                          maxLength={4}
-                          value={cardDetails.cvv}
-                          onChange={(e) => setCardDetails({ ...cardDetails, cvv: e.target.value })}
-                          className="w-1/2 p-2 bg-white border border-slate-200 rounded-xl text-xs font-mono text-center"
-                        />
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="MM/YY"
+                            value={cardDetails.expiry}
+                            onChange={(e) => setCardDetails({ ...cardDetails, expiry: e.target.value })}
+                            className="w-1/2 p-2 bg-white border border-slate-200 rounded-xl text-xs font-mono text-center"
+                          />
+                          <input
+                            type="text"
+                            placeholder="CVV"
+                            maxLength={4}
+                            value={cardDetails.cvv}
+                            onChange={(e) => setCardDetails({ ...cardDetails, cvv: e.target.value })}
+                            className="w-1/2 p-2 bg-white border border-slate-200 rounded-xl text-xs font-mono text-center"
+                          />
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
 
-                {/* 🌊 3. WAVE MONEY TRANSFER (AFRICAN MARKETS) */}
-                <div
-                  onClick={() => setSelectedPayment("wave")}
-                  className={`p-3.5 rounded-2xl border transition cursor-pointer flex flex-col gap-2.5 ${selectedPayment === "wave"
-                      ? "bg-sky-50/80 border-sky-600 shadow-2xs ring-1 ring-sky-600/20"
-                      : "bg-white border-slate-200/90 hover:border-slate-300"
-                    }`}
-                >
-                  <div className="flex items-center justify-between">
+                {/* 💳 TABBY (PAY IN 4 - UAE & SAUDI ARABIA) */}
+                {allowedMethods.includes("tabby") && (
+                  <div
+                    onClick={() => setSelectedPayment("tabby")}
+                    className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-3 ${selectedPayment === "tabby"
+                        ? "bg-sky-50/80 border-sky-600 shadow-2xs ring-1 ring-sky-600/20"
+                        : "bg-white border-slate-200/90 hover:border-slate-300"
+                      }`}
+                  >
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-sky-100 text-sky-800 flex items-center justify-center text-sm font-bold shrink-0">
-                        🌊
-                      </div>
+                      <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 font-black text-[10.5px]">
+                        tabby
+                      </span>
                       <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900 text-xs sm:text-sm">Wave Money Transfer</span>
-                          <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[9px] font-extrabold">
-                            0% Fee Africa
-                          </span>
-                        </div>
-                        <p className="text-[10.5px] text-slate-400">Direct mobile transfer in Senegal, Côte d'Ivoire &amp; West Africa</p>
+                        <span className="font-bold text-slate-900 text-xs sm:text-sm">Tabby</span>
+                        <p className="text-[10.5px] text-slate-400">
+                          Pay in 4 interest-free payments of <AedPrice amount={finalPayableTotal / 4} className="font-bold text-slate-700" />
+                        </p>
                       </div>
                     </div>
 
-                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${selectedPayment === "wave" ? "border-sky-600 bg-sky-600 text-white" : "border-slate-300 bg-white"
+                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedPayment === "tabby" ? "border-sky-600 bg-sky-600 text-white" : "border-slate-300 bg-white"
                       }`}>
-                      {selectedPayment === "wave" && <FiCheck className="text-[10px]" />}
+                      {selectedPayment === "tabby" && <FiCheck className="text-[10px]" />}
                     </div>
                   </div>
+                )}
 
-                  {selectedPayment === "wave" && (
-                    <div className="pt-2 border-t border-sky-200/60 p-3 bg-linear-to-br from-sky-950 to-slate-900 text-white rounded-xl space-y-2.5">
-                      <div className="flex items-center justify-between text-xs">
-                        <div>
-                          <span className="text-[9.5px] text-sky-200 uppercase font-bold block">Merchant Wave Phone</span>
-                          <span className="font-mono font-black text-white text-xs sm:text-sm">{WAVE_PAYMENT_CONFIG.merchantPhone}</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleCopyCode}
-                          className="px-2.5 py-1 bg-sky-600 hover:bg-sky-500 text-white text-[10px] font-bold rounded-lg transition cursor-pointer"
-                        >
-                          {copiedCode ? "Copied" : "Copy Number"}
-                        </button>
-                      </div>
-
+                {/* 💳 TAMARA (PAY IN 6 - UAE & SAUDI ARABIA) */}
+                {allowedMethods.includes("tamara") && (
+                  <div
+                    onClick={() => setSelectedPayment("tamara")}
+                    className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-3 ${selectedPayment === "tamara"
+                        ? "bg-sky-50/80 border-sky-600 shadow-2xs ring-1 ring-sky-600/20"
+                        : "bg-white border-slate-200/90 hover:border-slate-300"
+                      }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-900 font-black text-[10.5px]">
+                        tamara
+                      </span>
                       <div>
-                        <label className="block text-[9.5px] font-bold uppercase text-sky-200 tracking-wider mb-1">
-                          Wave Transaction Reference ID (Optional)
-                        </label>
-                        <input
-                          type="text"
-                          value={waveTransactionId}
-                          onChange={(e) => setWaveTransactionId(e.target.value)}
-                          placeholder="e.g. WV-90218492"
-                          className="w-full p-2 bg-white/10 border border-white/20 rounded-xl text-xs text-white placeholder-slate-400 font-mono font-semibold focus:outline-none focus:border-sky-400"
-                        />
+                        <span className="font-bold text-slate-900 text-xs sm:text-sm">Tamara</span>
+                        <p className="text-[10.5px] text-slate-400">
+                          Split into 6 payments of <AedPrice amount={finalPayableTotal / 6} className="font-bold text-slate-700" />
+                        </p>
                       </div>
                     </div>
-                  )}
-                </div>
 
-                {/* 💳 4. TABBY (PAY IN 4) */}
-                <div
-                  onClick={() => setSelectedPayment("tabby")}
-                  className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-3 ${selectedPayment === "tabby"
-                      ? "bg-sky-50/80 border-sky-600 shadow-2xs ring-1 ring-sky-600/20"
-                      : "bg-white border-slate-200/90 hover:border-slate-300"
-                    }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 font-black text-[10.5px]">
-                      tabby
-                    </span>
-                    <div>
-                      <span className="font-bold text-slate-900 text-xs sm:text-sm">Tabby</span>
-                      <p className="text-[10.5px] text-slate-400">
-                        Pay in 4 interest-free payments of <AedPrice amount={finalPayableTotal / 4} className="font-bold text-slate-700" />
-                      </p>
+                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedPayment === "tamara" ? "border-sky-600 bg-sky-600 text-white" : "border-slate-300 bg-white"
+                      }`}>
+                      {selectedPayment === "tamara" && <FiCheck className="text-[10px]" />}
                     </div>
                   </div>
+                )}
 
-                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedPayment === "tabby" ? "border-sky-600 bg-sky-600 text-white" : "border-slate-300 bg-white"
-                    }`}>
-                    {selectedPayment === "tabby" && <FiCheck className="text-[10px]" />}
-                  </div>
-                </div>
+                {/* 💵 CASH ON DELIVERY */}
+                {allowedMethods.includes("cod") && (
+                  <div
+                    onClick={() => setSelectedPayment("cod")}
+                    className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-3 ${selectedPayment === "cod"
+                        ? "bg-sky-50/80 border-sky-600 shadow-2xs ring-1 ring-sky-600/20"
+                        : "bg-white border-slate-200/90 hover:border-slate-300"
+                      }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-mono font-bold text-[10.5px]">
+                        CASH
+                      </span>
+                      <div>
+                        <span className="font-bold text-slate-900 text-xs sm:text-sm">Cash On Delivery</span>
+                        <p className="text-[10.5px] text-slate-400">
+                          Pay in {activeCountry.currency} upon doorstep delivery
+                        </p>
+                      </div>
+                    </div>
 
-                {/* 💳 5. TAMARA (PAY IN 6) */}
-                <div
-                  onClick={() => setSelectedPayment("tamara")}
-                  className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-3 ${selectedPayment === "tamara"
-                      ? "bg-sky-50/80 border-sky-600 shadow-2xs ring-1 ring-sky-600/20"
-                      : "bg-white border-slate-200/90 hover:border-slate-300"
-                    }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-900 font-black text-[10.5px]">
-                      tamara
-                    </span>
-                    <div>
-                      <span className="font-bold text-slate-900 text-xs sm:text-sm">Tamara</span>
-                      <p className="text-[10.5px] text-slate-400">
-                        Split into 6 payments of <AedPrice amount={finalPayableTotal / 6} className="font-bold text-slate-700" />
-                      </p>
+                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedPayment === "cod" ? "border-sky-600 bg-sky-600 text-white" : "border-slate-300 bg-white"
+                      }`}>
+                      {selectedPayment === "cod" && <FiCheck className="text-[10px]" />}
                     </div>
                   </div>
+                )}
 
-                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedPayment === "tamara" ? "border-sky-600 bg-sky-600 text-white" : "border-slate-300 bg-white"
-                    }`}>
-                    {selectedPayment === "tamara" && <FiCheck className="text-[10px]" />}
-                  </div>
-                </div>
+                {/* 🏦 DIRECT WIRE / BANK TRANSFER */}
+                {allowedMethods.includes("wire") && (
+                  <div
+                    onClick={() => setSelectedPayment("wire")}
+                    className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-3 ${selectedPayment === "wire"
+                        ? "bg-sky-50/80 border-sky-600 shadow-2xs ring-1 ring-sky-600/20"
+                        : "bg-white border-slate-200/90 hover:border-slate-300"
+                      }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-mono font-bold text-[10.5px]">
+                        WIRE
+                      </span>
+                      <div>
+                        <span className="font-bold text-slate-900 text-xs sm:text-sm">Direct Bank Transfer</span>
+                        <p className="text-[10.5px] text-slate-400">
+                          Direct transfer to {activeCountry.legalEntityName}
+                        </p>
+                      </div>
+                    </div>
 
-                {/* 💵 6. CASH ON DELIVERY */}
-                <div
-                  onClick={() => setSelectedPayment("cod")}
-                  className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-3 ${selectedPayment === "cod"
-                      ? "bg-sky-50/80 border-sky-600 shadow-2xs ring-1 ring-sky-600/20"
-                      : "bg-white border-slate-200/90 hover:border-slate-300"
-                    }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-mono font-bold text-[10.5px]">
-                      CASH
-                    </span>
-                    <div>
-                      <span className="font-bold text-slate-900 text-xs sm:text-sm">Cash On Delivery</span>
-                      <p className="text-[10.5px] text-slate-400">Pay in cash upon doorstep delivery</p>
+                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedPayment === "wire" ? "border-sky-600 bg-sky-600 text-white" : "border-slate-300 bg-white"
+                      }`}>
+                      {selectedPayment === "wire" && <FiCheck className="text-[10px]" />}
                     </div>
                   </div>
-
-                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedPayment === "cod" ? "border-sky-600 bg-sky-600 text-white" : "border-slate-300 bg-white"
-                    }`}>
-                    {selectedPayment === "cod" && <FiCheck className="text-[10px]" />}
-                  </div>
-                </div>
-
-                {/* 🏦 7. DIRECT WIRE / BANK TRANSFER */}
-                <div
-                  onClick={() => setSelectedPayment("wire")}
-                  className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-3 ${selectedPayment === "wire"
-                      ? "bg-sky-50/80 border-sky-600 shadow-2xs ring-1 ring-sky-600/20"
-                      : "bg-white border-slate-200/90 hover:border-slate-300"
-                    }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-mono font-bold text-[10.5px]">
-                      WIRE
-                    </span>
-                    <div>
-                      <span className="font-bold text-slate-900 text-xs sm:text-sm">Direct Bank Transfer</span>
-                      <p className="text-[10.5px] text-slate-400">Direct transfer to E-ALL corporate bank account</p>
-                    </div>
-                  </div>
-
-                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedPayment === "wire" ? "border-sky-600 bg-sky-600 text-white" : "border-slate-300 bg-white"
-                    }`}>
-                    {selectedPayment === "wire" && <FiCheck className="text-[10px]" />}
-                  </div>
-                </div>
+                )}
 
               </div>
             </div>
 
           </div>
 
-          {/* RIGHT COLUMN: NOON-STYLE COUPON BOX & PAYMENT SUMMARY */}
+          {/* RIGHT COLUMN: COUPON BOX & PAYMENT SUMMARY */}
           <div className="lg:col-span-5 space-y-4">
 
-            {/* 🏷️ NOON-STYLE "GOT A COUPON?" CARD */}
-            <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-2xs space-y-3.5 text-xs">
-              <h3 className="text-sm font-bold text-slate-900">
+            {/* "GOT A COUPON?" CARD */}
+            <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-slate-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.03)] space-y-3 text-xs">
+              <h3 className="text-sm font-extrabold text-slate-900">
                 Got a coupon?
               </h3>
 
@@ -1077,9 +1401,9 @@ const CheckoutPage = () => {
               </div>
             </div>
 
-            {/* 📋 PAYMENT SUMMARY (NOON STYLE) */}
-            <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-2xs space-y-4">
-              <h3 className="text-sm sm:text-base font-bold text-slate-900 border-b border-slate-100 pb-3">
+            {/* PAYMENT SUMMARY */}
+            <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-slate-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.03)] space-y-4">
+              <h3 className="text-sm sm:text-base font-extrabold text-slate-900 border-b border-slate-100 pb-3">
                 Payment summary
               </h3>
 
@@ -1130,7 +1454,9 @@ const CheckoutPage = () => {
                 </div>
 
                 <div className="pt-3 border-t border-slate-200 flex justify-between items-baseline">
-                  <span className="font-bold text-slate-900 text-sm">Total Incl. VAT</span>
+                  <span className="font-bold text-slate-900 text-sm">
+                    Total Incl. {activeCountry.vatRate}% VAT
+                  </span>
                   <AedPrice
                     amount={finalPayableTotal}
                     className="font-black text-xl text-slate-950"
@@ -1140,7 +1466,7 @@ const CheckoutPage = () => {
               </div>
 
               {/* Desktop Place Order CTA */}
-              <div className="hidden sm:block pt-2">
+              <div className="hidden lg:block pt-2">
                 {selectedPayment === "apple_pay" ? (
                   <button
                     type="submit"
@@ -1168,9 +1494,18 @@ const CheckoutPage = () => {
                 )}
               </div>
 
-              <div className="text-[10px] text-slate-400 text-center flex items-center justify-center gap-1 pt-1">
-                <FiShield className="text-emerald-600" />
-                <span>100% Encrypted &amp; Verified Checkout</span>
+              {/* Bottom Warranty & Storefront Region Trust Row (Matches Cart) */}
+              <div className="flex items-center justify-between gap-3 pt-2.5 border-t border-slate-100 text-[11.5px]">
+                <span className="inline-flex items-center gap-1.5 font-semibold text-slate-600">
+                  <FiShield className="text-emerald-600 text-sm shrink-0" />
+                  <span>Encrypted &amp; Warranty Backed</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5 font-semibold text-slate-600 shrink-0">
+                  <CountryFlag code={activeCountry.code} className="w-4 h-3" />
+                  <span>
+                    {activeCountry.shortName} · {activeCountry.currency}
+                  </span>
+                </span>
               </div>
             </div>
 
@@ -1178,16 +1513,16 @@ const CheckoutPage = () => {
 
         </form>
 
-        {/* 📱 MOBILE NOON-STYLE STICKY BOTTOM ACTION BAR */}
-        <div className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 px-4 py-3 shadow-2xl flex items-center justify-between gap-3">
-          <div>
-            <span className="text-[10.5px] text-slate-400 block font-medium">
-              {items.length} {items.length === 1 ? "Item" : "Items"}
+        {/* STICKY MOBILE / TABLET CHECKOUT BAR (Docked cleanly above MobileBottomNav) */}
+        <div className="lg:hidden fixed left-0 right-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom,0px))] z-30 bg-white/95 backdrop-blur-md border-t border-slate-200/90 shadow-[0_-4px_16px_rgba(15,23,42,0.06)] px-3.5 py-2.5 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block leading-none">
+              Total ({items.length} {items.length === 1 ? "item" : "items"})
             </span>
             <AedPrice
               amount={finalPayableTotal}
-              className="font-black text-base text-slate-950"
-              symbolClassName="text-sky-800"
+              className="font-black text-base text-slate-950 mt-0.5"
+              symbolClassName="text-sky-700"
             />
           </div>
 
@@ -1196,19 +1531,20 @@ const CheckoutPage = () => {
               type="button"
               onClick={handlePlaceOrder}
               disabled={submitting}
-              className="flex-1 max-w-[200px] py-3 bg-black text-white font-black text-sm rounded-xl flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+              className="flex-1 max-w-[210px] h-11 px-4 bg-black hover:bg-slate-900 active:scale-[0.99] text-white font-black text-sm rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
             >
-              <FaApple className="text-base" /> <span>Pay</span>
+              <FaApple className="text-base" />
+              <span>{submitting ? "Processing..." : "Pay"}</span>
             </button>
           ) : (
             <button
               type="button"
               onClick={handlePlaceOrder}
               disabled={submitting}
-              className="flex-1 max-w-[200px] py-3 bg-sky-700 hover:bg-sky-800 text-white font-bold text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+              className="flex-1 max-w-[210px] h-11 px-4 bg-sky-700 hover:bg-sky-800 active:scale-[0.99] disabled:opacity-50 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
             >
-              {submitting ? "Processing..." : "Place Order"}
-              <FiArrowRight />
+              <span>{submitting ? "Processing..." : "Place Order"}</span>
+              <FiArrowRight className="text-sm" />
             </button>
           )}
         </div>

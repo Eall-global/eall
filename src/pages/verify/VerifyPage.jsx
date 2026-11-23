@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { useSearchParams, Link } from "react-router-dom";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useSearchParams, useParams, Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { motion } from "framer-motion";
 import {
@@ -17,6 +17,11 @@ import {
 import IMEIScanner from "../../components/verify/IMEIScanner";
 import VerifyResult from "../../components/verify/VerifyResult";
 import { verifyIMEI, parseMultiIMEI } from "../../data/imeiRegistry";
+import {
+  fetchImeiRegistry,
+  getWarrantyState,
+} from "../../services/warrantyService";
+import { products } from "../../data/products/index";
 
 /**
  * VerifyPage — /verify
@@ -25,27 +30,109 @@ import { verifyIMEI, parseMultiIMEI } from "../../data/imeiRegistry";
  */
 const VerifyPage = () => {
   const [searchParams] = useSearchParams();
+  const { imei: routeImei } = useParams();
   const [mode, setMode] = useState("manual"); // 'manual' | 'scan'
   const [imeiInput, setImeiInput] = useState("");
   const [result, setResult] = useState(null);
   const [inputError, setInputError] = useState("");
   const [scannerActive, setScannerActive] = useState(false);
   const [multiImeis, setMultiImeis] = useState(null); // null | string[]
+  const [liveRegistry, setLiveRegistry] = useState([]);
   const inputRef = useRef(null);
 
-  // Auto-verify on deep link query param (?imei=...)
   useEffect(() => {
-    const paramImei = searchParams.get("imei");
+    let active = true;
+    fetchImeiRegistry()
+      .then((records) => {
+        if (active && Array.isArray(records)) {
+          setLiveRegistry(records);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const runVerification = useCallback(
+    (rawSerial) => {
+      const clean = String(rawSerial || "").trim();
+      const digitsOnly = clean.replace(/\D/g, "");
+
+      // 1. Check live Business Portal Firestore IMEI & Warranty Registry first
+      const matchedRecord = liveRegistry.find((r) => {
+        const s1 = String(r.serialNumber || "").toUpperCase();
+        const s2 = String(r.imei2 || "").toUpperCase();
+        const target = clean.toUpperCase();
+        return (
+          (target && (s1 === target || s2 === target)) ||
+          (digitsOnly.length >= 8 && (s1 === digitsOnly || s2 === digitsOnly))
+        );
+      });
+
+      if (matchedRecord) {
+        const wState = getWarrantyState(matchedRecord);
+        const skuUpper = String(matchedRecord.sku || "").toUpperCase();
+        const nameLower = String(matchedRecord.productName || "").toLowerCase();
+        const matchedProd =
+          products.find(
+            (p) =>
+              String(p.sku || "").toUpperCase() === skuUpper ||
+              skuUpper.startsWith(`${String(p.sku || "").toUpperCase()}-`)
+          ) ||
+          products.find(
+            (p) =>
+              nameLower &&
+              (String(p.name || "").toLowerCase().includes(nameLower) ||
+                nameLower.includes(String(p.name || "").toLowerCase()))
+          );
+
+        return {
+          status: "authentic",
+          imei: matchedRecord.serialNumber || digitsOnly || clean,
+          source: "portal_registry",
+          warrantyRecord: matchedRecord,
+          warrantyState: wState,
+          message: `Verified in E-ALL's Official Live Warranty Registry (${matchedRecord.productName}). Status: ${matchedRecord.status} • Warranty: ${wState.label}.`,
+          product: {
+            productSlug: matchedProd?.slug || null,
+            modelName: matchedRecord.productName,
+            brand: matchedRecord.brand,
+            sim:
+              digitsOnly &&
+              String(matchedRecord.imei2 || "") === digitsOnly
+                ? 2
+                : 1,
+            pairedImei: matchedRecord.imei2 || null,
+          },
+        };
+      }
+
+      // 2. Fallback to static Nokia/HMD IMEI & TAC registry
+      return verifyIMEI(digitsOnly || clean);
+    },
+    [liveRegistry]
+  );
+
+  // Auto-verify on deep link query param (?imei=...) or route param (/verify/:imei)
+  useEffect(() => {
+    const paramImei = searchParams.get("imei") || routeImei;
     if (paramImei) {
       const imeis = parseMultiIMEI(paramImei);
       if (imeis.length === 1) {
         setImeiInput(imeis[0]);
-        setResult(verifyIMEI(imeis[0]));
+        setResult(runVerification(imeis[0]));
       } else if (imeis.length > 1) {
         setMultiImeis(imeis);
+      } else {
+        const clean = paramImei.replace(/\D/g, "").slice(0, 15);
+        if (clean) {
+          setImeiInput(clean);
+          setResult(runVerification(clean));
+        }
       }
     }
-  }, [searchParams]);
+  }, [searchParams, routeImei, runVerification]);
 
   const handleInputChange = (e) => {
     const raw = e.target.value.replace(/\D/g, "");
@@ -62,7 +149,7 @@ const VerifyPage = () => {
       inputRef.current?.focus();
       return;
     }
-    setResult(verifyIMEI(imeiInput));
+    setResult(runVerification(imeiInput));
   };
 
   const handleScanResult = (rawValue) => {
@@ -71,12 +158,14 @@ const VerifyPage = () => {
     const imeis = parseMultiIMEI(rawValue);
 
     if (imeis.length === 0) {
-      setInputError("Could not extract a valid IMEI from the scanned code. Please enter it manually.");
+      setInputError(
+        "Could not extract a valid IMEI from the scanned code. Please enter it manually."
+      );
       return;
     }
     if (imeis.length === 1) {
       setImeiInput(imeis[0]);
-      setResult(verifyIMEI(imeis[0]));
+      setResult(runVerification(imeis[0]));
     } else {
       // Carton-level QR with multiple IMEIs
       setMultiImeis(imeis);
@@ -86,7 +175,7 @@ const VerifyPage = () => {
   const handleSelectImei = (imei) => {
     setMultiImeis(null);
     setImeiInput(imei);
-    setResult(verifyIMEI(imei));
+    setResult(runVerification(imei));
   };
 
   const handleReset = () => {
@@ -112,7 +201,7 @@ const VerifyPage = () => {
 
       <div className="min-h-screen bg-slate-100/70 font-sans text-slate-800">
         {/* ── HERO SECTION ────────────────────────────────────────── */}
-        <section className="relative bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-white pt-28 pb-20 sm:pt-36 sm:pb-28 overflow-hidden">
+        <section className="relative bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-white pt-[124px] pb-20 sm:pt-[136px] xl:pt-[164px] sm:pb-28 overflow-hidden">
           {/* Subtle Ambient Background Gradients */}
           <div className="absolute inset-0 pointer-events-none overflow-hidden">
             <div className="absolute -top-32 right-1/4 w-96 h-96 bg-indigo-500/15 rounded-full blur-3xl" />
@@ -123,23 +212,23 @@ const VerifyPage = () => {
             {/* Hero Text */}
             <div className="max-w-xl text-center md:text-left">
               {/* Brand Pills */}
-              <div className="flex items-center justify-center md:justify-start gap-2 mb-4">
-                <span className="px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-widest bg-white/10 text-white border border-white/20 backdrop-blur-md">
-                  Nokia
-                </span>
-                <span className="text-white/30 text-sm">×</span>
-                <span className="px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-widest bg-indigo-500/20 text-indigo-200 border border-indigo-400/30 backdrop-blur-md">
-                  HMD
-                </span>
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-4">
+                {["Apple", "Samsung", "HMD", "Nokia"].map((bName) => (
+                  <span
+                    key={bName}
+                    className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest bg-white/10 text-white border border-white/20 backdrop-blur-md"
+                  >
+                    {bName}
+                  </span>
+                ))}
               </div>
 
               <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight leading-tight">
-                Verify Device Authenticity
+                Verify Device &amp; Warranty Status
               </h1>
 
               <p className="mt-4 text-sm sm:text-base text-slate-300 leading-relaxed max-w-lg">
-                Enter or scan your IMEI to confirm your Nokia or HMD device is genuine
-                and distributed through E-ALL's official channel.
+                Enter or scan your 15-digit IMEI to confirm device authenticity and check live warranty coverage through E-ALL&apos;s official registry.
               </p>
 
               {/* Helpful Hint Badge */}

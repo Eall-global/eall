@@ -18,6 +18,7 @@ import {
   FiCheckCircle,
 } from "react-icons/fi";
 import { AedPrice, AedSymbol } from "../common/AedSymbol";
+import { usePortalCurrency } from "../../context/PortalCurrencyContext";
 import PortalKpiGrid from "./PortalKpiGrid";
 import { PortalFilterMenu, ActiveFilterChips } from "./PortalFilterMenu";
 
@@ -28,13 +29,6 @@ const DATE_PRESETS = [
   { id: "month", label: "This Month" },
   { id: "year", label: "This Year" },
   { id: "custom", label: "Custom" },
-];
-
-const REPORT_VIEWS = [
-  { id: "pnl", label: "P&L & Overview", icon: FiBarChart2 },
-  { id: "vat", label: "UAE VAT (5%)", icon: FiPercent },
-  { id: "brands", label: "Brands & SKUs", icon: FiLayers },
-  { id: "payables", label: "Cash & Payables", icon: FiCreditCard },
 ];
 
 const isDateInRange = (isoDate, preset, customStart, customEnd) => {
@@ -86,6 +80,16 @@ const fmtNum = (val, decimals = 2) =>
   });
 
 const ReportsAnalytics = ({ stock = [], invoices = [], purchases = [] }) => {
+  const portalCur = usePortalCurrency();
+  const reportViews = useMemo(
+    () => [
+      { id: "pnl", label: "P&L & Overview", icon: FiBarChart2 },
+      { id: "vat", label: `${portalCur.shortName} VAT (${portalCur.vatRate}%)`, icon: FiPercent },
+      { id: "brands", label: "Brands & SKUs", icon: FiLayers },
+      { id: "payables", label: "Cash & Payables", icon: FiCreditCard },
+    ],
+    [portalCur.shortName, portalCur.vatRate]
+  );
   const [datePreset, setDatePreset] = useState("all");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
@@ -383,14 +387,14 @@ const ReportsAnalytics = ({ stock = [], invoices = [], purchases = [] }) => {
     const periodLabel =
       DATE_PRESETS.find((p) => p.id === datePreset)?.label || datePreset;
     const rows = [
-      ["E-ALL (ELECTRONICS ALL FZCO) - FINANCIAL REPORT"],
+      [`${portalCur.legalEntityName.toUpperCase()} - FINANCIAL REPORT`],
       ["Generated At", new Date().toLocaleString("en-GB")],
       ["Period", periodLabel],
       ["Brand Filter", brandFilter],
       ["Payment Filter", paymentFilter],
       [],
-      ["SECTION 1: PROFIT & LOSS SUMMARY (AED)"],
-      ["Metric", "Amount (AED)"],
+      [`SECTION 1: PROFIT & LOSS SUMMARY (${portalCur.currency})`],
+      ["Metric", `Amount (${portalCur.currency})`],
       ["Gross Billed Revenue (Incl. VAT)", analytics.grossRevenue.toFixed(2)],
       ["Gross Sales Subtotal", analytics.totalSubtotal.toFixed(2)],
       ["Less: Customer Discounts", analytics.totalDiscounts.toFixed(2)],
@@ -398,11 +402,11 @@ const ReportsAnalytics = ({ stock = [], invoices = [], purchases = [] }) => {
       ["Estimated COGS (Inventory Cost)", analytics.estimatedCogs.toFixed(2)],
       ["Estimated Gross Profit", analytics.grossProfit.toFixed(2)],
       ["Gross Profit Margin (%)", `${analytics.grossMarginPct.toFixed(2)}%`],
-      ["UAE Output VAT Collected (5%)", analytics.totalVat.toFixed(2)],
+      [`${portalCur.shortName} Output VAT Collected (${portalCur.vatRate}%)`, analytics.totalVat.toFixed(2)],
       ["Procurement Spend (Inward POs)", analytics.procurementSpend.toFixed(2)],
       [],
       ["SECTION 2: SALES BY BRAND"],
-      ["Brand", "Units Sold", "Revenue (AED)", "Est. Profit (AED)"],
+      ["Brand", "Units Sold", `Revenue (${portalCur.currency})`, `Est. Profit (${portalCur.currency})`],
       ...analytics.brandSales.map((b) => [
         `"${b.brand}"`,
         b.units,
@@ -410,8 +414,8 @@ const ReportsAnalytics = ({ stock = [], invoices = [], purchases = [] }) => {
         b.profit.toFixed(2),
       ]),
       [],
-      ["SECTION 3: UAE VAT TAX INVOICE REGISTER"],
-      ["Invoice No", "Date", "Customer", "Customer TRN", "Payment", "Taxable Net (AED)", "VAT 5% (AED)", "Total (AED)"],
+      [`SECTION 3: ${portalCur.shortName.toUpperCase()} VAT TAX INVOICE REGISTER`],
+      ["Invoice No", "Date", "Customer", `Customer ${portalCur.taxIdLabel}`, "Payment", `Taxable Net (${portalCur.currency})`, `VAT ${portalCur.vatRate}% (${portalCur.currency})`, `Total (${portalCur.currency})`],
       ...filteredInvoices.map((inv) => [
         inv.invoiceNo,
         new Date(inv.createdAt).toLocaleDateString("en-GB"),
@@ -448,10 +452,10 @@ const ReportsAnalytics = ({ stock = [], invoices = [], purchases = [] }) => {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    doc.text("E-ALL (ELECTRONICS ALL FZCO)", 14, 14);
+    doc.text(portalCur.legalEntityName.toUpperCase(), 14, 14);
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text("Executive Financial, UAE VAT & Operations Report", 14, 21);
+    doc.text(`Executive Financial, ${portalCur.shortName} VAT & Operations Report`, 14, 21);
     doc.setFontSize(8.5);
     doc.setTextColor(148, 163, 184);
     doc.text(
@@ -464,21 +468,22 @@ const ReportsAnalytics = ({ stock = [], invoices = [], purchases = [] }) => {
     doc.setTextColor(15, 23, 42);
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
-    doc.text("1. Profit & Loss & UAE VAT Summary", 14, 42);
+    doc.text(`1. Profit & Loss & ${portalCur.shortName} VAT Summary`, 14, 42);
 
+    const cur = portalCur.currency;
     autoTable(doc, {
       startY: 46,
       head: [["Financial Metric", "Value"]],
       body: [
         ["Invoices Issued / Units Sold", `${filteredInvoices.length} invoices / ${analytics.totalUnitsSold} units`],
-        ["Gross Billed Revenue (Incl. VAT)", `AED ${fmtNum(analytics.grossRevenue)}`],
-        ["Less: Customer Discounts", `AED ${fmtNum(analytics.totalDiscounts)}`],
-        ["Net Revenue (Excl. VAT)", `AED ${fmtNum(analytics.netRevenueExVat)}`],
-        ["Estimated Cost of Goods Sold (COGS)", `AED ${fmtNum(analytics.estimatedCogs)}`],
-        ["Estimated Gross Profit", `AED ${fmtNum(analytics.grossProfit)} (${analytics.grossMarginPct.toFixed(1)}%)`],
-        ["UAE Output VAT Collected (5%)", `AED ${fmtNum(analytics.totalVat)}`],
-        ["Procurement Spend (Inward POs)", `AED ${fmtNum(analytics.procurementSpend)}`],
-        ["Active Inventory Valuation", `AED ${fmtNum(analytics.totalStockValue, 0)}`],
+        ["Gross Billed Revenue (Incl. VAT)", `${cur} ${fmtNum(analytics.grossRevenue)}`],
+        ["Less: Customer Discounts", `${cur} ${fmtNum(analytics.totalDiscounts)}`],
+        ["Net Revenue (Excl. VAT)", `${cur} ${fmtNum(analytics.netRevenueExVat)}`],
+        ["Estimated Cost of Goods Sold (COGS)", `${cur} ${fmtNum(analytics.estimatedCogs)}`],
+        ["Estimated Gross Profit", `${cur} ${fmtNum(analytics.grossProfit)} (${analytics.grossMarginPct.toFixed(1)}%)`],
+        [`${portalCur.shortName} Output VAT Collected (${portalCur.vatRate}%)`, `${cur} ${fmtNum(analytics.totalVat)}`],
+        ["Procurement Spend (Inward POs)", `${cur} ${fmtNum(analytics.procurementSpend)}`],
+        ["Active Inventory Valuation", `${cur} ${fmtNum(analytics.totalStockValue, 0)}`],
       ],
       theme: "grid",
       headStyles: { fillColor: [3, 105, 161], textColor: 255, fontSize: 9 },
@@ -494,7 +499,7 @@ const ReportsAnalytics = ({ stock = [], invoices = [], purchases = [] }) => {
 
     autoTable(doc, {
       startY: afterPnlY + 4,
-      head: [["Brand", "Units Sold", "Revenue (AED)", "Est. Profit (AED)"]],
+      head: [["Brand", "Units Sold", `Revenue (${cur})`, `Est. Profit (${cur})`]],
       body:
         analytics.brandSales.length > 0
           ? analytics.brandSales.map((b) => [
@@ -522,7 +527,7 @@ const ReportsAnalytics = ({ stock = [], invoices = [], purchases = [] }) => {
 
     autoTable(doc, {
       startY: afterBrandsY + 4,
-      head: [["Payment Method", "Invoices", "Total Collected (AED)", "Share"]],
+      head: [["Payment Method", "Invoices", `Total Collected (${cur})`, "Share"]],
       body:
         analytics.paymentMix.length > 0
           ? analytics.paymentMix.map((pm) => [
@@ -580,7 +585,7 @@ const ReportsAnalytics = ({ stock = [], invoices = [], purchases = [] }) => {
           },
           {
             id: "vat-tax",
-            label: "UAE VAT (5%)",
+            label: `${portalCur.shortName} VAT (${portalCur.vatRate}%)`,
             value: (
               <AedPrice
                 amount={analytics.totalVat}
@@ -696,7 +701,7 @@ const ReportsAnalytics = ({ stock = [], invoices = [], purchases = [] }) => {
 
       {/* Report Sub-View Switcher */}
       <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar border-b border-slate-200/80 dark:border-slate-800 pb-0">
-        {REPORT_VIEWS.map((view) => {
+        {reportViews.map((view) => {
           const Icon = view.icon;
           const isActive = activeView === view.id;
           return (
@@ -769,7 +774,7 @@ const ReportsAnalytics = ({ stock = [], invoices = [], purchases = [] }) => {
                   highlight: true,
                 },
                 {
-                  label: "Output VAT Liability (UAE 5%)",
+                  label: `Output VAT Liability (${portalCur.shortName} ${portalCur.vatRate}%)`,
                   value: analytics.totalVat,
                   tone: "text-purple-700 dark:text-purple-300 font-bold",
                 },
@@ -899,21 +904,21 @@ const ReportsAnalytics = ({ stock = [], invoices = [], purchases = [] }) => {
       )}
 
       {/* =================================================================== */}
-      {/* TAB 2: UAE VAT (5%) FTA TAX RETURN SUMMARY                          */}
+      {/* TAB 2: VAT TAX RETURN SUMMARY                                     */}
       {/* =================================================================== */}
       {activeView === "vat" && (
         <div className="space-y-5">
-          {/* FTA Box Summary Cards */}
+          {/* Tax Box Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-1">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Box 1 • Standard-Rated Supplies (5%)
+                Box 1 • Standard-Rated Supplies ({portalCur.vatRate}%)
               </span>
               <div className="text-xl font-black font-mono text-slate-900 dark:text-white">
                 <AedPrice amount={analytics.standardRatedSupplies} />
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Taxable net sales value in UAE
+                Taxable net sales value in {portalCur.shortName}
               </p>
             </div>
 
@@ -931,13 +936,13 @@ const ReportsAnalytics = ({ stock = [], invoices = [], purchases = [] }) => {
 
             <div className="p-5 bg-purple-50/70 dark:bg-purple-500/10 rounded-2xl border border-purple-200/80 dark:border-purple-500/25 shadow-2xs space-y-1">
               <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300">
-                Output VAT Payable to FTA
+                Output VAT Payable
               </span>
               <div className="text-xl font-black font-mono text-purple-900 dark:text-purple-200">
                 <AedPrice amount={analytics.totalVat} />
               </div>
               <p className="text-[11px] text-purple-700/80 dark:text-purple-300/80 font-mono">
-                Company TRN: 100482910400003
+                {portalCur.taxIdLabel}: {portalCur.legalTaxId}
               </p>
             </div>
           </div>

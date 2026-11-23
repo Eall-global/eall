@@ -15,7 +15,7 @@ import {
   setDoc,
   deleteDoc,
 } from "../lib/firebaseClient";
-import { fetchStock, updateProductDetails } from "./stockService";
+import { fetchStock, updateProductDetails, updateLocationStock } from "./stockService";
 import { createPurchaseRecord } from "./purchaseService";
 import { logAuditEvent } from "./auditService";
 
@@ -25,6 +25,11 @@ const COLLECTION_NAME = "landed_cost_sheets";
 
 export const CURRENCY_PRESETS = [
   { code: "AED", label: "AED — UAE Dirham", defaultRate: 1.0 },
+  { code: "KES", label: "KES — Kenyan Shilling", defaultRate: 1.0 },
+  { code: "XOF", label: "XOF — West African CFA", defaultRate: 1.0 },
+  { code: "UGX", label: "UGX — Ugandan Shilling", defaultRate: 1.0 },
+  { code: "GHS", label: "GHS — Ghanaian Cedi", defaultRate: 1.0 },
+  { code: "SAR", label: "SAR — Saudi Riyal", defaultRate: 1.0 },
   { code: "USD", label: "USD — US Dollar", defaultRate: 3.6725 },
   { code: "EUR", label: "EUR — Euro", defaultRate: 3.98 },
   { code: "GBP", label: "GBP — British Pound", defaultRate: 4.65 },
@@ -255,6 +260,7 @@ const DEFAULT_DEMO_SHEETS = [
   {
     id: "LC-2026-1001",
     sheetNo: "LC-2026-1001",
+    locationCode: "AE",
     title: "HMD 2,000 Pcs Air Cargo Shipment (40 Master Cartons)",
     supplierName: "HMD Global / Regional Distribution Hub",
     shipmentRef: "AWB-DXB-884920",
@@ -364,6 +370,8 @@ export const saveLandedCostSheet = async (sheetData, stockList = []) => {
   const record = {
     id: sheetNo,
     sheetNo,
+    locationCode: sheetData.locationCode || "AE",
+    localCurrency: sheetData.localCurrency || "AED",
     title: (sheetData.title || `${sheetData.supplierName || "Shipment"} (${computed.totalUnits} pcs)`).trim(),
     supplierName: (sheetData.supplierName || "General Supplier").trim(),
     shipmentRef: (sheetData.shipmentRef || "").trim(),
@@ -420,17 +428,18 @@ export const saveLandedCostSheet = async (sheetData, stockList = []) => {
   const nextList = [record, ...existingList.filter((s) => s.id !== record.id)];
   writeCache(nextList);
 
+  const cur = record.localCurrency || "AED";
   logAuditEvent({
     module: "landed_cost",
     action: isExisting ? "update" : "create",
     severity: "info",
     targetId: record.sheetNo,
     targetLabel: `${record.sheetNo} • ${record.title}`,
-    summary: `${isExisting ? "Updated" : "Saved"} Landed Cost Sheet ${record.sheetNo} (${record.totalUnits} pcs across ${record.totalPackages} pkgs • Total AED ${record.totalLandedAed.toLocaleString()})`,
+    summary: `${isExisting ? "Updated" : "Saved"} Landed Cost Sheet ${record.sheetNo} (${record.totalUnits} pcs across ${record.totalPackages} pkgs • Total ${cur} ${record.totalLandedAed.toLocaleString()})`,
     changes: [
       { field: "Total Units", before: "—", after: `${record.totalUnits} pcs (${record.totalPackages} pkgs)` },
-      { field: "Logistics & Fees", before: "—", after: `AED ${record.totalOverheadAed.toFixed(2)}` },
-      { field: "Avg Landed / Pc", before: "—", after: `AED ${record.avgLandedPerUnitAed.toFixed(2)}` },
+      { field: "Logistics & Fees", before: "—", after: `${cur} ${record.totalOverheadAed.toFixed(2)}` },
+      { field: "Avg Landed / Pc", before: "—", after: `${cur} ${record.avgLandedPerUnitAed.toFixed(2)}` },
     ],
   });
 
@@ -442,7 +451,7 @@ export const saveLandedCostSheet = async (sheetData, stockList = []) => {
  */
 export const applyLandedCostToStock = async (
   calculatedSheet,
-  { costRule = "wac", updateSellingPrice = false } = {}
+  { costRule = "wac", updateSellingPrice = false, locationCode = "AE", currencyLabel = "AED" } = {}
 ) => {
   const currentStock = await fetchStock();
   const stockMap = new Map(currentStock.map((s) => [s.sku, s]));
@@ -465,12 +474,19 @@ export const applyLandedCostToStock = async (
 
     const nextMargin = Math.max(0, Number((nextSellingPrice - newUnitCost).toFixed(2)));
 
-    await updateProductDetails(item.sku, {
-      costPrice: newUnitCost,
-      margin: nextMargin,
-      price: nextSellingPrice,
-      skipAudit: true,
-    });
+    if (locationCode && locationCode !== "AE" && locationCode !== "ALL") {
+      await updateLocationStock(item.sku, locationCode, {
+        costLocal: newUnitCost,
+        ...(updateSellingPrice ? { priceLocal: nextSellingPrice } : {}),
+      });
+    } else {
+      await updateProductDetails(item.sku, {
+        costPrice: newUnitCost,
+        margin: nextMargin,
+        price: nextSellingPrice,
+        skipAudit: true,
+      });
+    }
 
     updatedSkus.push({
       sku: item.sku,
@@ -486,11 +502,11 @@ export const applyLandedCostToStock = async (
     severity: "warning",
     targetId: calculatedSheet.sheetNo || "LANDED-APPLY",
     targetLabel: `${updatedSkus.length} SKU(s) • ${costRule === "wac" ? "WAC Blended" : "Latest Landed"}`,
-    summary: `Applied ${costRule === "wac" ? "Weighted Average (WAC)" : "Latest"} Landed Cost to ${updatedSkus.length} product(s) in Stock Manager`,
+    summary: `Applied ${costRule === "wac" ? "Weighted Average (WAC)" : "Latest"} Landed Cost to ${updatedSkus.length} product(s) in Stock Manager (${locationCode})`,
     changes: updatedSkus.slice(0, 6).map((u) => ({
       field: `${u.sku} Cost`,
-      before: `AED ${u.oldCost.toFixed(2)}`,
-      after: `AED ${u.newCost.toFixed(2)}`,
+      before: `${currencyLabel} ${u.oldCost.toFixed(2)}`,
+      after: `${currencyLabel} ${u.newCost.toFixed(2)}`,
     })),
   });
 

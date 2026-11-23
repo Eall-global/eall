@@ -26,13 +26,17 @@ import {
   FiArrowRight,
 } from "react-icons/fi";
 import { useStaffAuth } from "../../context/StaffAuthContext";
+import { useCountry } from "../../context/CountryContext";
+import { usePortalCurrency } from "../../context/PortalCurrencyContext";
 import { AedPrice } from "../common/AedSymbol";
 import PortalKpiGrid from "./PortalKpiGrid";
 import { PortalFilterMenu, ActiveFilterChips } from "./PortalFilterMenu";
 
 const ROLE_OPTIONS = [
-  { value: "admin", label: "Master Admin" },
-  { value: "sales", label: "Sales Executive" },
+  { value: "admin", label: "Master Admin (Global)" },
+  { value: "hub_manager", label: "Supply Hub Manager" },
+  { value: "country_manager", label: "Country Manager" },
+  { value: "sales", label: "Country Sales Executive" },
   { value: "procurement", label: "Procurement" },
   { value: "warehouse", label: "Warehouse / Ops" },
 ];
@@ -67,6 +71,7 @@ const EMPTY_FORM = {
   phone: "",
   email: "",
   branch: "Dubai Silicon Oasis HQ",
+  assignedLocation: "AE",
   commissionRate: 2,
   status: "active",
 };
@@ -79,6 +84,8 @@ const EmployeeManagement = ({ invoices = [], onViewInvoice }) => {
     deleteMember,
     pushAllMembersToCloud,
   } = useStaffAuth();
+  const { allLocations } = useCountry();
+  const portalCur = usePortalCurrency();
 
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("All");
@@ -237,6 +244,8 @@ const EmployeeManagement = ({ invoices = [], onViewInvoice }) => {
       phone: member.phone || "",
       email: member.email || "",
       branch: member.branch || "Dubai Silicon Oasis HQ",
+      assignedLocation:
+        member.assignedLocation || (member.role === "admin" ? "ALL" : "AE"),
       commissionRate: member.commissionRate ?? 0,
       status: member.status || "active",
     });
@@ -512,7 +521,7 @@ const EmployeeManagement = ({ invoices = [], onViewInvoice }) => {
                   <th className="py-3.5 px-4 whitespace-nowrap">Role &amp; Branch</th>
                   <th className="py-3.5 px-3 text-center whitespace-nowrap">Status</th>
                   <th className="py-3.5 px-3 text-center whitespace-nowrap">Invoices</th>
-                  <th className="py-3.5 px-4 text-right whitespace-nowrap">Revenue (AED)</th>
+                  <th className="py-3.5 px-4 text-right whitespace-nowrap">Revenue ({portalCur.symbol})</th>
                   <th className="py-3.5 px-4 text-right whitespace-nowrap">Commission</th>
                   <th className="py-3.5 px-3 text-center whitespace-nowrap">Access PIN</th>
                   <th className="py-3.5 px-4 text-right whitespace-nowrap">Actions</th>
@@ -1131,31 +1140,61 @@ const EmployeeManagement = ({ invoices = [], onViewInvoice }) => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 dark:text-slate-300 uppercase text-[10px] mb-1">
-                    Branch / Office
+                    Assigned Country / Warehouse Hub *
+                  </label>
+                  <select
+                    value={form.assignedLocation || "AE"}
+                    disabled={editingId === "admin"}
+                    onChange={(e) => {
+                      const locCode = e.target.value;
+                      const locObj = allLocations.find((l) => l.code === locCode);
+                      setForm({
+                        ...form,
+                        assignedLocation: locCode,
+                        branch:
+                          locCode === "ALL"
+                            ? "Global HQ (All Hubs & Countries)"
+                            : locObj?.hubName || form.branch,
+                      });
+                    }}
+                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl font-semibold outline-none focus:border-sky-600 cursor-pointer disabled:opacity-60"
+                  >
+                    <option value="ALL">🌍 Global (All Countries &amp; Supply Hubs)</option>
+                    {allLocations.map((loc) => (
+                      <option key={loc.code} value={loc.code}>
+                        {loc.flag} {loc.name} — {loc.hubName} ({loc.currency})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 uppercase text-[10px] mb-1">
+                    Branch / Office Label
                   </label>
                   <input
                     type="text"
-                    placeholder="Dubai Silicon Oasis HQ"
+                    placeholder="e.g. Nairobi Westlands Branch"
                     value={form.branch}
                     onChange={(e) => setForm({ ...form, branch: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-sky-600"
                   />
                 </div>
+              </div>
 
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 uppercase text-[10px] mb-1">
-                    Account Status
-                  </label>
-                  <select
-                    value={form.status}
-                    disabled={editingId === "admin"}
-                    onChange={(e) => setForm({ ...form, status: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl font-semibold outline-none focus:border-sky-600 cursor-pointer disabled:opacity-60"
-                  >
-                    <option value="active">Active (Can Sign In)</option>
-                    <option value="suspended">Suspended (Access Blocked)</option>
-                  </select>
-                </div>
+              <div>
+                <label className="block font-bold text-slate-700 dark:text-slate-300 uppercase text-[10px] mb-1">
+                  Account Status
+                </label>
+                <select
+                  value={form.status}
+                  disabled={editingId === "admin"}
+                  onChange={(e) => setForm({ ...form, status: e.target.value })}
+                  className="w-full p-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl font-semibold outline-none focus:border-sky-600 cursor-pointer disabled:opacity-60"
+                >
+                  <option value="active">Active (Can Sign In)</option>
+                  <option value="suspended">Suspended (Access Blocked)</option>
+                </select>
               </div>
 
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">

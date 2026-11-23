@@ -1,59 +1,55 @@
 import { Link } from "react-router-dom";
 import { FiBox, FiTag, FiShield } from "react-icons/fi";
+import { useCountry } from "../../../context/CountryContext";
 
 const MobileQuickActions = ({ onClose }) => {
+  const { countryPath } = useCountry();
+
   const actions = [
     {
-      label: "Products",
+      label: "All Products",
       icon: FiBox,
       to: "/products",
-      color: "text-sky-700",
+      iconCls: "text-sky-700 bg-sky-50",
     },
     {
       label: "Brands",
       icon: FiTag,
       to: "/brands",
-      color: "text-emerald-700",
+      iconCls: "text-emerald-700 bg-emerald-50",
     },
     {
-      label: "Verify",
+      label: "Verify IMEI",
       icon: FiShield,
       to: "/verify",
-      color: "text-violet-700",
+      iconCls: "text-violet-700 bg-violet-50",
     },
   ];
 
   return (
     <section>
-      <p className="text-xs uppercase tracking-wider text-left text-slate-500 mb-3!">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-left text-slate-400 mb-2">
         Quick Access
       </p>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-2">
         {actions.map((item) => {
           const Icon = item.icon;
-
           return (
             <Link
               key={item.label}
-              to={item.to}
+              to={countryPath(item.to)}
               onClick={onClose}
-              className="
-                rounded-2xl
-                bg-slate-50
-                border
-                border-slate-200
-                p-4
-                text-center
-                hover:border-sky-300
-                transition
-              "
+              className="rounded-xl bg-slate-50/80 border border-slate-200/80 hover:border-sky-300 hover:bg-white py-2.5 px-2 flex flex-col items-center justify-center gap-1.5 text-center transition"
             >
-              <Icon className={`mx-auto text-2xl ${item.color}`} />
-
-              <p className="mt-3 text-sm font-medium text-slate-700">
+              <span
+                className={`w-8 h-8 rounded-lg flex items-center justify-center ${item.iconCls}`}
+              >
+                <Icon className="text-base" />
+              </span>
+              <span className="text-[11px] font-semibold text-slate-700 leading-tight">
                 {item.label}
-              </p>
+              </span>
             </Link>
           );
         })}

@@ -14,6 +14,7 @@ import {
   FiShoppingBag,
 } from "react-icons/fi";
 import { savePosContact, deletePosContact } from "../../services/customerService";
+import { usePortalCurrency } from "../../context/PortalCurrencyContext";
 
 const normalizePhoneKey = (phone) =>
   String(phone || "")
@@ -69,6 +70,7 @@ const PosAddressBookModal = ({
   onContactsUpdated,
   isAdmin = false,
 }) => {
+  const portalCur = usePortalCurrency();
   const [mode, setMode] = useState("browse"); // "browse" | "create"
   const [search, setSearch] = useState("");
   const [segment, setSegment] = useState("all"); // all | registered | b2b | saved | pos
@@ -362,8 +364,8 @@ const PosAddressBookModal = ({
                           {contact.ordersCount > 0 && (
                             <span className="inline-flex items-center gap-1 text-[10px] font-mono text-slate-500 dark:text-slate-400">
                               <FiShoppingBag className="text-[10px]" />
-                              {contact.ordersCount} • AED{" "}
-                              {Math.round(contact.totalSpent).toLocaleString()}
+                              {contact.ordersCount} • {portalCur.symbol}{" "}
+                              {Math.round(contact.totalSpent).toLocaleString(portalCur.locale)}
                             </span>
                           )}
 

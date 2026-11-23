@@ -6,21 +6,17 @@ import {
   FiDownload,
   FiDollarSign,
   FiTrendingUp,
-  FiCalendar,
   FiPercent,
   FiEdit2,
   FiTrash2,
   FiPlus,
   FiMinus,
-  FiCheckCircle,
   FiAlertTriangle,
   FiX,
-  FiUser,
-  FiPhone,
-  FiMail,
 } from "react-icons/fi";
 import { updateInvoice, deleteInvoice } from "../../services/billingService";
 import { useStaffAuth } from "../../context/StaffAuthContext";
+import { usePortalCurrency } from "../../context/PortalCurrencyContext";
 import { AedPrice } from "../common/AedSymbol";
 import PortalKpiGrid from "./PortalKpiGrid";
 import { PortalFilterMenu, ActiveFilterChips } from "./PortalFilterMenu";
@@ -34,6 +30,7 @@ const InvoiceAudit = ({
   onInvoicesUpdated,
 }) => {
   const { currentUser, isAdmin } = useStaffAuth();
+  const portalCur = usePortalCurrency();
   const handleViewInvoice = onViewInvoice || onSelectInvoice;
   const notifyInvoicesChanged = () => {
     if (onInvoicesUpdated) onInvoicesUpdated();
@@ -173,12 +170,12 @@ const InvoiceAudit = ({
       "Date",
       "Customer Name",
       "Customer Phone",
-      "Customer TRN",
+      `Customer ${portalCur.taxIdLabel}`,
       "Payment Method",
-      "Subtotal (AED)",
-      "Discount (AED)",
-      "VAT Amount (AED)",
-      "Total Amount (AED)",
+      `Subtotal (${portalCur.currency})`,
+      `Discount (${portalCur.currency})`,
+      `VAT Amount (${portalCur.currency})`,
+      `Total Amount (${portalCur.currency})`,
       "Issued By",
     ];
 
@@ -217,7 +214,7 @@ const InvoiceAudit = ({
       customerTrn: inv.customerTrn || "",
       paymentMethod: inv.paymentMethod || "Cash",
       items: JSON.parse(JSON.stringify(inv.items || [])),
-      vatRate: inv.vatRate ?? 5,
+      vatRate: inv.vatRate ?? portalCur.vatRate,
       discount: inv.discount || 0,
       notes: inv.notes || "",
     });
@@ -379,7 +376,7 @@ const InvoiceAudit = ({
                 className="font-mono font-black text-purple-900 dark:text-purple-300"
               />
             ),
-            subtitle: "5% Tax element",
+            subtitle: `${portalCur.vatRate}% Tax element`,
             icon: FiPercent,
             tone: "purple",
           },
@@ -448,7 +445,7 @@ const InvoiceAudit = ({
                   <th className="py-3.5 px-3 whitespace-nowrap">Customer</th>
                   <th className="py-3.5 px-3">Items Summary</th>
                   <th className="py-3.5 px-3 whitespace-nowrap">Payment</th>
-                  <th className="py-3.5 px-3 text-right whitespace-nowrap">Total (AED)</th>
+                  <th className="py-3.5 px-3 text-right whitespace-nowrap">Total ({portalCur.symbol})</th>
                   <th className="py-3.5 px-4 text-right whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
@@ -507,7 +504,11 @@ const InvoiceAudit = ({
 
                     {/* Total Amount */}
                     <td className="py-3.5 px-3 text-right font-mono font-bold text-slate-900 dark:text-white text-xs sm:text-sm whitespace-nowrap">
-                      AED {Number(inv.totalAmount).toLocaleString("en-AE", { minimumFractionDigits: 2 })}
+                      {inv.currencySymbol || inv.currency || portalCur.symbol}{" "}
+                      {Number(inv.totalAmount).toLocaleString(portalCur.locale, {
+                        minimumFractionDigits: portalCur.decimals,
+                        maximumFractionDigits: portalCur.decimals,
+                      })}
                     </td>
 
                     {/* Actions: View/Print, Edit, Delete */}
@@ -647,7 +648,7 @@ const InvoiceAudit = ({
                     <div key={item.sku} className="p-3 flex items-center justify-between gap-3 bg-slate-50/50 dark:bg-slate-800/50">
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold text-slate-900 dark:text-white text-xs truncate">{item.name}</p>
-                        <p className="text-[10px] font-mono text-slate-400 dark:text-slate-500">{item.sku} • AED {item.unitPrice}</p>
+                        <p className="text-[10px] font-mono text-slate-400 dark:text-slate-500">{item.sku} • {portalCur.symbol} {item.unitPrice}</p>
                       </div>
 
                       {/* Stepper */}
@@ -669,8 +670,8 @@ const InvoiceAudit = ({
                         </button>
                       </div>
 
-                      <span className="font-mono font-bold text-xs text-slate-900 dark:text-white w-20 text-right">
-                        AED {(item.unitPrice * item.quantity).toLocaleString()}
+                      <span className="font-mono font-bold text-xs text-slate-900 dark:text-white w-24 text-right">
+                        {portalCur.symbol} {(item.unitPrice * item.quantity).toLocaleString(portalCur.locale)}
                       </span>
 
                       <button
@@ -715,7 +716,7 @@ const InvoiceAudit = ({
                           className="w-full flex items-center justify-between p-2 text-left hover:bg-sky-50 dark:hover:bg-slate-800 text-xs text-slate-800 dark:text-slate-200 cursor-pointer"
                         >
                           <span className="font-medium truncate">{prod.name} ({prod.sku})</span>
-                          <span className="font-mono font-bold text-sky-800 dark:text-sky-400 shrink-0">AED {prod.price}</span>
+                          <span className="font-mono font-bold text-sky-800 dark:text-sky-400 shrink-0">{portalCur.symbol} {prod.price}</span>
                         </button>
                       ))}
                   </div>
@@ -726,10 +727,10 @@ const InvoiceAudit = ({
               <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1 text-xs">
                 <div className="flex justify-between text-slate-600 dark:text-slate-400">
                   <span>Subtotal:</span>
-                  <span className="font-mono font-bold text-slate-800 dark:text-slate-200">AED {editSubtotal.toFixed(2)}</span>
+                  <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{portalCur.format(editSubtotal)}</span>
                 </div>
                 <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-                  <span>Discount (AED):</span>
+                  <span>Discount ({portalCur.symbol}):</span>
                   <input
                     type="number"
                     min="0"
@@ -740,11 +741,11 @@ const InvoiceAudit = ({
                 </div>
                 <div className="flex justify-between text-slate-600 dark:text-slate-400">
                   <span>VAT ({editForm.vatRate}%):</span>
-                  <span className="font-mono text-slate-800 dark:text-slate-200">AED {editVat.toFixed(2)}</span>
+                  <span className="font-mono text-slate-800 dark:text-slate-200">{portalCur.format(editVat)}</span>
                 </div>
                 <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center text-sm font-extrabold text-slate-900 dark:text-white">
                   <span>Grand Total:</span>
-                  <span className="font-mono text-sky-800 dark:text-sky-300 text-base">AED {editGrandTotal.toFixed(2)}</span>
+                  <span className="font-mono text-sky-800 dark:text-sky-300 text-base">{portalCur.format(editGrandTotal)}</span>
                 </div>
               </div>
 
@@ -799,7 +800,7 @@ const InvoiceAudit = ({
 
             <div className="p-3 bg-slate-50 dark:bg-slate-800/70 rounded-xl border border-slate-200 dark:border-slate-700 text-xs space-y-1 text-slate-800 dark:text-slate-200">
               <p><span className="text-slate-400 dark:text-slate-500">Customer:</span> <strong>{deletingInvoice.customerName}</strong></p>
-              <p><span className="text-slate-400 dark:text-slate-500">Amount:</span> <strong className="font-mono">AED {Number(deletingInvoice.totalAmount).toLocaleString()}</strong></p>
+              <p><span className="text-slate-400 dark:text-slate-500">Amount:</span> <strong className="font-mono">{portalCur.format(deletingInvoice.totalAmount)}</strong></p>
             </div>
 
             <div className="flex justify-end gap-2 pt-2">

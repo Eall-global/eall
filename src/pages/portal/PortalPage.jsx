@@ -14,13 +14,19 @@ import {
   FiGlobe,
   FiCpu,
   FiPercent,
+  FiRepeat,
+  FiMapPin,
 } from "react-icons/fi";
 import { useStaffAuth } from "../../context/StaffAuthContext";
+import { useCountry } from "../../context/CountryContext";
 import { PortalThemeProvider } from "../../context/PortalThemeContext";
+import { PortalCurrencyProvider } from "../../context/PortalCurrencyContext";
 import PortalLogin from "../../components/portal/PortalLogin";
 import PortalSidebar from "../../components/portal/PortalSidebar";
 import PortalHeader from "../../components/portal/PortalHeader";
 import StockTable from "../../components/portal/StockTable";
+import StockTransfersManagement from "../../components/portal/StockTransfersManagement";
+import LocationsManagement from "../../components/portal/LocationsManagement";
 import OnlineOrdersManagement from "../../components/portal/OnlineOrdersManagement";
 import B2BRfqManagement from "../../components/portal/B2BRfqManagement";
 import WarrantyImeiManagement from "../../components/portal/WarrantyImeiManagement";
@@ -35,7 +41,11 @@ import ReportsAnalytics from "../../components/portal/ReportsAnalytics";
 import AuditLogs from "../../components/portal/AuditLogs";
 import PortalSettings from "../../components/portal/PortalSettings";
 import InvoiceDocument from "../../components/portal/InvoiceDocument";
-import { fetchStock } from "../../services/stockService";
+import {
+  fetchStock,
+  projectStockForLocation,
+} from "../../services/stockService";
+import { fetchTransfers } from "../../services/transferService";
 import { fetchOnlineOrders } from "../../services/orderService";
 import { fetchAllRFQs } from "../../services/b2bService";
 import { fetchImeiRegistry } from "../../services/warrantyService";
@@ -57,6 +67,7 @@ import {
 
 const SIDEBAR_STORAGE_KEY = "eall_portal_sidebar_collapsed";
 const ADMIN_ONLY_TABS = [
+  "locations",
   "customers",
   "coupons",
   "employees",
@@ -66,11 +77,25 @@ const ADMIN_ONLY_TABS = [
 ];
 
 const PortalContent = () => {
-  const { isAuthenticated, currentUser, members, role, isAdmin, logout } =
-    useStaffAuth();
+  const {
+    isAuthenticated,
+    currentUser,
+    members,
+    role,
+    isAdmin,
+    isHubManager,
+    assignedLocation,
+    canSwitchLocations,
+    logout,
+  } = useStaffAuth();
+  const { allLocations, getLocationByCode, urlCountrySlug } = useCountry();
 
   const [activeTab, setActiveTab] = useState("stock");
+  const [selectedPortalLocation, setSelectedPortalLocation] = useState(() =>
+    urlCountrySlug ? urlCountrySlug.toUpperCase() : "AE"
+  );
   const [stock, setStock] = useState([]);
+  const [transfers, setTransfers] = useState([]);
   const [onlineOrders, setOnlineOrders] = useState([]);
   const [rfqs, setRfqs] = useState([]);
   const [imeiRecords, setImeiRecords] = useState([]);
@@ -84,6 +109,22 @@ const PortalContent = () => {
   const [loading, setLoading] = useState(true);
   const [viewingInvoice, setViewingInvoice] = useState(null);
   const [posPrefill, setPosPrefill] = useState(null);
+  const [transferPrefillSku, setTransferPrefillSku] = useState(null);
+
+  // Enforce strict RBAC scoping: country staff are permanently locked to their assignedLocation
+  const activePortalLocation = canSwitchLocations
+    ? selectedPortalLocation
+    : assignedLocation && assignedLocation !== "ALL"
+    ? assignedLocation
+    : "AE";
+
+  const activeLocationConfig = useMemo(
+    () =>
+      getLocationByCode(
+        activePortalLocation === "ALL" ? "AE" : activePortalLocation
+      ),
+    [getLocationByCode, activePortalLocation]
+  );
 
   // Desktop collapsible sidebar state (persisted) & Mobile burger menu drawer state
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -125,6 +166,7 @@ const PortalContent = () => {
   const fetchPortalSnapshot = useCallback(async () => {
     const [
       stockData,
+      transfersData,
       ordersData,
       rfqsData,
       imeiData,
@@ -137,6 +179,7 @@ const PortalContent = () => {
       auditData,
     ] = await Promise.all([
       fetchStock(),
+      fetchTransfers(),
       fetchOnlineOrders(),
       fetchAllRFQs(),
       fetchImeiRegistry(),
@@ -150,6 +193,7 @@ const PortalContent = () => {
     ]);
     return {
       stockData,
+      transfersData,
       ordersData,
       rfqsData,
       imeiData,
@@ -168,6 +212,7 @@ const PortalContent = () => {
     try {
       const {
         stockData,
+        transfersData,
         ordersData,
         rfqsData,
         imeiData,
@@ -180,6 +225,7 @@ const PortalContent = () => {
         auditData,
       } = await fetchPortalSnapshot();
       setStock(stockData);
+      setTransfers(transfersData);
       setOnlineOrders(ordersData);
       setRfqs(rfqsData);
       setImeiRecords(imeiData);
@@ -207,6 +253,7 @@ const PortalContent = () => {
       try {
         const {
           stockData,
+          transfersData,
           ordersData,
           rfqsData,
           imeiData,
@@ -220,6 +267,7 @@ const PortalContent = () => {
         } = await fetchPortalSnapshot();
         if (cancelled) return;
         setStock(stockData);
+        setTransfers(transfersData);
         setOnlineOrders(ordersData);
         setRfqs(rfqsData);
         setImeiRecords(imeiData);
@@ -242,38 +290,66 @@ const PortalContent = () => {
     const db = getFirebaseDb();
     if (db && isFirebaseConfigured()) {
       try {
-        const unSub1 = onSnapshot(collection(db, "product_stock"), () => {
-          syncFromSource();
-        });
-        const unSub2 = onSnapshot(collection(db, "invoices"), () => {
-          syncFromSource();
-        });
-        const unSub3 = onSnapshot(collection(db, "purchase_records"), () => {
-          syncFromSource();
-        });
-        const unSub4 = onSnapshot(collection(db, "audit_logs"), () => {
-          syncFromSource();
-        });
-        const unSub5 = onSnapshot(collection(db, "customer_orders"), () => {
-          syncFromSource();
-        });
-        const unSub6 = onSnapshot(collection(db, "b2b_rfqs"), () => {
-          syncFromSource();
-        });
-        const unSub7 = onSnapshot(collection(db, "imei_registry"), () => {
-          syncFromSource();
-        });
-        const unSub8 = onSnapshot(collection(db, "pos_contacts"), () => {
-          syncFromSource();
-        });
-        const unSub9 = onSnapshot(collection(db, "customers"), () => {
-          syncFromSource();
-        });
+        const noopErr = () => {};
+        const unSub1 = onSnapshot(
+          collection(db, "product_stock"),
+          () => syncFromSource(),
+          noopErr
+        );
+        const unSub2 = onSnapshot(
+          collection(db, "invoices"),
+          () => syncFromSource(),
+          noopErr
+        );
+        const unSub3 = onSnapshot(
+          collection(db, "purchase_records"),
+          () => syncFromSource(),
+          noopErr
+        );
+        const unSub4 = onSnapshot(
+          collection(db, "audit_logs"),
+          () => syncFromSource(),
+          noopErr
+        );
+        const unSub5 = onSnapshot(
+          collection(db, "customer_orders"),
+          () => syncFromSource(),
+          noopErr
+        );
+        const unSub6 = onSnapshot(
+          collection(db, "b2b_rfqs"),
+          () => syncFromSource(),
+          noopErr
+        );
+        const unSub7 = onSnapshot(
+          collection(db, "imei_registry"),
+          () => syncFromSource(),
+          noopErr
+        );
+        const unSub8 = onSnapshot(
+          collection(db, "pos_contacts"),
+          () => syncFromSource(),
+          noopErr
+        );
+        const unSub9 = onSnapshot(
+          collection(db, "customers"),
+          () => syncFromSource(),
+          noopErr
+        );
         const unSub10 = onSnapshot(
           collection(db, "landed_cost_sheets"),
-          () => {
-            syncFromSource();
-          }
+          () => syncFromSource(),
+          noopErr
+        );
+        const unSub11 = onSnapshot(
+          collection(db, "staff_members"),
+          () => syncFromSource(),
+          noopErr
+        );
+        const unSub12 = onSnapshot(
+          collection(db, "stock_transfers"),
+          () => syncFromSource(),
+          noopErr
         );
 
         return () => {
@@ -288,6 +364,8 @@ const PortalContent = () => {
           unSub8();
           unSub9();
           unSub10();
+          unSub11();
+          unSub12();
         };
       } catch (e) {
         console.warn("Could not attach Firestore portal listener:", e);
@@ -299,18 +377,74 @@ const PortalContent = () => {
     };
   }, [isAuthenticated, fetchPortalSnapshot]);
 
+  // Multi-Warehouse & Country-Scoped Data Projections
+  const scopedStock = useMemo(
+    () =>
+      projectStockForLocation(
+        stock,
+        activePortalLocation,
+        activeLocationConfig
+      ),
+    [stock, activePortalLocation, activeLocationConfig]
+  );
+
+  const scopedOrders = useMemo(() => {
+    if (activePortalLocation === "ALL") return onlineOrders;
+    return onlineOrders.filter(
+      (o) => String(o.countryCode || "AE").toUpperCase() === activePortalLocation
+    );
+  }, [onlineOrders, activePortalLocation]);
+
+  const scopedInvoices = useMemo(() => {
+    if (activePortalLocation === "ALL") return invoices;
+    return invoices.filter(
+      (inv) => String(inv.countryCode || "AE").toUpperCase() === activePortalLocation
+    );
+  }, [invoices, activePortalLocation]);
+
+  const scopedTransfers = useMemo(() => {
+    if (activePortalLocation === "ALL") return transfers;
+    return transfers.filter(
+      (t) =>
+        t.sourceHub === activePortalLocation ||
+        t.destinationCountry === activePortalLocation
+    );
+  }, [transfers, activePortalLocation]);
+
+  const scopedLandedSheets = useMemo(() => {
+    if (activePortalLocation === "ALL") return landedSheets;
+    return landedSheets.filter(
+      (s) => String(s.locationCode || "AE").toUpperCase() === activePortalLocation
+    );
+  }, [landedSheets, activePortalLocation]);
+
+  const scopedPurchases = useMemo(() => {
+    if (activePortalLocation === "ALL") return purchases;
+    return purchases.filter(
+      (p) => String(p.locationCode || "AE").toUpperCase() === activePortalLocation
+    );
+  }, [purchases, activePortalLocation]);
+
   // Alert indicators for sidebar
   const stockAlertCount = useMemo(
-    () => stock.filter((s) => s.quantity <= (s.minAlert ?? 3)).length,
-    [stock]
+    () => scopedStock.filter((s) => s.quantity <= (s.minAlert ?? 3)).length,
+    [scopedStock]
+  );
+
+  const pendingTransfersCount = useMemo(
+    () =>
+      scopedTransfers.filter((t) =>
+        ["Pending Approval", "In Transit"].includes(t.status)
+      ).length,
+    [scopedTransfers]
   );
 
   const pendingOrdersCount = useMemo(
     () =>
-      onlineOrders.filter((o) =>
+      scopedOrders.filter((o) =>
         ["Order Placed", "Awaiting Wave Verification"].includes(o.status)
       ).length,
-    [onlineOrders]
+    [scopedOrders]
   );
 
   const pendingRfqsCount = useMemo(
@@ -341,18 +475,29 @@ const PortalContent = () => {
             id: "stock",
             label: "Stock Manager",
             description:
-              "Inventory valuation, pricing controls & real-time stock alerts",
+              activePortalLocation === "ALL"
+                ? "Global multi-warehouse inventory across Dubai, China, HK & all country hubs"
+                : `${activeLocationConfig.hubName} stock & ${activeLocationConfig.currency} pricing`,
             icon: FiPackage,
-            badge: stock.length,
+            badge: scopedStock.length,
             alertCount: stockAlertCount,
+          },
+          {
+            id: "transfers",
+            label: "Stock Transfers",
+            description:
+              "Inter-hub requisitions (Dubai / China / HK → Countries), AWB tracking & landed cost receiving",
+            icon: FiRepeat,
+            badge: scopedTransfers.length,
+            alertCount: pendingTransfersCount,
           },
           {
             id: "orders",
             label: "Online Orders",
             description:
-              "Storefront order fulfillment, Wave/COD verification & courier tracking",
+              "Storefront order fulfillment, regional payment verification & courier tracking",
             icon: FiShoppingBag,
-            badge: onlineOrders.length,
+            badge: scopedOrders.length,
             alertCount: pendingOrdersCount,
           },
           {
@@ -377,23 +522,27 @@ const PortalContent = () => {
             id: "purchases",
             label: "Purchase Records",
             description:
-              "Supplier procurement, inward goods & purchase vouchers",
+              "Supplier procurement, inward goods, Excel/Invoice import & purchase vouchers",
             icon: FiTruck,
-            badge: purchases.length,
+            badge: scopedPurchases.length,
           },
           {
             id: "landed_cost",
             label: "Landed Cost",
             description:
-              "Package logistics calculator, 1-piece landed price lookup & WAC stock sync",
+              activePortalLocation === "ALL"
+                ? "Package logistics calculator, 1-piece landed price lookup & WAC stock sync"
+                : `${activeLocationConfig.hubName} landed cost calculator (${activeLocationConfig.currency}), 1-piece lookup & WAC sync`,
             icon: FiPercent,
-            badge: landedSheets.length,
+            badge: scopedLandedSheets.length,
           },
           {
             id: "billing",
             label: "Billing & POS",
             description:
-              "Point-of-sale checkout, Address Book, IMEI binding & UAE 5% VAT",
+              activePortalLocation === "ALL"
+                ? "Point-of-sale checkout, Address Book, IMEI binding & multi-country VAT"
+                : `Point-of-sale checkout (${activeLocationConfig.currency}), Address Book, IMEI binding & ${activeLocationConfig.shortName} ${activeLocationConfig.vatRate}% VAT`,
             icon: FiFileText,
           },
           {
@@ -402,7 +551,7 @@ const PortalContent = () => {
             description:
               "Revenue audit ledger, A4 tax invoices & stock reconciliation",
             icon: FiClipboard,
-            badge: invoices.length,
+            badge: scopedInvoices.length,
           },
         ],
       },
@@ -412,6 +561,14 @@ const PortalContent = () => {
       groups.push({
         title: "Administration",
         items: [
+          {
+            id: "locations",
+            label: "Countries & Hubs",
+            description:
+              "Launch new country storefronts (/ke, /tz, /ng), Tier-1 supply hubs, FX rates & VAT",
+            icon: FiMapPin,
+            badge: allLocations.length,
+          },
           {
             id: "customers",
             label: "Customers",
@@ -438,7 +595,9 @@ const PortalContent = () => {
             id: "reports",
             label: "Reports & Finance",
             description:
-              "P&L margin analytics, UAE 5% VAT return, brand performance & payables",
+              activePortalLocation === "ALL"
+                ? "P&L margin analytics, tax summaries, brand performance & payables"
+                : `P&L margin analytics (${activeLocationConfig.currency}), ${activeLocationConfig.shortName} ${activeLocationConfig.vatRate}% VAT return, brand performance & payables`,
             icon: FiBarChart2,
           },
           {
@@ -470,17 +629,22 @@ const PortalContent = () => {
     return groups;
   }, [
     isAdmin,
-    stock.length,
+    activePortalLocation,
+    activeLocationConfig,
+    allLocations.length,
+    scopedStock.length,
     stockAlertCount,
-    onlineOrders.length,
+    scopedTransfers.length,
+    pendingTransfersCount,
+    scopedOrders.length,
     pendingOrdersCount,
     rfqs.length,
     pendingRfqsCount,
     imeiRecords.length,
     openRmaCount,
-    purchases.length,
-    landedSheets.length,
-    invoices.length,
+    scopedPurchases.length,
+    scopedLandedSheets.length,
+    scopedInvoices.length,
     members.length,
     auditLogs.length,
     criticalAuditCount,
@@ -509,6 +673,12 @@ const PortalContent = () => {
     setViewingInvoice(null);
   }, []);
 
+  const handleRequestTransferForSku = useCallback((skuItem) => {
+    setTransferPrefillSku(skuItem);
+    setActiveTab("transfers");
+    setViewingInvoice(null);
+  }, []);
+
   if (!isAuthenticated) {
     return <PortalLogin />;
   }
@@ -516,6 +686,10 @@ const PortalContent = () => {
   const isConnected = isFirebaseConfigured();
 
   return (
+    <PortalCurrencyProvider
+      locationConfig={activeLocationConfig}
+      activeLocationCode={activePortalLocation}
+    >
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex font-sans text-left transition-colors duration-200">
       {/* Desktop Collapsible Sidebar + Mobile Burger Drawer */}
       <PortalSidebar
@@ -543,6 +717,11 @@ const PortalContent = () => {
           loading={loading}
           onRefresh={loadData}
           onLogout={logout}
+          activePortalLocation={activePortalLocation}
+          activeLocationConfig={activeLocationConfig}
+          allLocations={allLocations}
+          canSwitchLocations={canSwitchLocations}
+          onChangePortalLocation={setSelectedPortalLocation}
         />
 
         <main className="flex-1 w-full p-4 sm:p-5 lg:p-6">
@@ -555,22 +734,42 @@ const PortalContent = () => {
               />
             )}
 
-            {/* Stock Manager */}
+            {/* Stock Manager (Multi-Warehouse & Country Scoped) */}
             {currentTab === "stock" && (
               <StockTable
-                stock={stock}
-                invoices={invoices}
+                stock={scopedStock}
+                invoices={scopedInvoices}
                 purchases={purchases}
                 onStockChanged={loadData}
                 onStockUpdated={loadData}
                 isAdmin={isAdmin}
+                activeLocationCode={activePortalLocation}
+                activeLocationConfig={activeLocationConfig}
+                onRequestTransfer={handleRequestTransferForSku}
+              />
+            )}
+
+            {/* Inter-Hub Stock Transfers (Dubai AE / China CN / HK → Countries) */}
+            {currentTab === "transfers" && (
+              <StockTransfersManagement
+                key={transferPrefillSku?.sku || "transfers-default"}
+                transfers={transfers}
+                globalStock={stock}
+                activePortalLocation={activePortalLocation}
+                currentUser={currentUser}
+                isAdmin={isAdmin}
+                isHubManager={isHubManager}
+                canSwitchLocations={canSwitchLocations}
+                prefillSku={transferPrefillSku}
+                onClearPrefill={() => setTransferPrefillSku(null)}
+                onTransfersUpdated={loadData}
               />
             )}
 
             {/* Online Storefront Orders & Fulfillment */}
             {currentTab === "orders" && (
               <OnlineOrdersManagement
-                orders={onlineOrders}
+                orders={scopedOrders}
                 loading={loading}
                 onOrdersUpdated={loadData}
                 onViewInvoice={(ord) => setViewingInvoice(ord)}
@@ -593,9 +792,9 @@ const PortalContent = () => {
             {currentTab === "warranty" && (
               <WarrantyImeiManagement
                 records={imeiRecords}
-                stock={stock}
+                stock={scopedStock}
                 purchases={purchases}
-                invoices={invoices}
+                invoices={scopedInvoices}
                 onRecordsUpdated={loadData}
                 onViewInvoice={(inv) => setViewingInvoice(inv)}
                 currentUser={currentUser}
@@ -606,8 +805,8 @@ const PortalContent = () => {
             {/* Purchase Records */}
             {currentTab === "purchases" && (
               <PurchaseManagement
-                stock={stock}
-                purchases={purchases}
+                stock={scopedStock}
+                purchases={scopedPurchases}
                 onPurchasesUpdated={loadData}
                 currentUser={currentUser}
                 isAdmin={isAdmin}
@@ -617,28 +816,32 @@ const PortalContent = () => {
             {/* Landed Cost Calculator & 1-Piece Price Lookup */}
             {currentTab === "landed_cost" && (
               <LandedCostCalculator
-                stock={stock}
-                sheets={landedSheets}
+                key={activePortalLocation}
+                stock={scopedStock}
+                sheets={scopedLandedSheets}
                 onDataUpdated={loadData}
                 currentUser={currentUser}
                 isAdmin={isAdmin}
               />
             )}
 
-            {/* Billing & POS */}
+            {/* Billing & POS (Country-Scoped Local Stock + Read-Only Hub Availability) */}
             {currentTab === "billing" && (
               <BillingPOS
-                key={posPrefill?.rfqId || "pos-default"}
-                stock={stock}
+                key={`${activePortalLocation}-${posPrefill?.rfqId || "pos-default"}`}
+                stock={scopedStock}
                 customers={customers}
                 posContacts={posContacts}
-                invoices={invoices}
+                invoices={scopedInvoices}
                 rfqs={rfqs}
                 coupons={coupons}
                 imeiRecords={imeiRecords}
                 prefillCustomer={posPrefill}
                 onClearPrefill={() => setPosPrefill(null)}
                 onContactsUpdated={loadData}
+                activeLocationCode={activePortalLocation}
+                activeLocationConfig={activeLocationConfig}
+                onRequestTransfer={handleRequestTransferForSku}
                 onInvoiceCreated={(newInv) => {
                   loadData();
                   setViewingInvoice(newInv);
@@ -649,13 +852,16 @@ const PortalContent = () => {
             {/* Sales & Invoices Audit */}
             {currentTab === "invoices" && (
               <InvoiceAudit
-                invoices={invoices}
-                stock={stock}
+                invoices={scopedInvoices}
+                stock={scopedStock}
                 onViewInvoice={(inv) => setViewingInvoice(inv)}
                 onInvoicesUpdated={loadData}
                 isAdmin={isAdmin}
               />
             )}
+
+            {/* Super Admin Countries, Supply Hubs & FX Control Center */}
+            {currentTab === "locations" && isAdmin && <LocationsManagement />}
 
             {/* Customers (Admin Only) */}
             {currentTab === "customers" && isAdmin && <CustomerManagement />}
@@ -674,8 +880,8 @@ const PortalContent = () => {
             {/* Reports & Financial Analytics (Admin Only) */}
             {currentTab === "reports" && isAdmin && (
               <ReportsAnalytics
-                stock={stock}
-                invoices={invoices}
+                stock={scopedStock}
+                invoices={scopedInvoices}
                 purchases={purchases}
               />
             )}
@@ -702,6 +908,7 @@ const PortalContent = () => {
         </main>
       </div>
     </div>
+    </PortalCurrencyProvider>
   );
 };
 

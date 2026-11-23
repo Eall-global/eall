@@ -19,7 +19,7 @@ const MainLayout = () => {
   }, [location.pathname, location.search]);
 
   return (
-    <div className="flex flex-col min-h-screen pb-20 xl:pb-0">
+    <div className="flex flex-col min-h-screen pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))] xl:pb-0">
       <Header />
 
       {/* Push content below fixed header */}
@@ -27,7 +27,10 @@ const MainLayout = () => {
         <Outlet />
       </main>
 
-      <Footer />
+      {/* Desktop Footer only — Mobile uses persistent Bottom Nav + Account Support Hub */}
+      <div className="hidden xl:block">
+        <Footer />
+      </div>
 
       {/* Persistent Mobile Bottom Navigation */}
       <MobileBottomNav />

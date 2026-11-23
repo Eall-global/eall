@@ -1,15 +1,13 @@
 import { useState, useMemo } from "react";
 import {
   FiSearch,
-  FiFileText,
-  FiPrinter,
-  FiDollarSign,
-  FiCalendar,
   FiEye,
   FiDownload,
 } from "react-icons/fi";
+import { usePortalCurrency } from "../../context/PortalCurrencyContext";
 
 const InvoiceHistory = ({ invoices = [], onSelectInvoice }) => {
+  const portalCur = usePortalCurrency();
   const [search, setSearch] = useState("");
   const [dateFilter, setDateFilter] = useState("all"); // all | today | month
 
@@ -70,7 +68,7 @@ const InvoiceHistory = ({ invoices = [], onSelectInvoice }) => {
       "Payment Method",
       "Subtotal",
       "VAT",
-      "Total (AED)",
+      `Total (${portalCur.currency})`,
       "Created By",
     ];
 
@@ -120,7 +118,7 @@ const InvoiceHistory = ({ invoices = [], onSelectInvoice }) => {
             Total Revenue
           </span>
           <p className="text-2xl font-bold text-sky-800">
-            AED {stats.totalRevenue.toLocaleString("en-AE", { maximumFractionDigits: 0 })}
+            {portalCur.format(stats.totalRevenue, 0)}
           </p>
           <p className="text-[11px] text-slate-400 mt-0.5">Cumulative billing</p>
         </div>
@@ -130,7 +128,7 @@ const InvoiceHistory = ({ invoices = [], onSelectInvoice }) => {
             Today's Sales
           </span>
           <p className="text-2xl font-bold text-emerald-700">
-            AED {stats.todayRevenue.toLocaleString("en-AE", { maximumFractionDigits: 0 })}
+            {portalCur.format(stats.todayRevenue, 0)}
           </p>
           <p className="text-[11px] text-slate-400 mt-0.5">Generated today</p>
         </div>
@@ -140,9 +138,9 @@ const InvoiceHistory = ({ invoices = [], onSelectInvoice }) => {
             VAT Collected
           </span>
           <p className="text-2xl font-bold text-slate-700">
-            AED {stats.totalVat.toLocaleString("en-AE", { maximumFractionDigits: 0 })}
+            {portalCur.format(stats.totalVat, 0)}
           </p>
-          <p className="text-[11px] text-slate-400 mt-0.5">5% Tax element</p>
+          <p className="text-[11px] text-slate-400 mt-0.5">{portalCur.vatRate}% Tax element</p>
         </div>
       </div>
 
@@ -203,7 +201,7 @@ const InvoiceHistory = ({ invoices = [], onSelectInvoice }) => {
                 <th className="py-3.5 px-4 whitespace-nowrap">Customer</th>
                 <th className="py-3.5 px-4">Items Summary</th>
                 <th className="py-3.5 px-4 text-center whitespace-nowrap">Payment</th>
-                <th className="py-3.5 px-4 text-right whitespace-nowrap">Total (AED)</th>
+                <th className="py-3.5 px-4 text-right whitespace-nowrap">Total ({portalCur.symbol})</th>
                 <th className="py-3.5 px-4 text-right whitespace-nowrap">Action</th>
               </tr>
             </thead>
@@ -267,7 +265,7 @@ const InvoiceHistory = ({ invoices = [], onSelectInvoice }) => {
 
                     {/* Total Amount */}
                     <td className="py-3.5 px-4 text-right font-mono font-extrabold text-slate-900 whitespace-nowrap">
-                      AED {Number(inv.totalAmount).toLocaleString("en-AE", { minimumFractionDigits: 2 })}
+                      {portalCur.format(inv.totalAmount)}
                     </td>
 
                     {/* View Action */}

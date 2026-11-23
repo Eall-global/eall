@@ -27,6 +27,7 @@ import {
   updateOnlineOrder,
 } from "../../services/orderService";
 import { AedPrice, AedSymbol } from "../common/AedSymbol";
+import { usePortalCurrency } from "../../context/PortalCurrencyContext";
 import PortalKpiGrid from "./PortalKpiGrid";
 import { PortalFilterMenu, ActiveFilterChips } from "./PortalFilterMenu";
 
@@ -67,6 +68,7 @@ const OnlineOrdersManagement = ({
   onViewInvoice,
   currentUser,
 }) => {
+  const portalCur = usePortalCurrency();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [paymentFilter, setPaymentFilter] = useState("All");
@@ -271,7 +273,7 @@ const OnlineOrdersManagement = ({
       `*Status:* ${editStatus || order.status}\n` +
       (editCarrier ? `*Courier:* ${editCarrier}\n` : "") +
       (editTracking ? `*Tracking #:* ${editTracking}\n` : "") +
-      `*Order Total:* AED ${Number(order.total).toLocaleString("en-AE", { minimumFractionDigits: 2 })}\n\n` +
+      `*Order Total:* ${order.currency || portalCur.currency} ${Number(order.total).toLocaleString(portalCur.locale, { minimumFractionDigits: portalCur.decimals, maximumFractionDigits: portalCur.decimals })}\n\n` +
       `Thank you for shopping with E-ALL Electronics!`;
     window.open(
       `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`,
@@ -290,9 +292,9 @@ const OnlineOrdersManagement = ({
       "Country",
       "Payment Method",
       "Wave TxID",
-      "Subtotal (AED)",
-      "Discount (AED)",
-      "Total (AED)",
+      `Subtotal (${portalCur.currency})`,
+      `Discount (${portalCur.currency})`,
+      `Total (${portalCur.currency})`,
       "Fulfillment Status",
       "Courier",
       "Tracking No",

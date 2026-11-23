@@ -20,6 +20,7 @@ import {
 } from "react-icons/fi";
 import PortalKpiGrid from "./PortalKpiGrid";
 import { AedPrice } from "../common/AedSymbol";
+import { usePortalCurrency } from "../../context/PortalCurrencyContext";
 import {
   CURRENCY_PRESETS,
   ALLOCATION_METHODS,
@@ -32,37 +33,65 @@ import {
   setSalesFloorBufferPercent,
 } from "../../services/landedCostService";
 
-const createBlankSheet = () => ({
-  id: "",
-  sheetNo: "",
-  title: "HMD 2,000 Pcs Shipment (40 Master Cartons)",
-  supplierName: "HMD Global / Regional Distributor",
-  shipmentRef: "",
-  currency: "AED",
-  fxRate: 1.0,
-  allocationMethod: "packages",
-  logisticsMode: "per_package", // "per_package" | "lump_sum"
-  ratePerPackageAed: 135,
-  lumpSumFreightAed: 5400,
-  customsDutyPercent: 0,
-  clearanceFeeAed: 850,
-  insuranceAndBankAed: 350,
-  otherLogisticsAed: 200,
-  items: [
-    {
-      id: "item_default_1",
-      sku: "NOKIA-105",
-      name: "Nokia 105",
-      brand: "Nokia",
-      quantity: 2000,
-      pcsPerPackage: 50,
-      packages: 40,
-      unitBuyPrice: 38.5,
-      targetMarginPercent: 20,
-    },
-  ],
-  notes: "",
-});
+const createBlankSheet = (portalCur) => {
+  const isHq = !portalCur || portalCur.countryCode === "AE" || portalCur.isAll;
+  if (!isHq) {
+    return {
+      id: "",
+      sheetNo: "",
+      locationCode: portalCur.countryCode,
+      localCurrency: portalCur.currency,
+      title: `${portalCur.shortName} Inbound Shipment`,
+      supplierName: "Dubai Main Hub (HQ) / Distributor",
+      shipmentRef: "",
+      currency: portalCur.currency,
+      fxRate: 1.0,
+      allocationMethod: "packages",
+      logisticsMode: "per_package",
+      ratePerPackageAed: 0,
+      lumpSumFreightAed: 0,
+      customsDutyPercent: 0,
+      clearanceFeeAed: 0,
+      insuranceAndBankAed: 0,
+      otherLogisticsAed: 0,
+      items: [],
+      notes: "",
+    };
+  }
+  return {
+    id: "",
+    sheetNo: "",
+    locationCode: "AE",
+    localCurrency: "AED",
+    title: "HMD 2,000 Pcs Shipment (40 Master Cartons)",
+    supplierName: "HMD Global / Regional Distributor",
+    shipmentRef: "",
+    currency: "AED",
+    fxRate: 1.0,
+    allocationMethod: "packages",
+    logisticsMode: "per_package", // "per_package" | "lump_sum"
+    ratePerPackageAed: 135,
+    lumpSumFreightAed: 5400,
+    customsDutyPercent: 0,
+    clearanceFeeAed: 850,
+    insuranceAndBankAed: 350,
+    otherLogisticsAed: 200,
+    items: [
+      {
+        id: "item_default_1",
+        sku: "NOKIA-105",
+        name: "Nokia 105",
+        brand: "Nokia",
+        quantity: 2000,
+        pcsPerPackage: 50,
+        packages: 40,
+        unitBuyPrice: 38.5,
+        targetMarginPercent: 20,
+      },
+    ],
+    notes: "",
+  };
+};
 
 const LandedCostCalculator = ({
   stock = [],
@@ -71,14 +100,20 @@ const LandedCostCalculator = ({
   currentUser,
   isAdmin = false,
 }) => {
+  const portalCur = usePortalCurrency();
+  const curSym = portalCur.symbol;
+  const curCode = portalCur.currency;
+  const curDecimals = portalCur.decimals;
+  const curLocale = portalCur.locale;
+
   // Active View: Salespeople start on "lookup", Admins can switch freely between "calculator", "lookup", "history"
   const [activeView, setActiveView] = useState(
     isAdmin ? "calculator" : "lookup"
   );
 
-  // Active Shipment Sheet State (initialized from latest saved sheet or default 2,000 pcs HMD example)
+  // Active Shipment Sheet State (initialized from latest saved sheet or country-scoped blank sheet)
   const [sheetForm, setSheetForm] = useState(() =>
-    sheets.length > 0 ? { ...sheets[0] } : createBlankSheet()
+    sheets.length > 0 ? { ...sheets[0] } : createBlankSheet(portalCur)
   );
 
   // Add Product to Shipment Search
@@ -350,6 +385,8 @@ const LandedCostCalculator = ({
       const saved = await saveLandedCostSheet(
         {
           ...sheetForm,
+          locationCode: portalCur.countryCode,
+          localCurrency: curCode,
           createdBy: currentUser?.name || "Admin",
         },
         stock
@@ -376,12 +413,19 @@ const LandedCostCalculator = ({
     setBusyAction("apply");
     try {
       await saveLandedCostSheet(
-        { ...sheetForm, createdBy: currentUser?.name || "Admin" },
+        {
+          ...sheetForm,
+          locationCode: portalCur.countryCode,
+          localCurrency: curCode,
+          createdBy: currentUser?.name || "Admin",
+        },
         stock
       );
       const updated = await applyLandedCostToStock(calculatedSheet, {
         costRule,
         updateSellingPrice: alsoUpdateSellingPrice,
+        locationCode: portalCur.countryCode,
+        currencyLabel: curSym,
       });
       if (onDataUpdated) await onDataUpdated();
       showNotice(
@@ -438,13 +482,13 @@ const LandedCostCalculator = ({
       "Qty (Pcs)",
       "Packages / Cartons",
       `Unit Buy (${calculatedSheet.currency})`,
-      "FOB Unit (AED)",
-      "Logistics / Pc (AED)",
-      "Duty & Fees / Pc (AED)",
-      "Landed Cost / 1 Pc (AED)",
-      "Blended WAC / 1 Pc (AED)",
-      "Total Landed (AED)",
-      "Suggested Sell Price (AED)",
+      `FOB Unit (${curCode})`,
+      `Logistics / Pc (${curCode})`,
+      `Duty & Fees / Pc (${curCode})`,
+      `Landed Cost / 1 Pc (${curCode})`,
+      `Blended WAC / 1 Pc (${curCode})`,
+      `Total Landed (${curCode})`,
+      `Suggested Sell Price (${curCode})`,
     ];
     const rows = calculatedSheet.items.map((i) => [
       `"${i.sku}"`,
@@ -567,7 +611,7 @@ const LandedCostCalculator = ({
                 className="font-mono font-black text-amber-700 dark:text-amber-300"
               />
             ),
-            sublabel: `${calculatedSheet.totalPackages} pkgs • AED ${calculatedSheet.avgLogisticsPerPackageAed.toFixed(0)}/pkg`,
+            sublabel: `${calculatedSheet.totalPackages} pkgs • ${curSym} ${calculatedSheet.avgLogisticsPerPackageAed.toFixed(0)}/pkg`,
             icon: FiTruck,
             tone: "amber",
           },
@@ -664,7 +708,7 @@ const LandedCostCalculator = ({
           {activeView === "calculator" && (
             <button
               type="button"
-              onClick={() => setSheetForm(createBlankSheet())}
+              onClick={() => setSheetForm(createBlankSheet(portalCur))}
               aria-label="Reset calculator"
               title="Reset / New Sheet"
               className="inline-flex items-center justify-center gap-1.5 w-9 h-9 sm:w-auto sm:h-10 sm:px-3.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl transition cursor-pointer"
@@ -764,7 +808,7 @@ const LandedCostCalculator = ({
                         1-Pc Landed
                       </span>
                       <span className="font-mono font-black text-xs sm:text-sm text-sky-800 dark:text-sky-300">
-                        AED {displayUnit.toFixed(2)}
+                        {curSym} {displayUnit.toLocaleString(curLocale, { minimumFractionDigits: curDecimals, maximumFractionDigits: curDecimals })}
                       </span>
                     </div>
                   </button>
@@ -807,11 +851,11 @@ const LandedCostCalculator = ({
                         : "True Landed Cost / 1 Single Piece"}
                     </span>
                     <p className="text-2xl font-mono font-black text-emerald-800 dark:text-emerald-300 mt-0.5">
-                      AED {lookupMetrics.effectiveSalesUnitCost.toFixed(2)}
+                      {curSym} {lookupMetrics.effectiveSalesUnitCost.toLocaleString(curLocale, { minimumFractionDigits: curDecimals, maximumFractionDigits: curDecimals })}
                     </p>
                     {isAdmin && salesFloorBufferPct > 0 && (
                       <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-                        Raw Landed: AED {lookupMetrics.rawLandedUnit.toFixed(2)}
+                        Raw Landed: {curSym} {lookupMetrics.rawLandedUnit.toLocaleString(curLocale, { minimumFractionDigits: curDecimals, maximumFractionDigits: curDecimals })}
                       </p>
                     )}
                   </div>
@@ -825,7 +869,7 @@ const LandedCostCalculator = ({
                         Base Unit (FOB)
                       </span>
                       <p className="text-sm font-mono font-bold text-slate-900 dark:text-white mt-1">
-                        AED {lookupMetrics.unitFobAed.toFixed(2)}
+                        {curSym} {lookupMetrics.unitFobAed.toLocaleString(curLocale, { minimumFractionDigits: curDecimals, maximumFractionDigits: curDecimals })}
                       </p>
                     </div>
 
@@ -834,7 +878,7 @@ const LandedCostCalculator = ({
                         Package Logistics / Pc
                       </span>
                       <p className="text-sm font-mono font-bold text-amber-700 dark:text-amber-300 mt-1">
-                        + AED {lookupMetrics.logisticsPerUnitAed.toFixed(2)}
+                        + {curSym} {lookupMetrics.logisticsPerUnitAed.toLocaleString(curLocale, { minimumFractionDigits: curDecimals, maximumFractionDigits: curDecimals })}
                       </p>
                     </div>
 
@@ -843,7 +887,7 @@ const LandedCostCalculator = ({
                         Duty &amp; Fees / Pc
                       </span>
                       <p className="text-sm font-mono font-bold text-indigo-700 dark:text-indigo-300 mt-1">
-                        + AED {lookupMetrics.dutyAndFeesPerUnitAed.toFixed(2)}
+                        + {curSym} {lookupMetrics.dutyAndFeesPerUnitAed.toLocaleString(curLocale, { minimumFractionDigits: curDecimals, maximumFractionDigits: curDecimals })}
                       </p>
                     </div>
 
@@ -852,7 +896,7 @@ const LandedCostCalculator = ({
                         Blended WAC / Pc
                       </span>
                       <p className="text-sm font-mono font-black text-sky-900 dark:text-sky-200 mt-1">
-                        AED {lookupMetrics.wacUnit.toFixed(2)}
+                        {curSym} {lookupMetrics.wacUnit.toLocaleString(curLocale, { minimumFractionDigits: curDecimals, maximumFractionDigits: curDecimals })}
                       </p>
                     </div>
                   </div>
@@ -897,10 +941,10 @@ const LandedCostCalculator = ({
                           {tier.label}
                         </span>
                         <p className="text-sm font-mono font-black text-slate-900 dark:text-white mt-0.5">
-                          AED {tier.price.toFixed(2)}
+                          {curSym} {tier.price.toLocaleString(curLocale, { minimumFractionDigits: curDecimals, maximumFractionDigits: curDecimals })}
                         </p>
                         <span className="text-[10px] font-mono font-semibold text-emerald-700 dark:text-emerald-400">
-                          +AED {tier.profit.toFixed(2)} / pc profit
+                          +{curSym} {tier.profit.toLocaleString(curLocale, { minimumFractionDigits: curDecimals, maximumFractionDigits: curDecimals })} / pc profit
                         </span>
                       </button>
                     ))}
@@ -914,15 +958,15 @@ const LandedCostCalculator = ({
                       Live Sales Quote &amp; Profit Simulator
                     </h4>
                     <span className="text-[11px] font-mono text-slate-500">
-                      Catalog Price: AED{" "}
-                      {activeLookupItem.catalogSellingPriceAed.toFixed(2)}
+                      Catalog Price: {curSym}{" "}
+                      {activeLookupItem.catalogSellingPriceAed.toLocaleString(curLocale, { minimumFractionDigits: curDecimals, maximumFractionDigits: curDecimals })}
                     </span>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
-                        Proposed Selling Price / 1 Piece (AED)
+                        Proposed Selling Price / 1 Piece ({curCode})
                       </label>
                       <input
                         type="number"
@@ -931,7 +975,7 @@ const LandedCostCalculator = ({
                         value={
                           quoteUnitSellAed !== ""
                             ? quoteUnitSellAed
-                            : lookupMetrics.simulatedSellUnit.toFixed(2)
+                            : lookupMetrics.simulatedSellUnit.toFixed(curDecimals)
                         }
                         onChange={(e) => setQuoteUnitSellAed(e.target.value)}
                         className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-mono font-bold text-sm text-slate-900 dark:text-white outline-none focus:border-sky-600"
@@ -963,8 +1007,8 @@ const LandedCostCalculator = ({
                             : "text-rose-600 dark:text-rose-400"
                         }`}
                       >
-                        {lookupMetrics.unitProfit >= 0 ? "+" : ""}AED{" "}
-                        {lookupMetrics.unitProfit.toFixed(2)}
+                        {lookupMetrics.unitProfit >= 0 ? "+" : ""}{curSym}{" "}
+                        {lookupMetrics.unitProfit.toLocaleString(curLocale, { minimumFractionDigits: curDecimals, maximumFractionDigits: curDecimals })}
                       </p>
                     </div>
 
@@ -988,8 +1032,8 @@ const LandedCostCalculator = ({
                         Total Deal Value
                       </span>
                       <p className="text-sm font-mono font-bold text-slate-900 dark:text-white">
-                        AED{" "}
-                        {lookupMetrics.totalDealRevenue.toLocaleString("en-AE", {
+                        {curSym}{" "}
+                        {lookupMetrics.totalDealRevenue.toLocaleString(curLocale, {
                           maximumFractionDigits: 0,
                         })}
                       </p>
@@ -1006,8 +1050,8 @@ const LandedCostCalculator = ({
                             : "text-rose-600 dark:text-rose-400"
                         }`}
                       >
-                        AED{" "}
-                        {lookupMetrics.totalDealProfit.toLocaleString("en-AE", {
+                        {curSym}{" "}
+                        {lookupMetrics.totalDealProfit.toLocaleString(curLocale, {
                           maximumFractionDigits: 0,
                         })}
                       </p>
@@ -1142,7 +1186,7 @@ const LandedCostCalculator = ({
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
-                    Exchange Rate (1 {sheetForm.currency} → AED)
+                    Exchange Rate (1 {sheetForm.currency} → {curCode})
                   </label>
                   <input
                     type="number"
@@ -1163,7 +1207,7 @@ const LandedCostCalculator = ({
               <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100 dark:border-slate-800">
                 <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-2">
                   <FiTruck className="text-amber-600 dark:text-amber-400" />
-                  2. Package Logistics &amp; Import Overhead (AED)
+                  2. Package Logistics &amp; Import Overhead ({curCode})
                 </h3>
 
                 {/* Freight Input Mode Toggle */}
@@ -1201,7 +1245,7 @@ const LandedCostCalculator = ({
                 {sheetForm.logisticsMode === "per_package" ? (
                   <div>
                     <label className="block text-[10px] font-bold uppercase text-amber-700 dark:text-amber-300 mb-1">
-                      Freight Rate / Package (AED)
+                      Freight Rate / Package ({curCode})
                     </label>
                     <input
                       type="number"
@@ -1217,14 +1261,14 @@ const LandedCostCalculator = ({
                       className="w-full p-2.5 bg-amber-50/50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 text-slate-900 dark:text-white font-mono font-bold rounded-xl outline-none focus:border-amber-500"
                     />
                     <span className="text-[10px] font-mono text-slate-400 mt-0.5 block">
-                      × {calculatedSheet.totalPackages} pkgs = AED{" "}
-                      {calculatedSheet.freightTotalAed.toLocaleString()}
+                      × {calculatedSheet.totalPackages} pkgs = {curSym}{" "}
+                      {calculatedSheet.freightTotalAed.toLocaleString(curLocale)}
                     </span>
                   </div>
                 ) : (
                   <div>
                     <label className="block text-[10px] font-bold uppercase text-amber-700 dark:text-amber-300 mb-1">
-                      Total Shipment Freight (AED)
+                      Total Shipment Freight ({curCode})
                     </label>
                     <input
                       type="number"
@@ -1240,7 +1284,7 @@ const LandedCostCalculator = ({
                       className="w-full p-2.5 bg-amber-50/50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 text-slate-900 dark:text-white font-mono font-bold rounded-xl outline-none focus:border-amber-500"
                     />
                     <span className="text-[10px] font-mono text-slate-400 mt-0.5 block">
-                      Avg AED{" "}
+                      Avg {curSym}{" "}
                       {calculatedSheet.totalPackages > 0
                         ? (
                             calculatedSheet.freightTotalAed /
@@ -1254,7 +1298,7 @@ const LandedCostCalculator = ({
 
                 <div>
                   <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
-                    Clearance, DO &amp; Port (AED)
+                    Clearance, DO &amp; Port ({curCode})
                   </label>
                   <input
                     type="number"
@@ -1272,7 +1316,7 @@ const LandedCostCalculator = ({
 
                 <div>
                   <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
-                    Packing / Warehouse Handling (AED)
+                    Packing / Warehouse Handling ({curCode})
                   </label>
                   <input
                     type="number"
@@ -1312,7 +1356,7 @@ const LandedCostCalculator = ({
 
                 <div>
                   <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
-                    Insurance &amp; Bank Wire (AED)
+                    Insurance &amp; Bank Wire ({curCode})
                   </label>
                   <input
                     type="number"
@@ -1548,7 +1592,7 @@ const LandedCostCalculator = ({
                         Logistics / Pc
                       </span>
                       <span className="font-mono font-bold text-amber-700 dark:text-amber-300">
-                        +AED {item.overheadPerUnitAed.toFixed(2)}
+                        +{curSym} {item.overheadPerUnitAed.toFixed(curDecimals)}
                       </span>
                     </div>
 
@@ -1557,7 +1601,7 @@ const LandedCostCalculator = ({
                         Landed / 1 Pc
                       </span>
                       <span className="font-mono font-black text-emerald-800 dark:text-emerald-300 text-sm">
-                        AED {item.landedCostPerUnitAed.toFixed(2)}
+                        {curSym} {item.landedCostPerUnitAed.toFixed(curDecimals)}
                       </span>
                     </div>
 
@@ -1566,7 +1610,7 @@ const LandedCostCalculator = ({
                         Blended WAC
                       </span>
                       <span className="font-mono font-bold text-sky-800 dark:text-sky-300">
-                        AED {item.wacUnitCostAed.toFixed(2)}
+                        {curSym} {item.wacUnitCostAed.toFixed(curDecimals)}
                       </span>
                     </div>
                   </div>
@@ -1599,7 +1643,7 @@ const LandedCostCalculator = ({
                         Suggested Sell
                       </span>
                       <span className="font-mono font-black text-slate-900 dark:text-white">
-                        AED {item.suggestedSellingPriceAed.toFixed(2)}
+                        {curSym} {item.suggestedSellingPriceAed.toFixed(curDecimals)}
                       </span>
                     </div>
                   </div>
@@ -1743,18 +1787,18 @@ const LandedCostCalculator = ({
                       </td>
 
                       <td className="py-3 px-2.5 text-right font-mono text-amber-700 dark:text-amber-300 whitespace-nowrap">
-                        + AED {item.overheadPerUnitAed.toFixed(2)}
+                        + {curSym} {item.overheadPerUnitAed.toFixed(curDecimals)}
                         <span className="block text-[10px] text-slate-400">
                           ({item.overheadPercent.toFixed(1)}%)
                         </span>
                       </td>
 
                       <td className="py-3 px-3 text-right font-mono font-black text-sm text-emerald-800 dark:text-emerald-300 bg-emerald-50/40 dark:bg-emerald-500/10 whitespace-nowrap">
-                        AED {item.landedCostPerUnitAed.toFixed(2)}
+                        {curSym} {item.landedCostPerUnitAed.toFixed(curDecimals)}
                       </td>
 
                       <td className="py-3 px-2.5 text-right font-mono font-bold text-sky-800 dark:text-sky-300 whitespace-nowrap">
-                        AED {item.wacUnitCostAed.toFixed(2)}
+                        {curSym} {item.wacUnitCostAed.toFixed(curDecimals)}
                         {item.currentStockQty > 0 && (
                           <span className="block text-[10px] font-normal text-slate-400">
                             +{item.currentStockQty} old
@@ -1783,7 +1827,7 @@ const LandedCostCalculator = ({
                       </td>
 
                       <td className="py-3 px-2.5 text-right font-mono font-bold text-slate-900 dark:text-white whitespace-nowrap">
-                        AED {item.suggestedSellingPriceAed.toFixed(2)}
+                        {curSym} {item.suggestedSellingPriceAed.toFixed(curDecimals)}
                       </td>
 
                       <td className="py-3 px-2 text-center">
@@ -1980,7 +2024,7 @@ const LandedCostCalculator = ({
                           Avg Landed / 1 Pc
                         </span>
                         <span className="font-mono font-black text-emerald-700 dark:text-emerald-300 text-sm">
-                          AED {s.avgLandedPerUnitAed.toFixed(2)}
+                          {curSym} {s.avgLandedPerUnitAed.toFixed(curDecimals)}
                         </span>
                       </div>
 
@@ -1989,8 +2033,8 @@ const LandedCostCalculator = ({
                           FOB Goods Value
                         </span>
                         <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">
-                          AED{" "}
-                          {s.totalFobAed.toLocaleString("en-AE", {
+                          {curSym}{" "}
+                          {s.totalFobAed.toLocaleString(curLocale, {
                             maximumFractionDigits: 0,
                           })}
                         </span>
@@ -2001,8 +2045,8 @@ const LandedCostCalculator = ({
                           Logistics &amp; Fees
                         </span>
                         <span className="font-mono font-semibold text-amber-700 dark:text-amber-300">
-                          +AED{" "}
-                          {s.totalOverheadAed.toLocaleString("en-AE", {
+                          +{curSym}{" "}
+                          {s.totalOverheadAed.toLocaleString(curLocale, {
                             maximumFractionDigits: 0,
                           })}
                         </span>
@@ -2072,21 +2116,23 @@ const LandedCostCalculator = ({
                         </td>
 
                         <td className="py-3.5 px-4 text-right font-mono text-xs text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                          AED{" "}
-                          {s.totalFobAed.toLocaleString("en-AE", {
-                            minimumFractionDigits: 2,
+                          {curSym}{" "}
+                          {s.totalFobAed.toLocaleString(curLocale, {
+                            minimumFractionDigits: curDecimals,
+                            maximumFractionDigits: curDecimals,
                           })}
                         </td>
 
                         <td className="py-3.5 px-4 text-right font-mono text-xs text-amber-700 dark:text-amber-300 whitespace-nowrap">
-                          + AED{" "}
-                          {s.totalOverheadAed.toLocaleString("en-AE", {
-                            minimumFractionDigits: 2,
+                          + {curSym}{" "}
+                          {s.totalOverheadAed.toLocaleString(curLocale, {
+                            minimumFractionDigits: curDecimals,
+                            maximumFractionDigits: curDecimals,
                           })}
                         </td>
 
                         <td className="py-3.5 px-4 text-right font-mono font-black text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
-                          AED {s.avgLandedPerUnitAed.toFixed(2)}
+                          {curSym} {s.avgLandedPerUnitAed.toFixed(curDecimals)}
                         </td>
 
                         <td className="py-3.5 px-4 text-right whitespace-nowrap">

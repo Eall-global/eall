@@ -14,16 +14,37 @@ import {
   downloadInvoicePDF,
   getInvoicePDFBlob,
 } from "../../services/pdfInvoiceGenerator";
+import { usePortalCurrencyOptional } from "../../context/PortalCurrencyContext";
 
 const InvoiceDocument = ({ invoice: rawInvoice, onClose }) => {
   const [downloading, setDownloading] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const portalCur = usePortalCurrencyOptional();
 
   if (!rawInvoice) return null;
+
+  const invCurrency = rawInvoice.currency || portalCur?.currency || "AED";
+  const invSymbol =
+    rawInvoice.currencySymbol ||
+    (rawInvoice.currency ? rawInvoice.currency : portalCur?.symbol) ||
+    invCurrency;
+  const invLocale = rawInvoice.locale || portalCur?.locale || "en-AE";
+  const invDecimals = Number.isFinite(Number(rawInvoice.decimals))
+    ? Number(rawInvoice.decimals)
+    : invCurrency === "KES" || invCurrency === "XOF" || invCurrency === "UGX"
+    ? 0
+    : 2;
+  const fmtMoney = (val) =>
+    `${invSymbol} ${Number(val || 0).toLocaleString(invLocale, {
+      minimumFractionDigits: invDecimals,
+      maximumFractionDigits: invDecimals,
+    })}`;
 
   // Safe data normalization for invoices created from POS or Online Store Checkout
   const invoice = {
     ...rawInvoice,
+    currency: invCurrency,
+    currencySymbol: invSymbol,
     invoiceNo: rawInvoice.invoiceNo || rawInvoice.orderId || rawInvoice.id || "INV-001",
     customerName: rawInvoice.customerName || rawInvoice.fullName || "Customer",
     customerPhone: rawInvoice.customerPhone || rawInvoice.phone || "N/A",
@@ -81,7 +102,7 @@ const InvoiceDocument = ({ invoice: rawInvoice, onClose }) => {
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
           title: `Tax Invoice ${invoice.invoiceNo} - E-ALL`,
-          text: `E-ALL Official Tax Invoice for ${invoice.customerName}. Total: AED ${Number(invoice.totalAmount).toLocaleString("en-AE", { minimumFractionDigits: 2 })}`,
+          text: `E-ALL Official Tax Invoice for ${invoice.customerName}. Total: ${fmtMoney(invoice.totalAmount)}`,
           files: [file],
         });
         return;
@@ -96,7 +117,7 @@ const InvoiceDocument = ({ invoice: rawInvoice, onClose }) => {
     const summary =
       `*E-ALL OFFICIAL TAX INVOICE ${invoice.invoiceNo}*\n` +
       `*Customer:* ${invoice.customerName}\n` +
-      `*Total Amount:* AED ${Number(invoice.totalAmount).toLocaleString("en-AE", { minimumFractionDigits: 2 })}\n` +
+      `*Total Amount:* ${fmtMoney(invoice.totalAmount)}\n` +
       `*Date:* ${new Date(invoice.createdAt).toLocaleDateString("en-GB")}\n\n` +
       `Thank you for doing business with E-ALL Electronics!`;
 
@@ -350,7 +371,7 @@ const InvoiceDocument = ({ invoice: rawInvoice, onClose }) => {
                     <th className="py-2 px-3">Item &amp; Description</th>
                     <th className="py-2 px-3 text-center w-14">Qty</th>
                     <th className="py-2 px-3 text-right w-28">Unit Price</th>
-                    <th className="py-2 px-3 text-right w-28">Total (AED)</th>
+                    <th className="py-2 px-3 text-right w-28">Total ({invSymbol})</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 font-medium text-slate-700">
@@ -408,7 +429,7 @@ const InvoiceDocument = ({ invoice: rawInvoice, onClose }) => {
                 <div className="flex justify-between text-slate-600">
                   <span>Subtotal:</span>
                   <span className="font-mono font-bold text-slate-800">
-                    AED {Number(invoice.subtotal).toLocaleString("en-AE", { minimumFractionDigits: 2 })}
+                    {fmtMoney(invoice.subtotal)}
                   </span>
                 </div>
 
@@ -416,15 +437,15 @@ const InvoiceDocument = ({ invoice: rawInvoice, onClose }) => {
                   <div className="flex justify-between text-rose-600 font-semibold">
                     <span>Discount:</span>
                     <span className="font-mono">
-                      - AED {Number(invoice.discount).toLocaleString("en-AE", { minimumFractionDigits: 2 })}
+                      - {fmtMoney(invoice.discount)}
                     </span>
                   </div>
                 )}
 
                 <div className="flex justify-between text-slate-600">
-                  <span>UAE VAT ({invoice.vatRate}%):</span>
+                  <span>VAT ({invoice.vatRate}%):</span>
                   <span className="font-mono font-bold text-slate-800">
-                    AED {Number(invoice.vatAmount).toLocaleString("en-AE", { minimumFractionDigits: 2 })}
+                    {fmtMoney(invoice.vatAmount)}
                   </span>
                 </div>
 
@@ -432,7 +453,7 @@ const InvoiceDocument = ({ invoice: rawInvoice, onClose }) => {
                 <div className="flex justify-between items-center text-base font-black text-slate-950 pt-3 border-t-2 border-slate-900">
                   <span className="tracking-tight">Grand Total:</span>
                   <span className="font-mono text-sky-900 text-xl font-black">
-                    AED {Number(invoice.totalAmount).toLocaleString("en-AE", { minimumFractionDigits: 2 })}
+                    {fmtMoney(invoice.totalAmount)}
                   </span>
                 </div>
               </div>

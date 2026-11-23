@@ -11,8 +11,8 @@ import {
 } from "react-icons/fi";
 import { MdOutlineShoppingCart, MdShoppingCart } from "react-icons/md";
 import { useCart } from "../../context/CartContext";
-import { useCustomerAuth } from "../../context/CustomerAuthContext";
-import { AedSymbol, AedPrice } from "../common/AedSymbol";
+import { useCountry } from "../../context/CountryContext";
+import { AedPrice } from "../common/AedSymbol";
 
 const CartDrawer = () => {
   const {
@@ -20,6 +20,7 @@ const CartDrawer = () => {
     cartCount,
     cartSubtotal,
     shippingFee,
+    freeShippingThreshold,
     cartTotal,
     isCartOpen,
     setIsCartOpen,
@@ -28,23 +29,19 @@ const CartDrawer = () => {
     clearCart,
   } = useCart();
 
-  const { isLoggedIn, openAuthModal } = useCustomerAuth();
+  const { activeCountry, countryPath, formatPrice } = useCountry();
   const navigate = useNavigate();
 
   if (!isCartOpen) return null;
 
   const handleCheckoutClick = () => {
     setIsCartOpen(false);
-    if (!isLoggedIn) {
-      openAuthModal("login", "/checkout");
-    } else {
-      navigate("/checkout");
-    }
+    navigate(countryPath("/checkout"));
   };
 
-  const freeShippingThreshold = 500;
-  const progressPercent = Math.min(100, Math.round((cartSubtotal / freeShippingThreshold) * 100));
-  const amountToFreeShipping = Math.max(0, freeShippingThreshold - cartSubtotal);
+  const threshold = Number(freeShippingThreshold ?? activeCountry.freeShippingThreshold ?? 500);
+  const progressPercent = threshold > 0 ? Math.min(100, Math.round((cartSubtotal / threshold) * 100)) : 100;
+  const amountToFreeShipping = Math.max(0, threshold - cartSubtotal);
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden text-left">
@@ -74,7 +71,7 @@ const CartDrawer = () => {
                   )}
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.3">
-                  Review your selected items
+                  {activeCountry.flag} {activeCountry.shortName} ({activeCountry.currency})
                 </p>
               </div>
             </div>
@@ -98,7 +95,7 @@ const CartDrawer = () => {
                   {amountToFreeShipping === 0 ? (
                     <strong className="text-emerald-700 font-bold">You qualify for FREE Delivery!</strong>
                   ) : (
-                    <>Add <strong className="font-mono text-sky-800">AED {amountToFreeShipping.toFixed(2)}</strong> for Free Delivery</>
+                    <>Add <strong className="font-mono text-sky-800">{formatPrice(amountToFreeShipping)}</strong> for Free Delivery</>
                   )}
                 </span>
                 <span className="font-mono font-bold text-sky-800">{progressPercent}%</span>
@@ -125,7 +122,7 @@ const CartDrawer = () => {
                 </p>
                 <div className="pt-2">
                   <Link
-                    to="/products"
+                    to={countryPath("/products")}
                     onClick={() => setIsCartOpen(false)}
                     className="inline-flex items-center gap-1.5 px-4 py-2 bg-sky-700 text-white text-xs font-semibold rounded-xl hover:bg-sky-800 transition shadow-xs"
                   >
@@ -258,7 +255,7 @@ const CartDrawer = () => {
                     Clear Cart
                   </button>
                   <Link
-                    to="/cart"
+                    to={countryPath("/cart")}
                     onClick={() => setIsCartOpen(false)}
                     className="text-[11px] text-sky-700 hover:text-sky-900 font-bold underline cursor-pointer"
                   >
@@ -269,7 +266,7 @@ const CartDrawer = () => {
 
               <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-400 pt-1">
                 <FiShield className="text-emerald-600" />
-                <span>Secure Checkout • Wave Transfer &amp; Direct Delivery</span>
+                <span>Secure {activeCountry.shortName} Checkout • {activeCountry.hubName}</span>
               </div>
             </div>
           )}

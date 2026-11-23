@@ -5,9 +5,7 @@ import {
   FiAlertTriangle,
   FiXCircle,
   FiShield,
-  FiSmartphone,
   FiBox,
-  FiCalendar,
   FiArrowRight,
   FiRefreshCw,
   FiLayers,
@@ -24,9 +22,17 @@ import { products } from "../../data/products/index";
  *  - onReset(): callback to clear and check another IMEI
  */
 const VerifyResult = ({ result, onReset }) => {
-  const { status, imei, product, message, source } = result;
+  const {
+    status,
+    imei,
+    product,
+    message,
+    source,
+    warrantyRecord,
+    warrantyState,
+  } = result;
 
-  const productData = product
+  const productData = product?.productSlug
     ? products.find((p) => p.slug === product.productSlug)
     : null;
 
@@ -80,6 +86,12 @@ const VerifyResult = ({ result, onReset }) => {
             </span>
 
             {/* Source Tag */}
+            {isAuthentic && source === "portal_registry" && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                <FiShield className="text-[11px]" />
+                Live Warranty Registry Verified
+              </span>
+            )}
             {isAuthentic && source === "unit" && (
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200/60">
                 <FiShield className="text-[11px]" />
@@ -121,6 +133,61 @@ const VerifyResult = ({ result, onReset }) => {
           {imei.match(/.{1,5}/g)?.join(" ") || imei}
         </span>
       </div>
+
+      {/* ── Live Portal Warranty Coverage Card (if in Firestore Registry) ── */}
+      {isAuthentic && warrantyRecord && (
+        <div className="mx-6 sm:mx-8 mb-6 p-5 bg-emerald-50/60 border border-emerald-200/80 rounded-2xl text-left space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wider text-emerald-800">
+              <FiShield className="text-emerald-600" />
+              {warrantyRecord.warrantyType || "Official Manufacturer Warranty"}
+            </span>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-white text-emerald-800 border border-emerald-200">
+              {warrantyState?.label || "12-Month Official Coverage"}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs pt-1 border-t border-emerald-200/60">
+            <div>
+              <span className="block text-[10px] font-bold uppercase text-slate-400">
+                Device Model
+              </span>
+              <span className="font-bold text-slate-900">
+                {warrantyRecord.productName}
+              </span>
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold uppercase text-slate-400">
+                Registry Status
+              </span>
+              <span className="font-bold text-slate-900">
+                {warrantyRecord.status}
+              </span>
+            </div>
+            {warrantyRecord.warrantyExpiresAt ? (
+              <div>
+                <span className="block text-[10px] font-bold uppercase text-slate-400">
+                  Warranty Valid Until
+                </span>
+                <span className="font-bold text-slate-900">
+                  {new Date(
+                    warrantyRecord.warrantyExpiresAt
+                  ).toLocaleDateString("en-GB")}
+                </span>
+              </div>
+            ) : (
+              <div>
+                <span className="block text-[10px] font-bold uppercase text-slate-400">
+                  Coverage Term
+                </span>
+                <span className="font-bold text-slate-900">
+                  {warrantyRecord.warrantyMonths || 12} Months
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Product Card (if Authentic) ──────────────────────────── */}
       {isAuthentic && productData && (

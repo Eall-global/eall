@@ -11,10 +11,141 @@ import {
 import { products as catalogProducts } from "../data/products/index";
 import { expandToFlatSkus } from "../utils/productVariant";
 import { logAuditEvent } from "./auditService";
-
+import {
+  DEFAULT_LOCATIONS,
+  convertAedToLocalPrice,
+} from "../config/locationsConfig";
 
 const STORAGE_KEY = "eall_inventory_stock";
 const COLLECTION_NAME = "product_stock";
+
+/**
+ * Normalize per-location stock entry for any warehouse/country code (AE, CN, HK, KE, SN, etc.)
+ * Backward-compatible with legacy root fields on AE (Dubai Main Hub).
+ */
+export const getLocationStockEntry = (item, locationCode = "AE") => {
+  const code = String(locationCode || "AE").toUpperCase();
+  const raw = item?.locations?.[code];
+
+  if (code === "AE") {
+    return {
+      quantity:
+        raw?.quantity !== undefined
+          ? Math.max(0, Number(raw.quantity) || 0)
+          : Math.max(0, Number(item?.quantity) || 0),
+      inTransitIn: Math.max(0, Number(raw?.inTransitIn) || 0),
+      priceLocal:
+        Number(raw?.priceLocal) > 0
+          ? Number(raw.priceLocal)
+          : Number(item?.price) || 0,
+      costLocal:
+        Number(raw?.costLocal) > 0
+          ? Number(raw.costLocal)
+          : Number(item?.costPrice) || 0,
+      minAlert:
+        raw?.minAlert !== undefined
+          ? Number(raw.minAlert)
+          : Number(item?.minAlert ?? 3),
+      active: raw?.active !== false,
+    };
+  }
+
+  return {
+    quantity: raw?.quantity !== undefined ? Math.max(0, Number(raw.quantity) || 0) : 0,
+    inTransitIn: Math.max(0, Number(raw?.inTransitIn) || 0),
+    priceLocal: Number(raw?.priceLocal) > 0 ? Number(raw.priceLocal) : 0,
+    costLocal: Number(raw?.costLocal) > 0 ? Number(raw.costLocal) : 0,
+    minAlert:
+      raw?.minAlert !== undefined
+        ? Number(raw.minAlert)
+        : Number(item?.minAlert ?? 3),
+    active: raw?.active !== false,
+  };
+};
+
+/**
+ * Read-only Tier-1 Supply Hub inventory summary (Dubai AE, China CN, Hong Kong HK)
+ * shown to country salespeople so they know what can be requested for transfer.
+ */
+export const getSupplyHubTotals = (item) => {
+  const AE = getLocationStockEntry(item, "AE").quantity;
+  const CN = getLocationStockEntry(item, "CN").quantity;
+  const HK = getLocationStockEntry(item, "HK").quantity;
+  return { AE, CN, HK, total: AE + CN + HK };
+};
+
+/**
+ * Project global stock list into a specific warehouse/country view (e.g., KE in KES, CN in USD, AE in AED)
+ */
+export const projectStockForLocation = (
+  stockList = [],
+  locationCode = "AE",
+  locationConfig = null
+) => {
+  const code = String(locationCode || "AE").toUpperCase();
+  const cfg =
+    locationConfig ||
+    DEFAULT_LOCATIONS.find((l) => l.code === code) ||
+    DEFAULT_LOCATIONS[0];
+
+  return (stockList || []).map((item) => {
+    const loc = getLocationStockEntry(item, code);
+    const supplyHubStock = getSupplyHubTotals(item);
+    const priceAed = Number(item.price) || 0;
+    const costAed = Number(item.costPrice) || 0;
+
+    if (code === "ALL") {
+      // Aggregate across all locations in the map (plus AE fallback)
+      const locKeys = new Set(["AE", "CN", "HK", ...Object.keys(item.locations || {})]);
+      let totalQty = 0;
+      let totalInTransit = 0;
+      locKeys.forEach((k) => {
+        const entry = getLocationStockEntry(item, k);
+        totalQty += entry.quantity;
+        totalInTransit += entry.inTransitIn;
+      });
+      return {
+        ...item,
+        locationCode: "ALL",
+        quantity: totalQty,
+        inTransitIn: totalInTransit,
+        priceAed,
+        costPriceAed: costAed,
+        supplyHubStock,
+        currency: "AED",
+        currencySymbol: "AED",
+      };
+    }
+
+    const resolvedLocalPrice =
+      code === "AE"
+        ? loc.priceLocal || priceAed
+        : convertAedToLocalPrice(priceAed, cfg, loc.priceLocal);
+    const resolvedLocalCost =
+      loc.costLocal > 0
+        ? loc.costLocal
+        : code === "AE"
+        ? costAed
+        : convertAedToLocalPrice(costAed, cfg, 0);
+
+    return {
+      ...item,
+      locationCode: code,
+      quantity: loc.quantity,
+      inTransitIn: loc.inTransitIn,
+      price: resolvedLocalPrice,
+      costPrice: resolvedLocalCost,
+      margin: Math.max(0, resolvedLocalPrice - resolvedLocalCost),
+      minAlert: loc.minAlert,
+      hasExplicitLocalPrice: code !== "AE" && loc.priceLocal > 0,
+      priceAed,
+      costPriceAed: costAed,
+      supplyHubStock,
+      currency: cfg.currency || "AED",
+      currencySymbol: cfg.currencySymbol || cfg.currency || "AED",
+    };
+  });
+};
 
 // Helper to seed initial stock from existing product catalog.
 // Products with color variants and/or storage options are expanded into
@@ -92,6 +223,36 @@ const mapDocToStockItem = (data) => {
   const margin = Number(data.margin ?? 0);
   const price = data.price !== undefined && data.price !== null ? Number(data.price) : (costPrice + margin);
   const originalPrice = Number(data.originalPrice ?? data.original_price ?? data.listPrice ?? 0);
+  const rootQty = Number(data.quantity) || 0;
+  const minAlert = Number(data.minAlert ?? data.min_alert ?? 3);
+
+  // Preserve multi-warehouse locations map and keep AE synced with legacy root fields
+  const rawLocations =
+    data.locations && typeof data.locations === "object" ? { ...data.locations } : {};
+  const normalizedLocations = {};
+  Object.entries(rawLocations).forEach(([locKey, locVal]) => {
+    if (!locVal || typeof locVal !== "object") return;
+    const upperKey = String(locKey).trim().toUpperCase();
+    normalizedLocations[upperKey] = {
+      quantity: Math.max(0, Number(locVal.quantity) || 0),
+      inTransitIn: Math.max(0, Number(locVal.inTransitIn) || 0),
+      priceLocal: Number(locVal.priceLocal) || 0,
+      costLocal: Number(locVal.costLocal) || 0,
+      minAlert: locVal.minAlert !== undefined ? Number(locVal.minAlert) : minAlert,
+      active: locVal.active !== false,
+    };
+  });
+
+  if (!normalizedLocations.AE) {
+    normalizedLocations.AE = {
+      quantity: rootQty,
+      inTransitIn: 0,
+      priceLocal: price,
+      costLocal: costPrice,
+      minAlert,
+      active: true,
+    };
+  }
 
   return {
     sku: data.sku,
@@ -105,13 +266,14 @@ const mapDocToStockItem = (data) => {
     color: data.color || null,
     colorSlug: data.colorSlug || null,
     storage: data.storage || null,
-    // Inventory
-    quantity: Number(data.quantity) || 0,
+    // Inventory (legacy AE root fields + multi-warehouse locations map)
+    quantity: normalizedLocations.AE.quantity,
     costPrice,
     margin,
     price,
     originalPrice,
-    minAlert: Number(data.minAlert ?? data.min_alert ?? 3),
+    minAlert,
+    locations: normalizedLocations,
     updatedAt: data.updatedAt || data.updated_at || new Date().toISOString(),
   };
 };
@@ -218,33 +380,57 @@ export const subscribeToStock = (callback) => {
 };
 
 /**
- * Update stock quantity directly in Firestore and locally
+ * Update stock quantity directly in Firestore and locally for a specific hub/country code.
+ * Defaults to "AE" (Dubai Main Hub) for full backward compatibility.
  */
-export const updateStockQuantity = async (sku, newQuantity) => {
+export const updateStockQuantity = async (sku, newQuantity, locationCode = "AE") => {
+  const code = String(locationCode || "AE").toUpperCase();
   const qty = Math.max(0, parseInt(newQuantity, 10) || 0);
+  const now = new Date().toISOString();
   const db = getFirebaseDb();
+
+  const current = getLocalStock();
+  const existing = current.find((item) => item.sku === sku);
+  const prevLocations = existing?.locations ? { ...existing.locations } : {};
+  const prevLocEntry = getLocationStockEntry(existing, code);
+  const nextLocations = {
+    ...prevLocations,
+    [code]: {
+      ...prevLocEntry,
+      quantity: qty,
+    },
+  };
 
   if (db && isFirebaseConfigured()) {
     try {
       const docRef = doc(db, COLLECTION_NAME, sku);
-      await setDoc(
-        docRef,
-        {
-          quantity: qty,
-          updatedAt: new Date().toISOString(),
+      const payload = {
+        locations: {
+          [code]: {
+            ...prevLocEntry,
+            quantity: qty,
+          },
         },
-        { merge: true }
-      );
+        updatedAt: now,
+      };
+      if (code === "AE") {
+        payload.quantity = qty;
+      }
+      await setDoc(docRef, payload, { merge: true });
     } catch (err) {
       console.warn("Firestore quantity update error:", err.message);
     }
   }
 
   // Always sync local
-  const current = getLocalStock();
   const updated = current.map((item) =>
     item.sku === sku
-      ? { ...item, quantity: qty, updatedAt: new Date().toISOString() }
+      ? {
+          ...item,
+          quantity: code === "AE" ? qty : item.quantity,
+          locations: nextLocations,
+          updatedAt: now,
+        }
       : item
   );
   saveLocalStock(updated);
@@ -252,15 +438,122 @@ export const updateStockQuantity = async (sku, newQuantity) => {
 };
 
 /**
- * Increment or decrement stock by delta (e.g. +5 for restock or -1 for sale)
+ * Update multi-warehouse location fields (quantity, inTransitIn, priceLocal, costLocal, minAlert)
  */
-export const adjustStockDelta = async (sku, delta) => {
+export const updateLocationStock = async (
+  sku,
+  locationCode = "AE",
+  { quantity, inTransitIn, priceLocal, costLocal, minAlert, skipAudit = false } = {}
+) => {
+  const code = String(locationCode || "AE").toUpperCase();
+  const now = new Date().toISOString();
+  const db = getFirebaseDb();
+
+  const current = getLocalStock();
+  const existing = current.find((item) => item.sku === sku);
+  const prevEntry = getLocationStockEntry(existing, code);
+
+  const nextEntry = {
+    quantity:
+      quantity !== undefined ? Math.max(0, parseInt(quantity, 10) || 0) : prevEntry.quantity,
+    inTransitIn:
+      inTransitIn !== undefined
+        ? Math.max(0, parseInt(inTransitIn, 10) || 0)
+        : prevEntry.inTransitIn,
+    priceLocal: priceLocal !== undefined ? Math.max(0, Number(priceLocal) || 0) : prevEntry.priceLocal,
+    costLocal: costLocal !== undefined ? Math.max(0, Number(costLocal) || 0) : prevEntry.costLocal,
+    minAlert: minAlert !== undefined ? Math.max(0, Number(minAlert) || 0) : prevEntry.minAlert,
+    active: true,
+  };
+
+  const payload = {
+    locations: {
+      [code]: nextEntry,
+    },
+    updatedAt: now,
+  };
+
+  if (code === "AE") {
+    payload.quantity = nextEntry.quantity;
+    if (priceLocal !== undefined && nextEntry.priceLocal > 0) payload.price = nextEntry.priceLocal;
+    if (costLocal !== undefined && nextEntry.costLocal > 0) payload.costPrice = nextEntry.costLocal;
+    if (minAlert !== undefined) payload.minAlert = nextEntry.minAlert;
+  }
+
+  if (db && isFirebaseConfigured()) {
+    try {
+      await setDoc(doc(db, COLLECTION_NAME, sku), payload, { merge: true });
+    } catch (err) {
+      console.warn("Firestore location stock update error:", err.message);
+    }
+  }
+
+  const updated = current.map((item) => {
+    if (item.sku !== sku) return item;
+    const nextLocations = { ...(item.locations || {}), [code]: nextEntry };
+    return {
+      ...item,
+      quantity: code === "AE" ? nextEntry.quantity : item.quantity,
+      price: code === "AE" && nextEntry.priceLocal > 0 ? nextEntry.priceLocal : item.price,
+      costPrice: code === "AE" && nextEntry.costLocal > 0 ? nextEntry.costLocal : item.costPrice,
+      minAlert: code === "AE" ? nextEntry.minAlert : item.minAlert,
+      locations: nextLocations,
+      updatedAt: now,
+    };
+  });
+  saveLocalStock(updated);
+
+  if (!skipAudit && existing) {
+    const changes = [];
+    if (prevEntry.quantity !== nextEntry.quantity) {
+      changes.push({
+        field: `[${code}] Quantity`,
+        before: `${prevEntry.quantity} units`,
+        after: `${nextEntry.quantity} units`,
+      });
+    }
+    if (prevEntry.priceLocal !== nextEntry.priceLocal) {
+      changes.push({
+        field: `[${code}] Local Price`,
+        before: prevEntry.priceLocal || "Auto FX",
+        after: nextEntry.priceLocal || "Auto FX",
+      });
+    }
+    if (prevEntry.costLocal !== nextEntry.costLocal) {
+      changes.push({
+        field: `[${code}] Landed Cost`,
+        before: prevEntry.costLocal || "—",
+        after: nextEntry.costLocal || "—",
+      });
+    }
+    if (changes.length > 0) {
+      logAuditEvent({
+        module: "stock",
+        action: "update",
+        severity: "warning",
+        targetId: sku,
+        targetLabel: `[${code}] ${existing.name || sku}`,
+        summary: `Updated [${code}] warehouse stock for ${existing.name || sku}`,
+        changes,
+      });
+    }
+  }
+
+  return updated;
+};
+
+/**
+ * Increment or decrement stock by delta at a specific locationCode (default "AE")
+ */
+export const adjustStockDelta = async (sku, delta, locationCode = "AE") => {
+  const code = String(locationCode || "AE").toUpperCase();
   const current = await fetchStock();
   const target = current.find((i) => i.sku === sku);
   if (!target) throw new Error(`Product with SKU ${sku} not found`);
 
-  const newQty = Math.max(0, target.quantity + delta);
-  return await updateStockQuantity(sku, newQty);
+  const locEntry = getLocationStockEntry(target, code);
+  const newQty = Math.max(0, locEntry.quantity + Number(delta || 0));
+  return await updateStockQuantity(sku, newQty, code);
 };
 
 /**
@@ -300,6 +593,21 @@ export const updateProductDetails = async (
         updatePayload.quantity = Math.max(0, parseInt(quantity, 10) || 0);
       if (minAlert !== undefined) updatePayload.minAlert = Number(minAlert);
 
+      // Keep locations.AE mirror synchronized with root AE fields
+      const prevAe = getLocationStockEntry(previous, "AE");
+      updatePayload.locations = {
+        AE: {
+          ...prevAe,
+          quantity:
+            quantity !== undefined
+              ? Math.max(0, parseInt(quantity, 10) || 0)
+              : prevAe.quantity,
+          priceLocal: sPrice !== undefined ? sPrice : prevAe.priceLocal,
+          costLocal: cPrice !== undefined ? cPrice : prevAe.costLocal,
+          minAlert: minAlert !== undefined ? Number(minAlert) : prevAe.minAlert,
+        },
+      };
+
       const docRef = doc(db, COLLECTION_NAME, sku);
       await setDoc(docRef, updatePayload, { merge: true });
     } catch (err) {
@@ -307,27 +615,48 @@ export const updateProductDetails = async (
     }
   }
 
-  const updated = current.map((item) =>
-    item.sku === sku
-      ? {
-          ...item,
-          name: name !== undefined ? String(name).trim() : item.name,
-          brand: brand !== undefined ? String(brand).trim() : item.brand,
-          category: category !== undefined ? String(category).trim() : item.category,
-          image: image !== undefined ? String(image).trim() : item.image,
-          costPrice: cPrice !== undefined ? cPrice : (item.costPrice || 0),
-          margin: mMargin !== undefined ? mMargin : (item.margin || 0),
-          price: sPrice !== undefined ? sPrice : (cPrice !== undefined && mMargin !== undefined ? cPrice + mMargin : item.price),
-          originalPrice: originalPrice !== undefined ? Number(originalPrice) : (item.originalPrice ?? 0),
-          quantity:
-            quantity !== undefined
-              ? Math.max(0, parseInt(quantity, 10) || 0)
-              : item.quantity,
-          minAlert: minAlert !== undefined ? Number(minAlert) : item.minAlert,
-          updatedAt: new Date().toISOString(),
-        }
-      : item
-  );
+  const updated = current.map((item) => {
+    if (item.sku !== sku) return item;
+    const nextQty =
+      quantity !== undefined
+        ? Math.max(0, parseInt(quantity, 10) || 0)
+        : item.quantity;
+    const nextCost = cPrice !== undefined ? cPrice : item.costPrice || 0;
+    const nextMargin = mMargin !== undefined ? mMargin : item.margin || 0;
+    const nextPrice =
+      sPrice !== undefined
+        ? sPrice
+        : cPrice !== undefined && mMargin !== undefined
+        ? cPrice + mMargin
+        : item.price;
+    const nextAlert = minAlert !== undefined ? Number(minAlert) : item.minAlert;
+    const prevAe = getLocationStockEntry(item, "AE");
+    return {
+      ...item,
+      name: name !== undefined ? String(name).trim() : item.name,
+      brand: brand !== undefined ? String(brand).trim() : item.brand,
+      category: category !== undefined ? String(category).trim() : item.category,
+      image: image !== undefined ? String(image).trim() : item.image,
+      costPrice: nextCost,
+      margin: nextMargin,
+      price: nextPrice,
+      originalPrice:
+        originalPrice !== undefined ? Number(originalPrice) : item.originalPrice ?? 0,
+      quantity: nextQty,
+      minAlert: nextAlert,
+      locations: {
+        ...(item.locations || {}),
+        AE: {
+          ...prevAe,
+          quantity: nextQty,
+          priceLocal: nextPrice,
+          costLocal: nextCost,
+          minAlert: nextAlert,
+        },
+      },
+      updatedAt: new Date().toISOString(),
+    };
+  });
   saveLocalStock(updated);
 
   if (!skipAudit && previous) {

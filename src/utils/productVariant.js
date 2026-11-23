@@ -88,18 +88,23 @@ export const getActiveVariant = (product, colorVariant, storage) => {
 
   // If CatalogContext has already injected liveVariants keyed by variantSku, use it
   const live = product.liveVariants?.[variantSku.toUpperCase()];
+  const resolvedPrice =
+    Number(live?.price) > 0 ? Number(live.price) : Number(basePrice) || 0;
 
   return {
     ...base,
     storage: stor,
     sku: variantSku,
-    price: live?.price ?? basePrice,
-    livePrice: live?.price ?? basePrice,
+    price: resolvedPrice,
+    livePrice: resolvedPrice,
     liveQuantity: live?.quantity ?? null,
-    availability: live?.availability ?? product.availability,
+    availability: live?.availability || product.availability || "In Stock",
     costPrice: live?.costPrice ?? 0,
     margin: live?.margin ?? 0,
-    originalPrice: live?.originalPrice ?? product.originalPrice ?? 0,
+    originalPrice:
+      Number(live?.originalPrice) > 0
+        ? Number(live.originalPrice)
+        : Number(product.originalPrice) || 0,
   };
 };
 

@@ -2,74 +2,81 @@ import { Link } from "react-router-dom";
 import {
   FiHome,
   FiTag,
-  FiLayers,
   FiTool,
   FiInfo,
   FiMail,
+  FiShield,
 } from "react-icons/fi";
 import MobileCategoryAccordion from "./MobileCategoryAccordion";
+import { useCountry } from "../../../context/CountryContext";
 
 const MobileNavigation = ({ onClose }) => {
-  const linkClass = `
-    flex
-    items-center
-    gap-3
-    rounded-xl
-    px-4
-    py-3
-    text-slate-700
-    hover:bg-slate-100
-    hover:text-sky-700
-    transition
-  `;
+  const { countryPath } = useCountry();
 
-  const iconClass = `
-    text-lg
-    text-sky-700
-  `;
+  const linkClass =
+    "flex items-center gap-3 rounded-xl px-2.5 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-100/90 hover:text-sky-700 transition";
+
+  const iconWrapClass =
+    "w-7 h-7 rounded-lg bg-slate-100/90 text-sky-700 flex items-center justify-center shrink-0 text-sm";
 
   return (
-    <section className="space-y-1 text-left">
-      <p className="text-xs uppercase tracking-wider text-slate-500 mb-2!">
-        Navigation
+    <section className="space-y-0.5 text-left">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+        Browse Store
       </p>
 
-      <Link to="/" onClick={onClose} className={linkClass}>
-        <FiHome className={iconClass} />
-
+      <Link to={countryPath("/")} onClick={onClose} className={linkClass}>
+        <span className={iconWrapClass}>
+          <FiHome />
+        </span>
         <span>Home</span>
       </Link>
 
       <MobileCategoryAccordion onClose={onClose} />
 
-      <Link to="/brands" onClick={onClose} className={linkClass}>
-        <FiTag className={iconClass} />
-
-        <span>Brands</span>
+      <Link to={countryPath("/brands")} onClick={onClose} className={linkClass}>
+        <span className={iconWrapClass}>
+          <FiTag />
+        </span>
+        <span>Official Brands</span>
       </Link>
 
-      <Link to="/solutions" onClick={onClose} className={linkClass}>
-        <FiLayers className={iconClass} />
-
-        <span>Solutions</span>
+      <Link to={countryPath("/verify")} onClick={onClose} className={linkClass}>
+        <span className={iconWrapClass}>
+          <FiShield />
+        </span>
+        <span>Verify IMEI &amp; Warranty</span>
       </Link>
 
-      <Link to="/services" onClick={onClose} className={linkClass}>
-        <FiTool className={iconClass} />
+      <div className="my-2 border-t border-slate-100" />
 
+      <Link
+        to={countryPath("/services")}
+        onClick={onClose}
+        className={linkClass}
+      >
+        <span className={iconWrapClass}>
+          <FiTool />
+        </span>
         <span>Services</span>
       </Link>
 
-      <Link to="/about" onClick={onClose} className={linkClass}>
-        <FiInfo className={iconClass} />
-
-        <span>About</span>
+      <Link to={countryPath("/about")} onClick={onClose} className={linkClass}>
+        <span className={iconWrapClass}>
+          <FiInfo />
+        </span>
+        <span>About Us</span>
       </Link>
 
-      <Link to="/contact" onClick={onClose} className={linkClass}>
-        <FiMail className={iconClass} />
-
-        <span>Contact</span>
+      <Link
+        to={countryPath("/contact")}
+        onClick={onClose}
+        className={linkClass}
+      >
+        <span className={iconWrapClass}>
+          <FiMail />
+        </span>
+        <span>Contact Support</span>
       </Link>
     </section>
   );

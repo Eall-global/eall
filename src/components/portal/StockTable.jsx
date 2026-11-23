@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef } from "react";
 import {
   FiSearch,
   FiPlus,
@@ -14,18 +14,18 @@ import {
   FiChevronRight,
   FiChevronsLeft,
   FiChevronsRight,
-  FiPercent,
   FiDollarSign,
   FiX,
   FiUpload,
   FiImage,
+  FiRepeat,
 } from "react-icons/fi";
 import {
   updateProductDetails,
+  updateLocationStock,
   syncCatalogToStock,
   addCustomProduct,
 } from "../../services/stockService";
-import { formatAED, CURRENCY_SYMBOL } from "../../utils/currencyFormatter";
 import { AedSymbol, AedPrice } from "../common/AedSymbol";
 import ProductLedgerDrawer from "./ProductLedgerDrawer";
 import PortalKpiGrid from "./PortalKpiGrid";
@@ -38,7 +38,21 @@ const StockTable = ({
   isAdmin,
   invoices = [],
   purchases = [],
+  activeLocationCode = "AE",
+  activeLocationConfig = null,
+  onRequestTransfer,
 }) => {
+  const locSymbol =
+    activeLocationCode === "ALL"
+      ? "AED"
+      : activeLocationConfig?.currencySymbol || "AED";
+  const locDecimals =
+    activeLocationCode === "ALL"
+      ? 2
+      : activeLocationConfig?.decimals ?? 2;
+  const isCountryBranch =
+    activeLocationCode !== "ALL" &&
+    !["AE", "CN", "HK"].includes(activeLocationCode);
   const [search, setSearch] = useState("");
   const [brandFilter, setBrandFilter] = useState("All");
   const [categoryFilter, setCategoryFilter] = useState("All");
@@ -62,9 +76,12 @@ const StockTable = ({
   const [editAlert, setEditAlert] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
-  // Pagination State & Ref
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  // Pagination State & Ref (keyed to filters to avoid useEffect setState)
+  const itemsPerPage = 10;
+  const filterKey = `${search}|${brandFilter}|${categoryFilter}|${statusFilter}`;
+  const [pageState, setPageState] = useState({ key: filterKey, page: 1 });
+  const currentPage = pageState.key === filterKey ? pageState.page : 1;
+  const setCurrentPage = (p) => setPageState({ key: filterKey, page: p });
   const tableRef = useRef(null);
 
   // New Product Modal State
@@ -72,12 +89,12 @@ const StockTable = ({
   const [newSku, setNewSku] = useState("");
   const [newName, setNewName] = useState("");
   const [newBrand, setNewBrand] = useState("");
-  const [newCategory, setNewCategory] = useState("Electronics");
+  const [newCategory] = useState("Electronics");
   const [newImage, setNewImage] = useState("");
   const [newCostPrice, setNewCostPrice] = useState(0);
   const [newMargin, setNewMargin] = useState(0);
   const [newPrice, setNewPrice] = useState(0);
-  const [newOriginalPrice, setNewOriginalPrice] = useState(0);
+  const [newOriginalPrice] = useState(0);
   const [newAlert, setNewAlert] = useState(3);
 
   const handleImageFileChange = (e) => {
@@ -94,11 +111,6 @@ const StockTable = ({
       reader.readAsDataURL(file);
     }
   };
-
-  // Reset pagination to page 1 whenever filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search, brandFilter, categoryFilter, statusFilter, itemsPerPage]);
 
   const brands = useMemo(() => {
     const list = Array.from(
@@ -345,17 +357,27 @@ const StockTable = ({
       const selling = parseFloat(editPrice) || (cost + margin);
       const original = editOriginalPrice ? parseFloat(editOriginalPrice) : 0;
 
-      await updateProductDetails(editingItem.sku, {
-        name: editName,
-        brand: editBrand,
-        category: editCategory,
-        costPrice: cost,
-        margin: margin,
-        price: selling,
-        originalPrice: original,
-        quantity: editQty,
-        minAlert: editAlert,
-      });
+      if (activeLocationCode !== "AE" && activeLocationCode !== "ALL") {
+        // Multi-warehouse update: modifies ONLY the active country/hub's local quantity & price
+        await updateLocationStock(editingItem.sku, activeLocationCode, {
+          quantity: editQty,
+          costLocal: cost,
+          priceLocal: selling,
+          minAlert: editAlert,
+        });
+      } else {
+        await updateProductDetails(editingItem.sku, {
+          name: editName,
+          brand: editBrand,
+          category: editCategory,
+          costPrice: cost,
+          margin: margin,
+          price: selling,
+          originalPrice: original,
+          quantity: editQty,
+          minAlert: editAlert,
+        });
+      }
       setEditingItem(null);
       if (onStockChanged) onStockChanged();
       if (onStockUpdated) onStockUpdated();
@@ -408,10 +430,10 @@ const StockTable = ({
       "Brand",
       "Category",
       "Quantity",
-      `Cost Price (${CURRENCY_SYMBOL})`,
-      `Margin (${CURRENCY_SYMBOL})`,
-      `Selling Price (${CURRENCY_SYMBOL})`,
-      `Original Price (${CURRENCY_SYMBOL})`,
+      `Cost Price (${locSymbol})`,
+      `Margin (${locSymbol})`,
+      `Selling Price (${locSymbol})`,
+      `Original Price (${locSymbol})`,
       "Min Alert",
     ];
     const rows = filteredStock.map((i) => [
@@ -475,6 +497,7 @@ const StockTable = ({
             value: (
               <AedPrice
                 amount={metrics.totalValuation}
+                symbol={locSymbol}
                 decimals={0}
                 className="font-mono font-black text-sky-900 dark:text-sky-300"
               />
@@ -591,22 +614,26 @@ const StockTable = ({
                 <th className="py-3.5 px-4">Brand &amp; Category</th>
                 {isAdmin && (
                   <th className="py-3.5 px-3 text-right whitespace-nowrap">
-                    Cost (<AedSymbol />)
+                    Cost (<AedSymbol symbol={locSymbol} />)
                   </th>
                 )}
                 {isAdmin && (
                   <th className="py-3.5 px-3 text-center whitespace-nowrap">
-                    Margin (<AedSymbol />)
+                    Margin (<AedSymbol symbol={locSymbol} />)
                   </th>
                 )}
                 <th className="py-3.5 px-4 text-right whitespace-nowrap">
-                  Selling Price (<AedSymbol />)
+                  Selling Price (<AedSymbol symbol={locSymbol} />)
                 </th>
                 <th className="py-3.5 px-4 text-center whitespace-nowrap">
-                  Stock Units
+                  {activeLocationCode === "ALL"
+                    ? "Global Units"
+                    : `${activeLocationCode} Stock`}
                 </th>
                 <th className="py-3.5 px-4 text-center">Status</th>
-                {isAdmin && <th className="py-3.5 px-4 text-right">Edit</th>}
+                {(isAdmin || onRequestTransfer) && (
+                  <th className="py-3.5 px-4 text-right">Actions</th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 font-medium text-slate-700 dark:text-slate-300">
@@ -679,6 +706,17 @@ const StockTable = ({
                                   <p className="text-xs font-mono text-slate-400 dark:text-slate-500 font-medium">
                                     {item.sku}
                                   </p>
+                                  {/* Read-Only Hub Stock Available Badge for Country Staff (Dubai AE / China CN / HK) */}
+                                  {isCountryBranch && item.supplyHubStock && (
+                                    <div className="mt-1 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-indigo-50/90 dark:bg-indigo-500/15 border border-indigo-200/80 dark:border-indigo-500/30 text-[10px] font-mono font-bold text-indigo-800 dark:text-indigo-300">
+                                      <span>Hub Avail:</span>
+                                      <span>AE {item.supplyHubStock.AE}</span>
+                                      <span>·</span>
+                                      <span>CN {item.supplyHubStock.CN}</span>
+                                      <span>·</span>
+                                      <span>HK {item.supplyHubStock.HK}</span>
+                                    </div>
+                                  )}
                                 </>
                               );
                             })()}
@@ -699,7 +737,7 @@ const StockTable = ({
                       {/* Cost Price (Admin Only) */}
                       {isAdmin && (
                         <td className="py-3.5 px-3 text-right font-mono text-slate-600 dark:text-slate-400 text-xs whitespace-nowrap">
-                          <AedPrice amount={cost} />
+                          <AedPrice amount={cost} symbol={locSymbol} decimals={locDecimals} />
                         </td>
                       )}
 
@@ -708,7 +746,7 @@ const StockTable = ({
                         <td className="py-3.5 px-3 text-center font-mono whitespace-nowrap">
                           <span className="inline-flex items-center justify-center gap-1 font-bold text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-50/90 dark:bg-emerald-500/15 px-2.5 py-0.5 rounded-lg border border-emerald-200/80 dark:border-emerald-500/25">
                             <span>+</span>
-                            <AedPrice amount={margin} symbolClassName="text-emerald-600 dark:text-emerald-400" />
+                            <AedPrice amount={margin} symbol={locSymbol} decimals={locDecimals} symbolClassName="text-emerald-600 dark:text-emerald-400" />
                           </span>
                         </td>
                       )}
@@ -716,10 +754,10 @@ const StockTable = ({
                       {/* Selling Price */}
                       <td className="py-3.5 px-4 text-right font-mono whitespace-nowrap">
                         <div className="flex flex-col items-end">
-                          <AedPrice amount={sellingPrice} className="font-bold text-slate-950 dark:text-white text-sm" />
+                          <AedPrice amount={sellingPrice} symbol={locSymbol} decimals={locDecimals} className="font-bold text-slate-950 dark:text-white text-sm" />
                           {hasDiscount && (
                             <span className="text-[10px] text-slate-400 dark:text-slate-500 line-through">
-                              <AedPrice amount={originalPrice} />
+                              <AedPrice amount={originalPrice} symbol={locSymbol} decimals={locDecimals} />
                             </span>
                           )}
                         </div>
@@ -727,16 +765,23 @@ const StockTable = ({
 
                       {/* Available Stock */}
                       <td className="py-3.5 px-4 text-center font-mono font-bold whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-1 rounded-xl text-xs font-extrabold ${isOutOfStock
-                            ? "bg-rose-100/80 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/25"
-                            : isLowStock
-                              ? "bg-amber-100/80 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/25"
-                              : "bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200/60 dark:border-slate-700"
-                            }`}
-                        >
-                          {item.quantity} <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold ml-1">units</span>
-                        </span>
+                        <div className="flex flex-col items-center gap-1">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-1 rounded-xl text-xs font-extrabold ${isOutOfStock
+                              ? "bg-rose-100/80 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/25"
+                              : isLowStock
+                                ? "bg-amber-100/80 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/25"
+                                : "bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200/60 dark:border-slate-700"
+                              }`}
+                          >
+                            {item.quantity} <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold ml-1">units</span>
+                          </span>
+                          {Number(item.inTransitIn) > 0 && (
+                            <span className="text-[10px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-500/15 px-2 py-0.5 rounded-full">
+                              +{item.inTransitIn} in transit
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Status Badge */}
@@ -756,20 +801,38 @@ const StockTable = ({
                         )}
                       </td>
 
-                      {/* Admin Edit Modal Trigger */}
-                      {isAdmin && (
-                        <td className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenEdit(item);
-                            }}
-                            className="p-2 text-slate-400 dark:text-slate-500 hover:text-sky-700 dark:hover:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-500/15 rounded-xl transition cursor-pointer"
-                            title="Edit Product Details, Cost, Margin & Stock"
-                          >
-                            <FiEdit2 className="text-base" />
-                          </button>
+                      {/* Actions: Request Transfer + Admin Edit */}
+                      {(isAdmin || onRequestTransfer) && (
+                        <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                          <div className="inline-flex items-center justify-end gap-1">
+                            {onRequestTransfer && (isCountryBranch || isAdmin) && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onRequestTransfer(item);
+                                }}
+                                className="inline-flex items-center gap-1 px-2 py-1.5 text-[11px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-500/15 hover:bg-indigo-100 dark:hover:bg-indigo-500/25 rounded-lg transition cursor-pointer"
+                                title="Request Stock Transfer from Dubai / China / HK Hub"
+                              >
+                                <FiRepeat className="text-xs" />
+                                <span className="hidden xl:inline">Transfer</span>
+                              </button>
+                            )}
+                            {isAdmin && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenEdit(item);
+                                }}
+                                className="p-2 text-slate-400 dark:text-slate-500 hover:text-sky-700 dark:hover:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-500/15 rounded-xl transition cursor-pointer"
+                                title={`Edit [${activeLocationCode}] Stock & Pricing`}
+                              >
+                                <FiEdit2 className="text-base" />
+                              </button>
+                            )}
+                          </div>
                         </td>
                       )}
                     </tr>
@@ -1118,7 +1181,7 @@ const StockTable = ({
               <div className="p-3 bg-sky-50 dark:bg-sky-500/10 rounded-2xl border border-sky-100 dark:border-sky-500/20 grid grid-cols-3 gap-2 text-xs">
                 <div>
                   <label className="block font-bold text-slate-700 dark:text-slate-300 text-[10px] mb-1">
-                    Cost ({CURRENCY_SYMBOL})
+                    Cost ({locSymbol})
                   </label>
                   <input
                     type="number"
@@ -1137,7 +1200,7 @@ const StockTable = ({
 
                 <div>
                   <label className="block font-bold text-slate-700 dark:text-slate-300 text-[10px] mb-1">
-                    Margin ({CURRENCY_SYMBOL})
+                    Margin ({locSymbol})
                   </label>
                   <input
                     type="number"
@@ -1155,7 +1218,7 @@ const StockTable = ({
 
                 <div>
                   <label className="block font-bold text-sky-900 dark:text-sky-300 text-[10px] mb-1">
-                    Selling ({CURRENCY_SYMBOL})
+                    Selling ({locSymbol})
                   </label>
                   <input
                     type="number"

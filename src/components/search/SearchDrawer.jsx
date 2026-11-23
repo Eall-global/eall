@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -9,30 +9,39 @@ import {
   FiTag,
   FiLayers,
   FiShoppingBag,
-  FiCheckCircle,
 } from "react-icons/fi";
 import useSearchEngine from "./useSearchEngine";
-import { AedSymbol, AedPrice } from "../common/AedSymbol";
+import { AedPrice } from "../common/AedSymbol";
+import { useCountry } from "../../context/CountryContext";
 
 const SearchDrawer = ({ isOpen, onClose }) => {
   const [query, setQuery] = useState("");
   const inputRef = useRef(null);
   const navigate = useNavigate();
+  const { countryPath } = useCountry();
 
   const results = useSearchEngine(query);
+
+  const handleClose = useCallback(() => {
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+    setQuery("");
+    onClose();
+  }, [onClose]);
 
   // Focus input on open & lock background scroll
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
-      setTimeout(() => inputRef.current?.focus(), 50);
-    } else {
-      document.body.style.overflow = "auto";
-      setQuery("");
+      const id = window.setTimeout(() => inputRef.current?.focus(), 60);
+      return () => {
+        window.clearTimeout(id);
+        document.body.style.overflow = "auto";
+      };
     }
-    return () => {
-      document.body.style.overflow = "auto";
-    };
+    document.body.style.overflow = "auto";
+    return undefined;
   }, [isOpen]);
 
   // Handle ESC key to close
@@ -44,22 +53,14 @@ const SearchDrawer = ({ isOpen, onClose }) => {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen]);
-
-  const handleClose = () => {
-    if (document.activeElement instanceof HTMLElement) {
-      document.activeElement.blur();
-    }
-    setQuery("");
-    onClose();
-  };
+  }, [isOpen, handleClose]);
 
   const handleSearchSubmit = (e) => {
     e?.preventDefault();
     const clean = query.trim();
     if (!clean) return;
     handleClose();
-    navigate(`/products?search=${encodeURIComponent(clean)}`);
+    navigate(countryPath(`/products?search=${encodeURIComponent(clean)}`));
   };
 
   const handleKeywordClick = (keyword) => {
@@ -164,7 +165,7 @@ const SearchDrawer = ({ isOpen, onClose }) => {
                         <span>Popular in Catalog</span>
                       </h3>
                       <Link
-                        to="/products"
+                        to={countryPath("/products")}
                         onClick={handleClose}
                         className="text-xs font-bold text-sky-700 hover:underline flex items-center gap-1"
                       >
@@ -173,13 +174,13 @@ const SearchDrawer = ({ isOpen, onClose }) => {
                       </Link>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                       {results.popularProducts.map((p) => (
                         <Link
                           key={p.id}
-                          to={`/products/${p.slug}`}
+                          to={countryPath(`/products/${p.slug}`)}
                           onClick={handleClose}
-                          className="group p-3.5 rounded-2xl border border-slate-100 hover:border-sky-300 hover:shadow-md bg-white hover:bg-slate-50/50 transition flex items-center gap-3.5"
+                          className="group p-3 sm:p-3.5 rounded-2xl border border-slate-100 hover:border-sky-300 hover:shadow-md bg-white hover:bg-slate-50/50 transition flex items-center gap-3.5"
                         >
                           <img
                             src={p.image || "/logo.png"}
@@ -225,7 +226,7 @@ const SearchDrawer = ({ isOpen, onClose }) => {
                           {results.brands.map((b) => (
                             <Link
                               key={b.slug}
-                              to={`/brands/${b.slug}`}
+                              to={countryPath(`/brands/${b.slug}`)}
                               onClick={handleClose}
                               className="px-3 py-1.5 bg-white hover:bg-sky-50 text-slate-800 hover:text-sky-700 text-xs font-bold rounded-xl border border-slate-200 hover:border-sky-300 transition shadow-2xs"
                             >
@@ -247,7 +248,7 @@ const SearchDrawer = ({ isOpen, onClose }) => {
                           {results.categories.map((c) => (
                             <Link
                               key={c.slug}
-                              to={`/products?category=${c.slug}`}
+                              to={countryPath(`/products?category=${c.slug}`)}
                               onClick={handleClose}
                               className="flex items-center justify-between p-2 rounded-xl hover:bg-white text-xs font-medium text-slate-700 hover:text-sky-700 transition"
                             >
@@ -280,7 +281,7 @@ const SearchDrawer = ({ isOpen, onClose }) => {
                       {results.products.map((p) => (
                         <Link
                           key={p.id}
-                          to={`/products/${p.slug}`}
+                          to={countryPath(`/products/${p.slug}`)}
                           onClick={handleClose}
                           className="group p-3 rounded-2xl border border-slate-200/80 hover:border-sky-300 hover:shadow-md bg-white hover:bg-slate-50/40 transition flex items-center gap-3.5"
                         >
@@ -335,7 +336,7 @@ const SearchDrawer = ({ isOpen, onClose }) => {
                   </p>
                   <div className="pt-2">
                     <Link
-                      to="/products"
+                      to={countryPath("/products")}
                       onClick={handleClose}
                       className="inline-flex items-center gap-2 px-5 py-2.5 bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold uppercase rounded-xl transition shadow-xs"
                     >

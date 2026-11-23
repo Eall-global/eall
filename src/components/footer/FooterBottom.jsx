@@ -3,7 +3,7 @@ import FooterSocial from "./FooterSocial";
 
 const FooterBottom = () => {
   return (
-    <div className="max-w-7xl mx-auto flex flex-col lg:flex-row justify-between items-center gap-5 p-6 lg:px-10 text-center lg:text-left">
+    <div className="w-full px-4 sm:px-6 lg:px-8 py-6 flex flex-col lg:flex-row justify-between items-center gap-5 text-center lg:text-left">
 
       {/* Copyright Notice */}
       <p className="text-slate-400 text-xs sm:text-sm font-normal">

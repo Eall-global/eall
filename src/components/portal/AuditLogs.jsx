@@ -16,6 +16,7 @@ import {
 } from "react-icons/fi";
 import PortalKpiGrid from "./PortalKpiGrid";
 import { PortalFilterMenu, ActiveFilterChips } from "./PortalFilterMenu";
+import { syncAuditLogsToCloud } from "../../services/auditService";
 
 const MODULE_LABELS = {
   stock: "Stock",
@@ -60,6 +61,17 @@ const AuditLogs = ({ logs = [], loading = false, onRefresh }) => {
   const [periodFilter, setPeriodFilter] = useState("all");
   const [page, setPage] = useState(1);
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [syncingCloud, setSyncingCloud] = useState(false);
+
+  const handleCloudSyncRefresh = async () => {
+    setSyncingCloud(true);
+    try {
+      await syncAuditLogsToCloud();
+      if (onRefresh) await onRefresh();
+    } finally {
+      setSyncingCloud(false);
+    }
+  };
 
   const distinctActors = useMemo(() => {
     const set = new Set();
@@ -323,13 +335,17 @@ const AuditLogs = ({ logs = [], loading = false, onRefresh }) => {
           {onRefresh && (
             <button
               type="button"
-              onClick={onRefresh}
-              disabled={loading}
-              aria-label="Refresh audit logs"
-              title="Refresh Audit Logs"
+              onClick={handleCloudSyncRefresh}
+              disabled={loading || syncingCloud}
+              aria-label="Sync and refresh audit logs"
+              title="Sync & Refresh Cloud Audit Logs"
               className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition cursor-pointer disabled:opacity-50 shrink-0"
             >
-              <FiRefreshCw className={`text-[15px] ${loading ? "animate-spin" : ""}`} />
+              <FiRefreshCw
+                className={`text-[15px] ${
+                  loading || syncingCloud ? "animate-spin" : ""
+                }`}
+              />
             </button>
           )}
 
@@ -415,6 +431,7 @@ const AuditLogs = ({ logs = [], loading = false, onRefresh }) => {
                         </p>
                         <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 dark:text-slate-500">
                           {log.actorRole}
+                          {log.device ? ` • ${log.device}` : ""}
                         </span>
                       </td>
 

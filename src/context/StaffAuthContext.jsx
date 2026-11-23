@@ -24,6 +24,7 @@ const DEFAULT_MEMBERS = [
     phone: "+971 4 000 0000",
     email: "admin@eall.ae",
     branch: "Dubai Silicon Oasis HQ",
+    assignedLocation: "ALL",
     commissionRate: 0,
     status: "active",
   },
@@ -36,18 +37,20 @@ const DEFAULT_MEMBERS = [
     phone: "",
     email: "",
     branch: "Dubai Silicon Oasis HQ",
+    assignedLocation: "AE",
     commissionRate: 2,
     status: "active",
   },
   {
     id: "sales-2",
     name: "Hidayat - Procurement Manager",
-    role: "sales",
-    title: "Procurement Manager",
+    role: "hub_manager",
+    title: "Procurement & Hub Manager",
     pin: "2345",
     phone: "",
     email: "",
     branch: "Dubai Silicon Oasis HQ",
+    assignedLocation: "AE",
     commissionRate: 1.5,
     status: "active",
   },
@@ -60,6 +63,7 @@ const DEFAULT_MEMBERS = [
     phone: "",
     email: "",
     branch: "Dubai Silicon Oasis HQ",
+    assignedLocation: "AE",
     commissionRate: 2.5,
     status: "active",
   },
@@ -69,21 +73,27 @@ const SESSION_KEY = "eall_staff_auth_session";
 const MEMBERS_KEY = "eall_staff_team_members";
 const COLLECTION_NAME = "staff_members";
 
-const sanitizeMemberForDb = (m) => ({
-  id: String(m.id),
-  name: String(m.name || "").trim(),
-  role: String(m.role || "sales"),
-  title: String(m.title || (m.role === "admin" ? "Master Administrator" : "Sales Executive")).trim(),
-  pin: String(m.pin || "").trim(),
-  phone: String(m.phone || "").trim(),
-  email: String(m.email || "").trim(),
-  branch: String(m.branch || "Dubai Silicon Oasis HQ").trim(),
-  commissionRate: Number(m.commissionRate ?? 0) || 0,
-  status: m.status === "suspended" ? "suspended" : "active",
-  joinedAt: m.joinedAt || m.createdAt || m.created_at || new Date().toISOString(),
-  lastLoginAt: m.lastLoginAt || null,
-  createdAt: m.createdAt || m.created_at || new Date().toISOString(),
-});
+const sanitizeMemberForDb = (m) => {
+  const role = String(m.role || "sales");
+  const defaultLoc = role === "admin" ? "ALL" : "AE";
+  const assignedLocation = String(m.assignedLocation || defaultLoc).trim().toUpperCase();
+  return {
+    id: String(m.id),
+    name: String(m.name || "").trim(),
+    role,
+    title: String(m.title || (role === "admin" ? "Master Administrator" : "Sales Executive")).trim(),
+    pin: String(m.pin || "").trim(),
+    phone: String(m.phone || "").trim(),
+    email: String(m.email || "").trim(),
+    branch: String(m.branch || "Dubai Silicon Oasis HQ").trim(),
+    assignedLocation,
+    commissionRate: Number(m.commissionRate ?? 0) || 0,
+    status: m.status === "suspended" ? "suspended" : "active",
+    joinedAt: m.joinedAt || m.createdAt || m.created_at || new Date().toISOString(),
+    lastLoginAt: m.lastLoginAt || null,
+    createdAt: m.createdAt || m.created_at || new Date().toISOString(),
+  };
+};
 
 export const StaffAuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(() => {
@@ -117,6 +127,7 @@ export const StaffAuthProvider = ({ children }) => {
         if (!snapshot.empty) {
           const list = [];
           snapshot.forEach((docSnap) => {
+            if (docSnap.id.startsWith("_")) return;
             list.push(sanitizeMemberForDb({ id: docSnap.id, ...docSnap.data() }));
           });
           list.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
@@ -150,6 +161,7 @@ export const StaffAuthProvider = ({ children }) => {
           if (!snapshot.empty) {
             const list = [];
             snapshot.forEach((docSnap) => {
+              if (docSnap.id.startsWith("_")) return;
               list.push(sanitizeMemberForDb({ id: docSnap.id, ...docSnap.data() }));
             });
             list.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
@@ -182,6 +194,7 @@ export const StaffAuthProvider = ({ children }) => {
             if (!active || snapshot.empty) return;
             const list = [];
             snapshot.forEach((docSnap) => {
+              if (docSnap.id.startsWith("_")) return;
               list.push(sanitizeMemberForDb({ id: docSnap.id, ...docSnap.data() }));
             });
             list.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
@@ -323,6 +336,13 @@ export const StaffAuthProvider = ({ children }) => {
     if (previous.branch !== merged.branch) {
       changes.push({ field: "Branch", before: previous.branch, after: merged.branch });
     }
+    if (previous.assignedLocation !== merged.assignedLocation) {
+      changes.push({
+        field: "Assigned Location",
+        before: previous.assignedLocation || "AE",
+        after: merged.assignedLocation,
+      });
+    }
     if (previous.pin !== merged.pin) {
       changes.push({ field: "Access PIN", before: "••••", after: "•••• (Updated)" });
     }
@@ -406,12 +426,15 @@ export const StaffAuthProvider = ({ children }) => {
 
   const recordLoginSuccess = (match) => {
     const now = new Date().toISOString();
+    const assignedLoc =
+      match.assignedLocation || (match.role === "admin" ? "ALL" : "AE");
     const user = {
       id: match.id,
       role: match.role,
       name: match.name,
       title: match.title,
       branch: match.branch,
+      assignedLocation: assignedLoc,
       loginAt: now,
     };
     setCurrentUser(user);
@@ -500,11 +523,26 @@ export const StaffAuthProvider = ({ children }) => {
     localStorage.removeItem(SESSION_KEY);
   };
 
+  const effectiveAssignedLocation = currentUser
+    ? String(
+        currentUser.assignedLocation ||
+          (currentUser.role === "admin" ? "ALL" : "AE")
+      ).toUpperCase()
+    : "AE";
+  const isAdmin = currentUser?.role === "admin";
+  const canSwitchLocations = isAdmin || effectiveAssignedLocation === "ALL";
+  const isHubManager = isAdmin || currentUser?.role === "hub_manager";
+  const isCountryManager = isAdmin || currentUser?.role === "country_manager";
+
   const value = {
     currentUser,
     members,
     role: currentUser?.role || null,
-    isAdmin: currentUser?.role === "admin",
+    isAdmin,
+    isHubManager,
+    isCountryManager,
+    assignedLocation: effectiveAssignedLocation,
+    canSwitchLocations,
     isSales: currentUser?.role !== "admin" && !!currentUser,
     isAuthenticated: !!currentUser,
     loginByPin,

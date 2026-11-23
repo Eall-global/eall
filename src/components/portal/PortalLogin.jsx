@@ -152,7 +152,7 @@ const PortalLogin = () => {
                 <option value="">Any Sales Person (Login with your PIN)</option>
                 {salesMembers.map((m) => (
                   <option key={m.id} value={m.id}>
-                    {m.name}
+                    [{m.assignedLocation || "AE"}] {m.name} ({m.branch || "HQ"})
                   </option>
                 ))}
               </select>

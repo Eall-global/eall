@@ -28,6 +28,7 @@ import {
   deleteRFQ,
 } from "../../services/b2bService";
 import { useStaffAuth } from "../../context/StaffAuthContext";
+import { usePortalCurrency } from "../../context/PortalCurrencyContext";
 import { AedPrice, AedSymbol } from "../common/AedSymbol";
 import PortalKpiGrid from "./PortalKpiGrid";
 import { PortalFilterMenu, ActiveFilterChips } from "./PortalFilterMenu";
@@ -69,6 +70,7 @@ const B2BRfqManagement = ({
   isAdmin,
 }) => {
   const { members } = useStaffAuth();
+  const portalCur = usePortalCurrency();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -290,7 +292,7 @@ const B2BRfqManagement = ({
       `*Company:* ${rfq.companyName}\n` +
       `*Incoterms:* ${rfq.incoterms}\n` +
       (amount > 0
-        ? `*Quoted Total:* AED ${amount.toLocaleString("en-AE", { minimumFractionDigits: 2 })}\n`
+        ? `*Quoted Total:* ${portalCur.format(amount)}\n`
         : "") +
       `\nPlease reply to confirm stock allocation and proforma invoice issuance.`;
     window.open(
@@ -301,15 +303,15 @@ const B2BRfqManagement = ({
 
   const handleEmailQuote = (rfq) => {
     const amount = parseFloat(editQuotedAmount) || Number(rfq.quotedAmount) || 0;
-    const subject = `Official Quotation ${editQuoteRef || rfq.rfqId} - E-ALL Electronics FZCO`;
+    const subject = `Official Quotation ${editQuoteRef || rfq.rfqId} - ${portalCur.legalEntityName}`;
     const body =
       `Dear ${rfq.contactName || rfq.companyName},\n\n` +
       `Please find our wholesale quotation summary for RFQ ${rfq.rfqId}:\n` +
       `- Company: ${rfq.companyName}\n` +
       `- Incoterms: ${rfq.incoterms}\n` +
       `- Destination: ${rfq.destinationCity}, ${rfq.destinationCountry}\n` +
-      (amount > 0 ? `- Quoted Total: AED ${amount.toLocaleString("en-AE", { minimumFractionDigits: 2 })}\n` : "") +
-      `\nBest regards,\n${currentUser?.name || "E-ALL B2B Sales Desk"}\nElectronics All FZCO, Dubai Silicon Oasis`;
+      (amount > 0 ? `- Quoted Total: ${portalCur.format(amount)}\n` : "") +
+      `\nBest regards,\n${currentUser?.name || "E-ALL B2B Sales Desk"}\n${portalCur.legalEntityName}`;
     window.open(
       `mailto:${rfq.email || ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`,
       "_self"
@@ -322,14 +324,14 @@ const B2BRfqManagement = ({
       "RFQ ID",
       "Date",
       "Company",
-      "TRN",
+      portalCur.taxIdLabel,
       "Contact",
       "Phone",
       "Email",
       "Destination",
       "Incoterms",
       "Volume",
-      "Quoted Value (AED)",
+      `Quoted Value (${portalCur.currency})`,
       "Status",
       "Assigned To",
     ];
@@ -842,7 +844,7 @@ const B2BRfqManagement = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold uppercase text-[10px] text-slate-500 dark:text-slate-400 mb-1">
-                    Quoted Amount (AED)
+                    Quoted Amount ({portalCur.currency})
                   </label>
                   <input
                     type="number"

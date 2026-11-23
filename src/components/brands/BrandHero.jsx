@@ -49,7 +49,7 @@ const BrandHero = ({ brand }) => {
       <div className="absolute inset-0 bg-slate-950/65" />
 
       {/* CONTENT */}
-      <div className="relative z-10 w-full px-6 sm:px-8 lg:px-12 pt-28 pb-16 sm:pt-32 sm:pb-20 lg:pt-36 lg:pb-24 text-left">
+      <div className="relative z-10 w-full px-6 sm:px-8 lg:px-12 pt-[124px] pb-16 sm:pt-[136px] sm:pb-20 xl:pt-[164px] lg:pb-24 text-left">
         <div className="max-w-4xl text-white">
           <SlideUp>
             {/* Partnership Badge */}
