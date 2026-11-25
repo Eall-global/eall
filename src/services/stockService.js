@@ -20,6 +20,22 @@ const STORAGE_KEY = "eall_inventory_stock";
 const COLLECTION_NAME = "product_stock";
 
 /**
+ * Sanitize a SKU so it is ALWAYS a valid Firestore document ID
+ * (Firestore forbids forward slashes "/" and bare "." / ".." as document IDs).
+ */
+export const sanitizeSkuId = (rawSku = "") => {
+  const cleaned = String(rawSku || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\\/]+/g, "-")
+    .replace(/\s+/g, "-")
+    .replace(/[^A-Z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^[-.]+|[-.]+$/g, "");
+  return cleaned || `SKU-${Date.now()}`;
+};
+
+/**
  * Normalize per-location stock entry for any warehouse/country code (AE, CN, HK, KE, SN, etc.)
  * Backward-compatible with legacy root fields on AE (Dubai Main Hub).
  */
@@ -718,24 +734,39 @@ export const addCustomProduct = async ({
   originalPrice = 0,
   minAlert = 3,
 }) => {
-  const cleanSku = sku.trim().toUpperCase();
-  const cPrice = Number(costPrice) || 0;
-  const mMargin = Number(margin) || 0;
-  const sPrice = price !== undefined ? Number(price) : (cPrice + mMargin);
+  const cleanSku = sanitizeSkuId(sku);
+  const qty = Math.max(0, Number(quantity) || 0);
+  const cPrice = Number.isFinite(Number(costPrice)) ? Number(costPrice) : 0;
+  const mMargin = Number.isFinite(Number(margin)) ? Number(margin) : 0;
+  const sPrice =
+    price !== undefined && Number.isFinite(Number(price))
+      ? Number(price)
+      : cPrice + mMargin;
   const prodImage = (image && String(image).trim()) || "/logo.png";
+  const safeAlert = Number.isFinite(Number(minAlert)) ? Number(minAlert) : 3;
 
   const newProduct = {
     sku: cleanSku,
-    name: name.trim(),
-    brand: brand.trim() || "General",
-    category: category.trim() || "Electronics",
+    name: String(name || cleanSku).trim(),
+    brand: String(brand || "General").trim() || "General",
+    category: String(category || "Electronics").trim() || "Electronics",
     image: prodImage,
-    quantity: Number(quantity) || 0,
+    quantity: qty,
     costPrice: cPrice,
     margin: mMargin,
     price: sPrice,
-    originalPrice: Number(originalPrice) || 0,
-    minAlert: Number(minAlert) || 3,
+    originalPrice: Number.isFinite(Number(originalPrice)) ? Number(originalPrice) : 0,
+    minAlert: safeAlert,
+    locations: {
+      AE: {
+        quantity: qty,
+        inTransitIn: 0,
+        priceLocal: sPrice,
+        costLocal: cPrice,
+        minAlert: safeAlert,
+        active: true,
+      },
+    },
     updatedAt: new Date().toISOString(),
   };
 

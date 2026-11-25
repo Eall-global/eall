@@ -309,48 +309,112 @@ export const CatalogProvider = ({ children }) => {
     };
   }, []);
 
+  // Normalize SKU/slug tokens so underscores and hyphens match cleanly (e.g. HMD-150_MUSIC ↔ HMD-150-MUSIC-WEA)
+  const normalizeMatchKey = (val = "") =>
+    String(val || "")
+      .trim()
+      .toUpperCase()
+      .replace(/[_\s]+/g, "-")
+      .replace(/-+/g, "-");
+
   // Merge static catalog specifications with dynamic multi-location live inventory & active country pricing
   const allCatalogProducts = useMemo(() => {
-    return (staticCatalog || []).map((prod) => {
-      const cleanSku = (prod.sku || `EALL-${(prod.brand || "GEN").toUpperCase()}-${prod.id}`).toUpperCase();
+    // 1. Pre-index static catalog products so each Firestore SKU is assigned to its SINGLE MOST SPECIFIC product
+    //    (prevents e.g. NOKIA-110 from stealing NOKIA-110-POWER, and maps HMD-150-MUSIC-WEA -> HMD-150_MUSIC)
+    const catalogDescriptors = (staticCatalog || []).map((prod, idx) => {
+      const cleanSku = (
+        prod.sku || `EALL-${(prod.brand || "GEN").toUpperCase()}-${prod.id}`
+      ).toUpperCase();
       const prodSlug = (prod.slug || "").toLowerCase();
+      return {
+        idx,
+        prod,
+        cleanSku,
+        normSku: normalizeMatchKey(cleanSku),
+        prodSlug,
+        normSlug: normalizeMatchKey(prodSlug),
+      };
+    });
 
-      // Collect all Firestore documents belonging to this product
-      const matchingItems = [];
-      liveStockMap.forEach((item) => {
-        const itemSku = (item.sku || "").toUpperCase();
-        const itemParent = (item.parentSku || "").toUpperCase();
-        const itemSlug = (item.slug || "").toLowerCase();
+    const matchesByIndex = new Map();
+    const claimedStockSkus = new Set();
 
-        const isExactSku = itemSku === cleanSku;
-        const isExactParent = Boolean(itemParent && itemParent === cleanSku);
-        const isSameSlug = Boolean(itemSlug && prodSlug && itemSlug === prodSlug);
+    liveStockMap.forEach((item) => {
+      const itemSku = (item.sku || "").toUpperCase();
+      if (!itemSku) return;
+      const itemNormSku = normalizeMatchKey(itemSku);
+      const itemParentNorm = normalizeMatchKey(item.parentSku || "");
+      const itemSlug = (item.slug || "").toLowerCase();
 
-        let isChildSku = false;
-        if (itemSku.startsWith(`${cleanSku}-`)) {
-          if (cleanSku === "APPLE-IP18-PRO" && itemSku.startsWith("APPLE-IP18-PRO-MAX-")) {
-            isChildSku = false;
-          } else if (cleanSku === "APPLE-IP18" && (itemSku.startsWith("APPLE-IP18-PRO-") || itemSku.startsWith("APPLE-IP18-PRO-MAX-"))) {
-            isChildSku = false;
-          } else if (cleanSku === "APL-IP16P" && itemSku.startsWith("APL-IP16PM-")) {
-            isChildSku = false;
+      let bestDesc = null;
+      let bestScore = 0;
+
+      for (const desc of catalogDescriptors) {
+        let score = 0;
+
+        if (itemNormSku === desc.normSku) {
+          score = 1000 + desc.normSku.length;
+        } else if (itemParentNorm && itemParentNorm === desc.normSku) {
+          score = 900 + desc.normSku.length;
+        } else if (itemSlug && desc.prodSlug && itemSlug === desc.prodSlug) {
+          score = 850 + desc.prodSlug.length;
+        } else if (
+          desc.normSku &&
+          itemNormSku.startsWith(`${desc.normSku}-`)
+        ) {
+          // Guard Apple sibling prefix overlaps
+          if (
+            (desc.cleanSku === "APPLE-IP18-PRO" &&
+              itemNormSku.startsWith("APPLE-IP18-PRO-MAX-")) ||
+            (desc.cleanSku === "APPLE-IP18" &&
+              (itemNormSku.startsWith("APPLE-IP18-PRO-") ||
+                itemNormSku.startsWith("APPLE-IP18-PRO-MAX-"))) ||
+            (desc.cleanSku === "APL-IP16P" &&
+              itemNormSku.startsWith("APL-IP16PM-"))
+          ) {
+            score = 0;
           } else {
-            isChildSku = true;
+            score = 700 + desc.normSku.length;
           }
+        } else if (
+          desc.normSlug.length >= 6 &&
+          (itemNormSku === desc.normSlug ||
+            itemNormSku.startsWith(`${desc.normSlug}-`))
+        ) {
+          // Handles e.g. NOKIA-150-MUSIC-SSA matching Nokia 150 Music (slug: nokia-150-music)
+          score = 720 + desc.normSlug.length;
+        } else if (
+          desc.cleanSku === "APL-IP16P-256-BLK" &&
+          (itemSku === "APL-IP16P-256-BLK" ||
+            (itemSku.startsWith("APL-IP16P-") &&
+              !itemSku.startsWith("APL-IP16PM-")))
+        ) {
+          score = 650;
+        } else if (
+          desc.cleanSku === "APL-IP17PM-256-ORN" &&
+          (itemSku === "APL-IP17PM-256-ORN" ||
+            itemSku.startsWith("APL-IP17PM-"))
+        ) {
+          score = 650;
         }
 
-        let isFamilyPrefixMatch = false;
-        if (cleanSku === "APL-IP16P-256-BLK" && (itemSku === "APL-IP16P-256-BLK" || (itemSku.startsWith("APL-IP16P-") && !itemSku.startsWith("APL-IP16PM-")))) {
-          isFamilyPrefixMatch = true;
-        } else if (cleanSku === "APL-IP17PM-256-ORN" && (itemSku === "APL-IP17PM-256-ORN" || itemSku.startsWith("APL-IP17PM-"))) {
-          isFamilyPrefixMatch = true;
+        if (score > bestScore) {
+          bestScore = score;
+          bestDesc = desc;
         }
+      }
 
-        if (isExactParent || isExactSku || isSameSlug || isChildSku || isFamilyPrefixMatch) {
-          matchingItems.push(item);
+      if (bestDesc) {
+        claimedStockSkus.add(itemSku);
+        if (!matchesByIndex.has(bestDesc.idx)) {
+          matchesByIndex.set(bestDesc.idx, []);
         }
-      });
+        matchesByIndex.get(bestDesc.idx).push(item);
+      }
+    });
 
+    const hydratedStatic = catalogDescriptors.map(({ idx, prod, cleanSku }) => {
+      const matchingItems = matchesByIndex.get(idx) || [];
       const directItem =
         liveStockMap.get(cleanSku) ||
         matchingItems.find((i) => i.sku.toUpperCase() === cleanSku);
@@ -360,7 +424,7 @@ export const CatalogProvider = ({ children }) => {
         matchingItems.length > 0 ? matchingItems : directItem ? [directItem] : []
       );
 
-      // Local country quantity & alert threshold across all Firestore variants
+      // Local country quantity & alert threshold across all matched Firestore variants
       let totalLocalQty = 0;
       let minAlert = 3;
       matchingItems.forEach((v) => {
@@ -386,7 +450,65 @@ export const CatalogProvider = ({ children }) => {
       const hasStorageTiers =
         (prod.storageOptions && prod.storageOptions.length > 0) || Boolean(prod.storagePricing);
 
-      // Resolve Base AED pricing first (Hub reference price)
+      // Evaluate EVERY matching variant by its true effective price in the active country
+      // Priority:
+      //   1) In-stock variants at active country (preferring explicit local country priceLocal > 0, then lowest effective price)
+      //   2) Any priced variant (preferring explicit local priceLocal > 0, then lowest effective price)
+      let bestInStockVariant = null;
+      let bestInStockHasExplicit = false;
+      let bestInStockLocalPrice = Infinity;
+
+      let bestAnyVariant = null;
+      let bestAnyHasExplicit = false;
+      let bestAnyLocalPrice = Infinity;
+
+      matchingItems.forEach((item) => {
+        const aeInfo = getItemLocationStock(item, "AE");
+        const locInfo = getItemLocationStock(item, countryCode);
+        const pAed = aeInfo.priceLocal > 0 ? aeInfo.priceLocal : Number(item.price || 0);
+        const explicitLoc =
+          isStrictLocalCountry && locInfo.priceLocal > 0 ? locInfo.priceLocal : 0;
+        const effectiveLocal =
+          explicitLoc > 0
+            ? explicitLoc
+            : pAed > 0
+            ? convertAedToLocalPrice(pAed, activeCountry, 0)
+            : 0;
+        const q = locInfo.quantity;
+
+        if (effectiveLocal > 0) {
+          const hasExp = explicitLoc > 0;
+
+          if (
+            !bestAnyVariant ||
+            (hasExp && !bestAnyHasExplicit) ||
+            (hasExp === bestAnyHasExplicit && effectiveLocal < bestAnyLocalPrice)
+          ) {
+            bestAnyVariant = item;
+            bestAnyHasExplicit = hasExp;
+            bestAnyLocalPrice = effectiveLocal;
+          }
+
+          if (
+            q > 0 &&
+            (!bestInStockVariant ||
+              (hasExp && !bestInStockHasExplicit) ||
+              (hasExp === bestInStockHasExplicit &&
+                effectiveLocal < bestInStockLocalPrice))
+          ) {
+            bestInStockVariant = item;
+            bestInStockHasExplicit = hasExp;
+            bestInStockLocalPrice = effectiveLocal;
+          }
+        } else if (q > 0 && !bestInStockVariant) {
+          // Even if price wasn't filled yet, remember an in-stock SKU exists
+          bestInStockVariant = item;
+        }
+      });
+
+      const activeLiveTier = bestInStockVariant || bestAnyVariant;
+
+      // Resolve Base AED pricing & Explicit Country Local Price directly from active live tier!
       let basePriceAed = 0;
       let costPrice = directItem ? Number(directItem.costPrice || 0) : Number(prod.costPrice || 0);
       let margin = directItem ? Number(directItem.margin || 0) : Number(prod.margin || 0);
@@ -394,34 +516,11 @@ export const CatalogProvider = ({ children }) => {
       let startingStorage = null;
       let explicitCountryPrice = 0;
 
-      let cheapestVariant = null;
-      let cheapestInStockVariant = null;
-      let minPriceAed = Infinity;
-      let minInStockPriceAed = Infinity;
-
-      matchingItems.forEach((item) => {
-        const aeInfo = getItemLocationStock(item, "AE");
-        const locInfo = getItemLocationStock(item, countryCode);
-        const pAed = aeInfo.priceLocal > 0 ? aeInfo.priceLocal : Number(item.price || 0);
-        const q = locInfo.quantity;
-        if (pAed > 0) {
-          if (pAed < minPriceAed) {
-            minPriceAed = pAed;
-            cheapestVariant = item;
-          }
-          if (q > 0 && pAed < minInStockPriceAed) {
-            minInStockPriceAed = pAed;
-            cheapestInStockVariant = item;
-          }
-        }
-      });
-
-      const activeLiveTier = cheapestInStockVariant || cheapestVariant;
-
-      if (hasStorageTiers && activeLiveTier) {
+      if (activeLiveTier) {
         const aeTier = getItemLocationStock(activeLiveTier, "AE");
         const locTier = getItemLocationStock(activeLiveTier, countryCode);
-        basePriceAed = aeTier.priceLocal > 0 ? aeTier.priceLocal : Number(activeLiveTier.price || 0);
+        basePriceAed =
+          aeTier.priceLocal > 0 ? aeTier.priceLocal : Number(activeLiveTier.price || 0);
         if (isStrictLocalCountry && locTier.priceLocal > 0) {
           explicitCountryPrice = locTier.priceLocal;
         }
@@ -452,11 +551,6 @@ export const CatalogProvider = ({ children }) => {
           basePriceAed = costPrice + margin;
         } else if (prod.price !== undefined && Number(prod.price) > 0) {
           basePriceAed = Number(prod.price);
-        } else if (activeLiveTier) {
-          basePriceAed = Number(activeLiveTier.price || 0);
-          if (activeLiveTier.originalPrice && Number(activeLiveTier.originalPrice) > 0) {
-            baseOriginalPriceAed = Number(activeLiveTier.originalPrice);
-          }
         }
       }
 
@@ -500,7 +594,7 @@ export const CatalogProvider = ({ children }) => {
         }
       }
 
-      // Convert AED base prices -> Active country local prices
+      // Convert AED base prices -> Active country local prices (explicit local price ALWAYS wins!)
       const livePrice = convertAedToLocalPrice(basePriceAed, activeCountry, explicitCountryPrice);
       const originalPrice =
         baseOriginalPriceAed > 0
@@ -512,7 +606,6 @@ export const CatalogProvider = ({ children }) => {
       if (resolvedStoragePricingAed && typeof resolvedStoragePricingAed === "object") {
         resolvedStoragePricing = {};
         Object.entries(resolvedStoragePricingAed).forEach(([storLabel, aedVal]) => {
-          // Check if any matching Firestore variant has an explicit local price for this storage tier
           const matchingStorageItem = matchingItems.find(
             (m) =>
               m.storage &&
@@ -567,6 +660,10 @@ export const CatalogProvider = ({ children }) => {
         };
       });
 
+      const activeStockSku = bestInStockVariant
+        ? bestInStockVariant.sku.toUpperCase()
+        : cleanSku;
+
       const startingFromPrice = hasStorageTiers;
       const hasDiscount = originalPrice > livePrice && livePrice > 0;
       const discountPercentage = hasDiscount
@@ -578,6 +675,8 @@ export const CatalogProvider = ({ children }) => {
       return {
         ...prod,
         sku: cleanSku,
+        activeStockSku,
+        activeStockName: bestInStockVariant?.name || prod.name,
         storagePricing: resolvedStoragePricing || prod.storagePricing,
         storagePricingAed: resolvedStoragePricingAed,
         liveQuantity: localQty,
@@ -590,7 +689,7 @@ export const CatalogProvider = ({ children }) => {
         costPrice,
         margin,
         livePrice,
-        price: livePrice, // local currency price for storefront, cart & checkout
+        price: livePrice, // exact local currency price matching Stock Manager
         originalPrice,
         hasDiscount,
         discountPercentage,
@@ -606,6 +705,104 @@ export const CatalogProvider = ({ children }) => {
         liveVariants,
       };
     });
+
+    // 2. Surface any custom/unlisted Firestore SKUs that did not match staticCatalog and have stock
+    const customStockProducts = [];
+    liveStockMap.forEach((item) => {
+      const itemSku = (item.sku || "").toUpperCase();
+      if (!itemSku || claimedStockSkus.has(itemSku)) return;
+
+      const locInfo = getItemLocationStock(item, countryCode);
+      const aeInfo = getItemLocationStock(item, "AE");
+      const supplyHubStock = getSupplyHubBreakdown([item]);
+      const localQty = locInfo.quantity;
+      if (localQty <= 0 && (isStrictLocalCountry || supplyHubStock.total <= 0)) {
+        return;
+      }
+
+      const basePriceAed =
+        aeInfo.priceLocal > 0 ? aeInfo.priceLocal : Number(item.price || 0);
+      const explicitCountryPrice =
+        isStrictLocalCountry && locInfo.priceLocal > 0 ? locInfo.priceLocal : 0;
+      const livePrice = convertAedToLocalPrice(
+        basePriceAed,
+        activeCountry,
+        explicitCountryPrice
+      );
+      const originalPrice =
+        Number(item.originalPrice) > 0
+          ? convertAedToLocalPrice(Number(item.originalPrice), activeCountry, 0)
+          : 0;
+      const avail = computeLiveAvailability(
+        localQty,
+        locInfo.minAlert,
+        isStrictLocalCountry
+      );
+      const brandLabel = String(item.brand || "General").trim();
+      const catLabel = String(item.category || "Mobile Devices").trim();
+      const slug = itemSku.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+
+      customStockProducts.push({
+        id: `custom-${itemSku}`,
+        sku: itemSku,
+        activeStockSku: itemSku,
+        activeStockName: item.name || itemSku,
+        slug,
+        name: item.name || itemSku,
+        shortName: item.name || itemSku,
+        brand: brandLabel,
+        brandSlug: brandLabel.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+        category: catLabel.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+        categoryName: catLabel,
+        subCategory: catLabel,
+        image: item.image || "/logo.png",
+        gallery: [item.image || "/logo.png"],
+        warranty: "Official 12-Month Warranty",
+        liveQuantity: localQty,
+        localQuantity: localQty,
+        hasLocalStock: localQty > 0,
+        supplyHubStock,
+        countryCode,
+        currency: activeCountry.currency,
+        basePriceAed,
+        costPrice: Number(item.costPrice || 0),
+        margin: Number(item.margin || 0),
+        livePrice,
+        price: livePrice,
+        originalPrice,
+        hasDiscount: originalPrice > livePrice && livePrice > 0,
+        discountPercentage:
+          originalPrice > livePrice && livePrice > 0
+            ? Math.round(((originalPrice - livePrice) / originalPrice) * 100)
+            : 0,
+        minAlert: locInfo.minAlert,
+        startingFromPrice: false,
+        startingStorage: null,
+        availability: avail.status,
+        availabilityBadge: avail.badgeText,
+        availabilityClass: avail.className,
+        isInStock: avail.inStock,
+        isLowStock: avail.isLowStock,
+        stockUnitsLeft: avail.unitsLeft,
+        liveVariants: {
+          [itemSku]: {
+            ...item,
+            price: livePrice,
+            priceAed: basePriceAed,
+            originalPrice,
+            quantity: localQty,
+            localQuantity: localQty,
+            availability: avail.status,
+            availabilityBadge: avail.badgeText,
+            isInStock: avail.inStock,
+            isLowStock: avail.isLowStock,
+            stockUnitsLeft: avail.unitsLeft,
+          },
+        },
+      });
+    });
+
+    return [...hydratedStatic, ...customStockProducts];
   }, [liveStockMap, activeCountry, countryCode, isStrictLocalCountry]);
 
   // Confirmed User Rule #3: Non-HQ country storefronts filter strictly to local country inventory

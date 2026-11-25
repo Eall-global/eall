@@ -15,6 +15,7 @@ import {
   updateLocationStock,
   addCustomProduct,
   getLocationStockEntry,
+  sanitizeSkuId,
 } from "./stockService";
 import { logAuditEvent } from "./auditService";
 
@@ -154,9 +155,11 @@ const normalizePurchaseItems = (items = []) =>
       const qty = Math.max(1, parseInt(item.quantity, 10) || 1);
       const unitCost = Math.max(0, Number(item.unitCost) || 0);
       const sellingPrice = Math.max(0, Number(item.sellingPrice) || 0);
+      const rawSku = String(item.sku || "").trim();
+      const safeSku = rawSku ? sanitizeSkuId(rawSku) : "";
       return {
-        sku: String(item.sku || "").trim().toUpperCase(),
-        name: String(item.name || item.sku || "Unnamed Product").trim(),
+        sku: safeSku,
+        name: String(item.name || safeSku || "Unnamed Product").trim(),
         brand: String(item.brand || "General").trim(),
         category: String(item.category || "Mobile Devices").trim(),
         image: item.image || "/logo.png",
@@ -325,6 +328,7 @@ export const createPurchaseRecord = async ({
   currency = "AED",
   currencySymbol = "AED",
   updateProductCost = true,
+  skipStockInward = false,
 }) => {
   const cleanItems = normalizePurchaseItems(items);
   if (cleanItems.length === 0) {
@@ -332,55 +336,88 @@ export const createPurchaseRecord = async ({
   }
 
   const locCode = locationCode === "ALL" ? "AE" : String(locationCode || "AE").toUpperCase();
-  const totalQuantity = cleanItems.reduce((sum, item) => sum + item.quantity, 0);
-  const totalAmount = Number(
-    cleanItems.reduce((sum, item) => sum + item.totalCost, 0).toFixed(2)
-  );
-
   const existingPurchases = await fetchPurchases();
   const purchaseNo = generatePurchaseNumber(existingPurchases);
   const now = new Date().toISOString();
 
-  // Reconcile stock & auto-create unlisted products
-  const currentStock = await fetchStock();
-  const stockMap = new Map(
-    currentStock.map((s) => [String(s.sku || "").trim().toUpperCase(), s])
-  );
+  // Reconcile stock & auto-create unlisted products with per-item fault tolerance
+  // so a single problematic SKU NEVER leaves orphaned stock without a Purchase Record.
   let newlyCreatedSkus = 0;
+  const appliedItems = [];
+  const failedItems = [];
 
-  for (const item of cleanItems) {
-    const res = await ensureAndInwardItem({
-      item,
-      qtyDelta: item.quantity,
-      stockMap,
-      locationCode: locCode,
-      updateProductCost,
-    });
-    if (res.createdNew) {
-      newlyCreatedSkus++;
-      item.isUnlisted = true;
+  if (skipStockInward) {
+    appliedItems.push(...cleanItems);
+  } else {
+    const currentStock = await fetchStock();
+    const stockMap = new Map(
+      currentStock.map((s) => [String(s.sku || "").trim().toUpperCase(), s])
+    );
+
+    for (const item of cleanItems) {
+      try {
+        const res = await ensureAndInwardItem({
+          item,
+          qtyDelta: item.quantity,
+          stockMap,
+          locationCode: locCode,
+          updateProductCost,
+        });
+        if (res.createdNew) {
+          newlyCreatedSkus++;
+          item.isUnlisted = true;
+        }
+        appliedItems.push(item);
+      } catch (err) {
+        console.warn(`Purchase item inward failed for ${item.sku}:`, err?.message || err);
+        failedItems.push({
+          sku: item.sku,
+          name: item.name,
+          error: err?.message || "Failed to update inventory",
+        });
+      }
     }
   }
 
-  const newPurchase = {
-    id: purchaseNo,
-    purchaseNo,
-    locationCode: locCode,
-    currency: currency || "AED",
-    currencySymbol: currencySymbol || currency || "AED",
-    supplierName: supplierName.trim(),
-    supplierInvoiceRef: supplierInvoiceRef.trim(),
-    sourceFile: sourceFile || "",
-    purchaseDate: purchaseDate || now.slice(0, 10),
-    paymentStatus,
-    paymentMethod,
-    items: cleanItems,
-    totalQuantity,
-    totalAmount,
-    notes: notes.trim(),
-    createdBy,
-    createdAt: now,
-  };
+  if (appliedItems.length === 0) {
+    const firstErr = failedItems[0]?.error || "Could not inward any items";
+    throw new Error(
+      `Failed to inward purchase items (${failedItems.map((f) => f.sku).join(", ")}): ${firstErr}`
+    );
+  }
+
+  const totalQuantity = appliedItems.reduce((sum, item) => sum + item.quantity, 0);
+  const totalAmount = Number(
+    appliedItems.reduce((sum, item) => sum + item.totalCost, 0).toFixed(2)
+  );
+  const partialNote =
+    failedItems.length > 0
+      ? ` [Partial inward: ${failedItems.length} item(s) skipped — ${failedItems
+          .map((f) => `${f.sku}: ${f.error}`)
+          .join("; ")}]`
+      : "";
+
+  const newPurchase = JSON.parse(
+    JSON.stringify({
+      id: purchaseNo,
+      purchaseNo,
+      locationCode: locCode,
+      currency: currency || "AED",
+      currencySymbol: currencySymbol || currency || "AED",
+      supplierName: String(supplierName || "General Supplier").trim(),
+      supplierInvoiceRef: String(supplierInvoiceRef || "").trim(),
+      sourceFile: sourceFile || "",
+      purchaseDate: purchaseDate || now.slice(0, 10),
+      paymentStatus,
+      paymentMethod,
+      items: appliedItems,
+      totalQuantity,
+      totalAmount,
+      notes: `${String(notes || "").trim()}${partialNote}`.trim(),
+      createdBy,
+      createdAt: now,
+    })
+  );
 
   const db = getFirebaseDb();
   if (db && isFirebaseConfigured()) {
@@ -399,10 +436,10 @@ export const createPurchaseRecord = async ({
   logAuditEvent({
     module: "purchases",
     action: "create",
-    severity: "info",
+    severity: failedItems.length > 0 ? "warning" : "info",
     targetId: purchaseNo,
     targetLabel: `${purchaseNo} • ${newPurchase.supplierName}`,
-    summary: `Recorded purchase ${purchaseNo} from ${newPurchase.supplierName} (${locCode} • +${totalQuantity} units • ${newPurchase.currencySymbol} ${totalAmount.toLocaleString()}${newlyCreatedSkus > 0 ? ` • ${newlyCreatedSkus} new SKU(s)` : ""})`,
+    summary: `Recorded purchase ${purchaseNo} from ${newPurchase.supplierName} (${locCode} • +${totalQuantity} units • ${newPurchase.currencySymbol} ${totalAmount.toLocaleString()}${newlyCreatedSkus > 0 ? ` • ${newlyCreatedSkus} new SKU(s)` : ""}${failedItems.length > 0 ? ` • ${failedItems.length} skipped` : ""})`,
     changes: [
       { field: "Inward Units", before: "—", after: `+${totalQuantity} units` },
       { field: "Total Cost", before: "—", after: `${newPurchase.currencySymbol} ${totalAmount.toFixed(2)}` },
@@ -410,7 +447,7 @@ export const createPurchaseRecord = async ({
     ],
   });
 
-  return newPurchase;
+  return { ...newPurchase, failedItems };
 };
 
 /**
@@ -463,6 +500,8 @@ export const updatePurchaseRecord = async (
   }
 
   const allSkus = new Set([...oldQtyMap.keys(), ...newQtyMap.keys()]);
+  const failedSkus = new Set();
+  const failedItems = [];
 
   for (const sku of allSkus) {
     const oldQty = oldQtyMap.get(sku) || 0;
@@ -470,48 +509,68 @@ export const updatePurchaseRecord = async (
     const delta = newQty - oldQty;
     const itemMeta = newItemMeta.get(sku);
 
-    if (itemMeta) {
-      await ensureAndInwardItem({
-        item: itemMeta,
-        qtyDelta: delta,
-        stockMap,
-        locationCode: locCode,
-        updateProductCost,
-      });
-    } else if (delta < 0) {
-      // Item was completely removed from the PO -> reverse old inward quantity
-      const stockItem = stockMap.get(sku);
-      if (stockItem) {
-        const isBranch = locCode !== "AE" && locCode !== "ALL";
-        const prevQty = isBranch
-          ? Number(getLocationStockEntry(stockItem, locCode).quantity) || 0
-          : Number(stockItem.quantity) || 0;
-        await updateStockQuantity(stockItem.sku, Math.max(0, prevQty + delta), locCode);
+    try {
+      if (itemMeta) {
+        await ensureAndInwardItem({
+          item: itemMeta,
+          qtyDelta: delta,
+          stockMap,
+          locationCode: locCode,
+          updateProductCost,
+        });
+      } else if (delta < 0) {
+        // Item was completely removed from the PO -> reverse old inward quantity
+        const stockItem = stockMap.get(sku);
+        if (stockItem) {
+          const isBranch = locCode !== "AE" && locCode !== "ALL";
+          const prevQty = isBranch
+            ? Number(getLocationStockEntry(stockItem, locCode).quantity) || 0
+            : Number(stockItem.quantity) || 0;
+          await updateStockQuantity(stockItem.sku, Math.max(0, prevQty + delta), locCode);
+        }
       }
+    } catch (err) {
+      console.warn(`Purchase edit reconciliation failed for ${sku}:`, err?.message || err);
+      failedSkus.add(sku);
+      failedItems.push({
+        sku,
+        name: itemMeta?.name || sku,
+        error: err?.message || "Failed to update inventory",
+      });
     }
   }
 
-  const totalQuantity = cleanItems.reduce((sum, item) => sum + item.quantity, 0);
+  // Keep only items that succeeded (or preserve old item if edit failed on an existing SKU)
+  const finalItems = cleanItems.filter((item) => !failedSkus.has(item.sku));
+  if (finalItems.length === 0) {
+    throw new Error(
+      `Failed to reconcile purchase items: ${failedItems[0]?.error || "Unknown error"}`
+    );
+  }
+
+  const totalQuantity = finalItems.reduce((sum, item) => sum + item.quantity, 0);
   const totalAmount = Number(
-    cleanItems.reduce((sum, item) => sum + item.totalCost, 0).toFixed(2)
+    finalItems.reduce((sum, item) => sum + item.totalCost, 0).toFixed(2)
   );
   const now = new Date().toISOString();
 
-  const updatedPurchase = {
-    ...existing,
-    supplierName: (supplierName ?? existing.supplierName).trim(),
-    supplierInvoiceRef: (supplierInvoiceRef ?? existing.supplierInvoiceRef).trim(),
-    sourceFile: sourceFile !== undefined ? sourceFile : existing.sourceFile || "",
-    purchaseDate: purchaseDate || existing.purchaseDate,
-    paymentStatus,
-    paymentMethod,
-    items: cleanItems,
-    totalQuantity,
-    totalAmount,
-    notes: (notes ?? existing.notes).trim(),
-    updatedBy,
-    updatedAt: now,
-  };
+  const updatedPurchase = JSON.parse(
+    JSON.stringify({
+      ...existing,
+      supplierName: (supplierName ?? existing.supplierName).trim(),
+      supplierInvoiceRef: (supplierInvoiceRef ?? existing.supplierInvoiceRef).trim(),
+      sourceFile: sourceFile !== undefined ? sourceFile : existing.sourceFile || "",
+      purchaseDate: purchaseDate || existing.purchaseDate,
+      paymentStatus,
+      paymentMethod,
+      items: finalItems,
+      totalQuantity,
+      totalAmount,
+      notes: (notes ?? existing.notes).trim(),
+      updatedBy,
+      updatedAt: now,
+    })
+  );
 
   const db = getFirebaseDb();
   if (db && isFirebaseConfigured()) {
@@ -544,7 +603,7 @@ export const updatePurchaseRecord = async (
     ],
   });
 
-  return updatedPurchase;
+  return { ...updatedPurchase, failedItems };
 };
 
 /**

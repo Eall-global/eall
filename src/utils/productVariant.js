@@ -12,17 +12,44 @@
  */
 
 /**
- * Returns the default (first) colour variant for a product.
- * Falls back to a minimal object if no variants exist.
+ * Returns the default colour variant for a product.
+ * When live inventory is loaded, automatically prefers a colour variant that
+ * matches an in-stock SKU (including regional SKUs like HMD-102-WEA / GREY).
  */
 export const getDefaultVariant = (product) => {
   if (product?.variants?.length) {
+    const liveVars = product.liveVariants || {};
+    const activeSku = String(product.activeStockSku || "").toUpperCase();
+    const activeLive = activeSku ? liveVars[activeSku] : null;
+    const activeText = `${activeSku} ${activeLive?.name || ""} ${product.activeStockName || ""}`.toLowerCase();
+
+    // 1. Prefer a color variant whose exact built SKU is in stock
+    const exactInStock = product.variants.find((v) => {
+      const built = buildVariantSku(product.sku, v.colorSlug, getDefaultStorage(product));
+      return Number(liveVars[built]?.quantity) > 0;
+    });
+    if (exactInStock) return exactInStock;
+
+    // 2. Prefer a color variant whose color name/slug appears in the active stocked regional SKU/name (e.g. GREY / BLUE / CHARCOAL)
+    if (activeLive && Number(activeLive.quantity) > 0) {
+      const colorMatched = product.variants.find((v) => {
+        const slug = String(v.colorSlug || "").toLowerCase();
+        const col = String(v.color || "").toLowerCase();
+        if (slug && activeText.includes(slug)) return true;
+        if (col && activeText.includes(col)) return true;
+        if ((slug === "grey" || slug === "gray") && (activeText.includes("grey") || activeText.includes("gray") || activeText.includes("charcoal"))) return true;
+        if (slug === "charcoal" && (activeText.includes("charcoal") || activeText.includes("darkgrey") || activeText.includes("black"))) return true;
+        return false;
+      });
+      if (colorMatched) return colorMatched;
+    }
+
     return product.variants.find((v) => v.isDefault) ?? product.variants[0];
   }
   return {
     color: null,
     colorSlug: null,
-    sku: product?.sku,
+    sku: product?.activeStockSku || product?.sku,
     image: product?.image,
     gallery: product?.gallery || [],
   };
@@ -86,18 +113,38 @@ export const getActiveVariant = (product, colorVariant, storage) => {
       ? product.storagePricing[stor]
       : product.price ?? product.livePrice ?? 0;
 
-  // If CatalogContext has already injected liveVariants keyed by variantSku, use it
-  const live = product.liveVariants?.[variantSku.toUpperCase()];
+  // If CatalogContext has already injected liveVariants keyed by variantSku, use it.
+  // When a product is stocked under a regional/custom child SKU (e.g. HMD-102-WEA),
+  // fall back to the active in-stock variant so detail page & cart match Stock Manager 1:1.
+  const liveVars = product.liveVariants || {};
+  const exactLive = liveVars[variantSku.toUpperCase()];
+  const activeStockKey = String(product.activeStockSku || "").toUpperCase();
+  const fallbackLive =
+    exactLive && Number(exactLive.quantity) > 0
+      ? exactLive
+      : activeStockKey &&
+        liveVars[activeStockKey] &&
+        Number(liveVars[activeStockKey].quantity) > 0 &&
+        (!stor ||
+          !liveVars[activeStockKey].storage ||
+          String(liveVars[activeStockKey].storage).toLowerCase() ===
+            String(stor).toLowerCase())
+      ? liveVars[activeStockKey]
+      : exactLive || (activeStockKey ? liveVars[activeStockKey] : null);
+
+  const live = fallbackLive;
+  const resolvedSku =
+    live && Number(live.quantity) > 0 ? live.sku || variantSku : variantSku;
   const resolvedPrice =
     Number(live?.price) > 0 ? Number(live.price) : Number(basePrice) || 0;
 
   return {
     ...base,
     storage: stor,
-    sku: variantSku,
+    sku: resolvedSku,
     price: resolvedPrice,
     livePrice: resolvedPrice,
-    liveQuantity: live?.quantity ?? null,
+    liveQuantity: live?.quantity ?? product.liveQuantity ?? null,
     availability: live?.availability || product.availability || "In Stock",
     costPrice: live?.costPrice ?? 0,
     margin: live?.margin ?? 0,

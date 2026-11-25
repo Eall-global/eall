@@ -16,6 +16,7 @@ import {
   FiDownload,
 } from "react-icons/fi";
 import PortalKpiGrid from "./PortalKpiGrid";
+import CountryFlag from "../common/CountryFlag";
 import { useCountry } from "../../context/CountryContext";
 import {
   getLocationStockEntry,
@@ -343,11 +344,22 @@ const StockTransfersManagement = ({
     setReceiveNotes("");
     setReceiveDraftLines(
       (transfer.items || []).map((item) => {
-        const refAed = Number(item.unitPriceAed || 0);
-        const autoLocalPrice = convertAedToLocalPrice(refAed, destCfg, item.targetPriceLocal || 0);
+        const liveStockDoc = (globalStock || []).find(
+          (s) => String(s.sku || "").toUpperCase() === String(item.sku || "").toUpperCase()
+        );
+        const existingDestPrice = liveStockDoc
+          ? getLocationStockEntry(liveStockDoc, transfer.destinationCountry).priceLocal
+          : 0;
+        const refAed = Number(liveStockDoc?.price || item.unitPriceAed || 0);
+        const baseCostAed = Number(item.unitCostAed || liveStockDoc?.costPrice || 0);
+        const autoLocalPrice =
+          existingDestPrice > 0
+            ? existingDestPrice
+            : convertAedToLocalPrice(refAed, destCfg, item.targetPriceLocal || 0);
         return {
           sku: item.sku,
           name: item.name,
+          baseCostAed,
           dispatchedQty: Number(item.dispatchedQty || item.approvedQty || item.requestedQty || 0),
           receivedQty: Number(item.dispatchedQty || item.approvedQty || item.requestedQty || 0),
           priceLocal: autoLocalPrice,
@@ -543,12 +555,16 @@ const StockTransfersManagement = ({
                     </span>
 
                     <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-800 dark:text-slate-200">
-                      <span>
-                        {srcLoc.flag} {trf.sourceHub}
+                      <span className="inline-flex items-center gap-1">
+                        <CountryFlag code={trf.sourceHub} size="xs" />
+                        <span>{trf.sourceHub}</span>
                       </span>
                       <FiArrowRight className="text-sky-600" />
-                      <span>
-                        {destLoc.flag} {trf.destinationCountry} ({destLoc.currency})
+                      <span className="inline-flex items-center gap-1">
+                        <CountryFlag code={trf.destinationCountry} size="xs" />
+                        <span>
+                          {trf.destinationCountry} ({destLoc.currency})
+                        </span>
                       </span>
                     </div>
 
@@ -557,6 +573,12 @@ const StockTransfersManagement = ({
                     >
                       {trf.status}
                     </span>
+
+                    {trf.recoveredFromAudit && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                        Recovered from Audit Trail
+                      </span>
+                    )}
 
                     {trf.priority === "Urgent" && (
                       <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">
@@ -630,58 +652,96 @@ const StockTransfersManagement = ({
                   </div>
                 </div>
 
-                {/* Items table */}
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="text-[10.5px] uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800">
-                        <th className="py-1.5 text-left font-bold">SKU / Product</th>
-                        <th className="py-1.5 text-right font-bold">Requested</th>
-                        <th className="py-1.5 text-right font-bold">Dispatched</th>
-                        <th className="py-1.5 text-right font-bold">Received</th>
-                        <th className="py-1.5 text-right font-bold">Hub Cost (AED)</th>
-                        <th className="py-1.5 text-right font-bold">
-                          Dest Retail ({destLoc.currency})
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
-                      {(trf.items || []).map((item) => (
-                        <tr key={item.sku}>
-                          <td className="py-2 pr-3">
-                            <p className="font-bold text-slate-900 dark:text-white">
-                              {item.name}
-                            </p>
-                            <span className="font-mono text-[10.5px] text-slate-400">
-                              {item.sku}
-                            </span>
-                          </td>
-                          <td className="py-2 text-right font-mono font-bold text-slate-700 dark:text-slate-300">
-                            {item.requestedQty}
-                          </td>
-                          <td className="py-2 text-right font-mono font-bold text-indigo-700 dark:text-indigo-400">
-                            {item.dispatchedQty || "—"}
-                          </td>
-                          <td className="py-2 text-right font-mono font-bold text-emerald-700 dark:text-emerald-400">
-                            {item.receivedQty || "—"}
-                          </td>
-                          <td className="py-2 text-right font-mono text-slate-600 dark:text-slate-400">
-                            {item.unitCostAed > 0
-                              ? `AED ${Number(item.unitCostAed).toLocaleString()}`
-                              : "—"}
-                          </td>
-                          <td className="py-2 text-right font-mono font-bold text-slate-900 dark:text-white">
-                            {item.appliedPriceLocal > 0
-                              ? `${destLoc.currencySymbol} ${Number(
-                                  item.appliedPriceLocal
-                                ).toLocaleString()}`
-                              : "Auto FX"}
-                          </td>
+                {/* Items table (or compact audit-recovered unit summary) */}
+                {(trf.items || []).length === 0 ? (
+                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/70 flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <div className="flex flex-wrap items-center gap-4 font-mono">
+                      <span>
+                        Requested:{" "}
+                        <strong className="text-slate-900 dark:text-white">
+                          {Number(trf.totalRequestedUnits || 0).toLocaleString()} pcs
+                        </strong>
+                      </span>
+                      <span>
+                        Dispatched:{" "}
+                        <strong className="text-indigo-700 dark:text-indigo-400">
+                          {Number(trf.totalDispatchedUnits || 0).toLocaleString()} pcs
+                        </strong>
+                      </span>
+                      <span>
+                        Received:{" "}
+                        <strong className="text-emerald-700 dark:text-emerald-400">
+                          {Number(trf.totalReceivedUnits || 0).toLocaleString()} pcs
+                        </strong>
+                      </span>
+                    </div>
+                    {trf.skuCount > 0 && (
+                      <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                        {trf.skuCount} SKU{trf.skuCount === 1 ? "" : "s"} transferred
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="text-[10.5px] uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800">
+                          <th className="py-1.5 text-left font-bold">SKU / Product</th>
+                          <th className="py-1.5 text-right font-bold">Requested</th>
+                          <th className="py-1.5 text-right font-bold">Dispatched</th>
+                          <th className="py-1.5 text-right font-bold">Received</th>
+                          <th className="py-1.5 text-right font-bold">
+                            Hub Cost ({srcLoc.currency || "AED"})
+                          </th>
+                          <th className="py-1.5 text-right font-bold">
+                            Dest Retail ({destLoc.currency})
+                          </th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
+                        {(trf.items || []).map((item) => (
+                          <tr key={item.sku}>
+                            <td className="py-2 pr-3">
+                              <p className="font-bold text-slate-900 dark:text-white">
+                                {item.name}
+                              </p>
+                              <span className="font-mono text-[10.5px] text-slate-400">
+                                {item.sku}
+                              </span>
+                            </td>
+                            <td className="py-2 text-right font-mono font-bold text-slate-700 dark:text-slate-300">
+                              {Number(item.requestedQty || 0).toLocaleString()}
+                            </td>
+                            <td className="py-2 text-right font-mono font-bold text-indigo-700 dark:text-indigo-400">
+                              {item.dispatchedQty
+                                ? Number(item.dispatchedQty).toLocaleString()
+                                : "—"}
+                            </td>
+                            <td className="py-2 text-right font-mono font-bold text-emerald-700 dark:text-emerald-400">
+                              {item.receivedQty
+                                ? Number(item.receivedQty).toLocaleString()
+                                : "—"}
+                            </td>
+                            <td className="py-2 text-right font-mono text-slate-600 dark:text-slate-400">
+                              {item.unitCostAed > 0
+                                ? `${srcLoc.currencySymbol || "AED"} ${Number(
+                                    item.unitCostAed
+                                  ).toLocaleString()}`
+                                : "—"}
+                            </td>
+                            <td className="py-2 text-right font-mono font-bold text-slate-900 dark:text-white">
+                              {item.appliedPriceLocal > 0
+                                ? `${destLoc.currencySymbol} ${Number(
+                                    item.appliedPriceLocal
+                                  ).toLocaleString()}`
+                                : "Auto FX"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
 
                 {/* Metadata Footer */}
                 <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400">
@@ -853,60 +913,85 @@ const StockTransfersManagement = ({
               {draftItems.length > 0 && (
                 <div className="bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 p-3 space-y-2">
                   <p className="text-[10.5px] font-extrabold uppercase text-slate-500">
-                    Transfer Cart ({draftItems.length} SKU /{" "}
-                    {draftItems.reduce((s, i) => s + Number(i.requestedQty || 0), 0)} units)
+                    Transfer Cart ({draftItems.length} SKU{draftItems.length === 1 ? "" : "s"} /{" "}
+                    {draftItems
+                      .reduce((s, i) => s + Number(i.requestedQty || 0), 0)
+                      .toLocaleString()}{" "}
+                    units)
                   </p>
-                  <div className="space-y-1.5">
-                    {draftItems.map((item) => (
-                      <div
-                        key={item.sku}
-                        className="flex items-center justify-between gap-2 bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200/80 dark:border-slate-800"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="font-bold text-slate-900 dark:text-white truncate">
-                            {item.name}
-                          </p>
-                          <span className="font-mono text-[10px] text-slate-400">
-                            {item.sku}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <label className="text-[10px] text-slate-400">Qty:</label>
-                          <input
-                            type="number"
-                            min="1"
-                            value={item.requestedQty}
-                            onChange={(e) =>
-                              setDraftItems((prev) =>
-                                prev.map((x) =>
-                                  x.sku === item.sku
-                                    ? {
-                                        ...x,
-                                        requestedQty: Math.max(
-                                          1,
-                                          parseInt(e.target.value, 10) || 1
-                                        ),
-                                      }
-                                    : x
+                  <div className="space-y-1.5 max-h-56 overflow-y-auto pr-0.5">
+                    {draftItems.map((item) => {
+                      const liveDoc = (globalStock || []).find(
+                        (s) => String(s.sku || "").toUpperCase() === String(item.sku || "").toUpperCase()
+                      );
+                      const srcAvail = liveDoc
+                        ? getLocationStockEntry(liveDoc, sourceHub).quantity
+                        : 0;
+                      const exceedsHub = Number(item.requestedQty || 0) > srcAvail;
+                      return (
+                        <div
+                          key={item.sku}
+                          className={`flex items-center justify-between gap-2 bg-white dark:bg-slate-900 p-2 rounded-xl border ${
+                            exceedsHub
+                              ? "border-amber-300 dark:border-amber-500/40"
+                              : "border-slate-200/80 dark:border-slate-800"
+                          }`}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="font-bold text-slate-900 dark:text-white truncate">
+                              {item.name}
+                            </p>
+                            <div className="flex items-center gap-2 text-[10px] font-mono">
+                              <span className="text-slate-400">{item.sku}</span>
+                              <span
+                                className={
+                                  exceedsHub
+                                    ? "text-amber-600 dark:text-amber-400 font-bold"
+                                    : "text-slate-400"
+                                }
+                              >
+                                {sourceHub} avail: {srcAvail.toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <label className="text-[10px] text-slate-400">Qty:</label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={item.requestedQty}
+                              onChange={(e) =>
+                                setDraftItems((prev) =>
+                                  prev.map((x) =>
+                                    x.sku === item.sku
+                                      ? {
+                                          ...x,
+                                          requestedQty: Math.max(
+                                            1,
+                                            parseInt(e.target.value, 10) || 1
+                                          ),
+                                        }
+                                      : x
+                                  )
                                 )
-                              )
-                            }
-                            className="w-16 p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono font-bold text-center text-slate-900 dark:text-white"
-                          />
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setDraftItems((prev) =>
-                                prev.filter((x) => x.sku !== item.sku)
-                              )
-                            }
-                            className="p-1.5 text-slate-400 hover:text-rose-600 cursor-pointer"
-                          >
-                            <FiTrash2 />
-                          </button>
+                              }
+                              className="w-24 p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono font-bold text-center text-slate-900 dark:text-white"
+                            />
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setDraftItems((prev) =>
+                                  prev.filter((x) => x.sku !== item.sku)
+                                )
+                              }
+                              className="p-1.5 text-slate-400 hover:text-rose-600 cursor-pointer"
+                            >
+                              <FiTrash2 />
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -1054,13 +1139,28 @@ const StockTransfersManagement = ({
       {/* ===================================================================== */}
       {receivingTransfer && (() => {
         const destCfg = getLocationByCode(receivingTransfer.destinationCountry);
+        const totalRecvUnits = receiveDraftLines.reduce(
+          (s, l) => s + Number(l.receivedQty || 0),
+          0
+        );
+        const freightAed = (Number(receivingTransfer.freightCostUsd) || 0) * 3.6725;
+        const freightLocal = convertAedToLocalPrice(freightAed, destCfg, 0);
+        const sharedOverheadPerUnit =
+          totalRecvUnits > 0
+            ? (freightLocal +
+                (Number(customsDutyLocal) || 0) +
+                (Number(localLogisticsLocal) || 0)) /
+              totalRecvUnits
+            : 0;
         return (
           <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-            <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-2xl shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4 my-6">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-3xl shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4 my-6">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                 <div>
-                  <h3 className="text-base font-black text-slate-900 dark:text-white">
-                    Receive {receivingTransfer.transferId} into {destCfg.flag} {destCfg.hubName}
+                  <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>Receive {receivingTransfer.transferId} into</span>
+                    <CountryFlag code={destCfg.code} size="sm" />
+                    <span>{destCfg.hubName}</span>
                   </h3>
                   <p className="text-xs text-slate-500">
                     Confirm arrived units, enter local customs duty &amp; set {destCfg.currency} retail prices
@@ -1103,80 +1203,96 @@ const StockTransfersManagement = ({
                   </div>
                 </div>
 
-                <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
+                <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden max-h-64 overflow-y-auto">
                   <table className="w-full text-xs">
-                    <thead className="bg-slate-50 dark:bg-slate-800/80 text-[10px] uppercase text-slate-500">
+                    <thead className="bg-slate-50 dark:bg-slate-800/80 text-[10px] uppercase text-slate-500 sticky top-0 z-10">
                       <tr>
                         <th className="p-2.5 text-left">SKU / Item</th>
                         <th className="p-2.5 text-center">Shipped</th>
                         <th className="p-2.5 text-center">Received Qty</th>
                         <th className="p-2.5 text-right">
-                          {destCfg.shortName} Retail Price ({destCfg.currency})
+                          Est. Landed ({destCfg.currency})
+                        </th>
+                        <th className="p-2.5 text-right">
+                          {destCfg.shortName} Retail ({destCfg.currency})
                         </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {receiveDraftLines.map((line) => (
-                        <tr key={line.sku}>
-                          <td className="p-2.5">
-                            <p className="font-bold text-slate-900 dark:text-white">
-                              {line.name}
-                            </p>
-                            <span className="font-mono text-[10px] text-slate-400">
-                              {line.sku}
-                            </span>
-                          </td>
-                          <td className="p-2.5 text-center font-mono text-slate-500">
-                            {line.dispatchedQty}
-                          </td>
-                          <td className="p-2.5 text-center">
-                            <input
-                              type="number"
-                              min="0"
-                              value={line.receivedQty}
-                              onChange={(e) =>
-                                setReceiveDraftLines((prev) =>
-                                  prev.map((x) =>
-                                    x.sku === line.sku
-                                      ? {
-                                          ...x,
-                                          receivedQty: Math.max(
-                                            0,
-                                            parseInt(e.target.value, 10) || 0
-                                          ),
-                                        }
-                                      : x
+                      {receiveDraftLines.map((line) => {
+                        const baseLocal =
+                          Number(line.baseCostAed || 0) *
+                          (Number(destCfg.fxRateFromAed) || 1);
+                        const estLanded = Math.round(
+                          baseLocal + sharedOverheadPerUnit
+                        );
+                        return (
+                          <tr key={line.sku}>
+                            <td className="p-2.5">
+                              <p className="font-bold text-slate-900 dark:text-white">
+                                {line.name}
+                              </p>
+                              <span className="font-mono text-[10px] text-slate-400">
+                                {line.sku}
+                              </span>
+                            </td>
+                            <td className="p-2.5 text-center font-mono text-slate-500">
+                              {Number(line.dispatchedQty || 0).toLocaleString()}
+                            </td>
+                            <td className="p-2.5 text-center">
+                              <input
+                                type="number"
+                                min="0"
+                                value={line.receivedQty}
+                                onChange={(e) =>
+                                  setReceiveDraftLines((prev) =>
+                                    prev.map((x) =>
+                                      x.sku === line.sku
+                                        ? {
+                                            ...x,
+                                            receivedQty: Math.max(
+                                              0,
+                                              parseInt(e.target.value, 10) || 0
+                                            ),
+                                          }
+                                        : x
+                                    )
                                   )
-                                )
-                              }
-                              className="w-16 p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono font-bold text-center"
-                            />
-                          </td>
-                          <td className="p-2.5 text-right">
-                            <input
-                              type="number"
-                              min="0"
-                              value={line.priceLocal}
-                              onChange={(e) =>
-                                setReceiveDraftLines((prev) =>
-                                  prev.map((x) =>
-                                    x.sku === line.sku
-                                      ? {
-                                          ...x,
-                                          priceLocal: Math.max(
-                                            0,
-                                            Number(e.target.value) || 0
-                                          ),
-                                        }
-                                      : x
+                                }
+                                className="w-24 p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono font-bold text-center"
+                              />
+                            </td>
+                            <td className="p-2.5 text-right font-mono text-slate-500 dark:text-slate-400">
+                              {estLanded > 0
+                                ? `${destCfg.currencySymbol} ${estLanded.toLocaleString()}`
+                                : "—"}
+                            </td>
+                            <td className="p-2.5 text-right">
+                              <input
+                                type="number"
+                                min="0"
+                                value={line.priceLocal}
+                                onChange={(e) =>
+                                  setReceiveDraftLines((prev) =>
+                                    prev.map((x) =>
+                                      x.sku === line.sku
+                                        ? {
+                                            ...x,
+                                            priceLocal: Math.max(
+                                              0,
+                                              Number(e.target.value) || 0
+                                            ),
+                                          }
+                                        : x
+                                    )
                                   )
-                                )
-                              }
-                              className="w-28 p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono font-bold text-right text-emerald-700 dark:text-emerald-400"
-                            />
-                          </td>
-                        </tr>
-                      ))}
+                                }
+                                className="w-28 p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono font-bold text-right text-emerald-700 dark:text-emerald-400"
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

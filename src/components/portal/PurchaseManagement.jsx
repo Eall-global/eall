@@ -75,6 +75,7 @@ const PurchaseManagement = ({
   const [paymentStatus, setPaymentStatus] = useState("Paid");
   const [paymentMethod, setPaymentMethod] = useState("Bank Transfer");
   const [notes, setNotes] = useState("");
+  const [inwardToStock, setInwardToStock] = useState(true);
 
   // Active Line Items (all rows inline-editable for Qty & Unit Cost)
   const [lineItems, setLineItems] = useState([]);
@@ -262,6 +263,7 @@ const PurchaseManagement = ({
     setPaymentStatus("Paid");
     setPaymentMethod("Bank Transfer");
     setNotes("");
+    setInwardToStock(true);
     setLineItems([]);
     setErrorMessage("");
     setCatalogQuery("");
@@ -632,7 +634,7 @@ const PurchaseManagement = ({
 
     try {
       if (editingPurchaseNo) {
-        await updatePurchaseRecord(editingPurchaseNo, {
+        const updated = await updatePurchaseRecord(editingPurchaseNo, {
           supplierName,
           supplierInvoiceRef,
           sourceFile: sourceFileName,
@@ -643,8 +645,12 @@ const PurchaseManagement = ({
           notes,
           updatedBy: currentUser?.name || "Admin",
         });
+        const warnText =
+          updated?.failedItems?.length > 0
+            ? ` (${updated.failedItems.length} SKU skipped: ${updated.failedItems.map((f) => f.sku).join(", ")})`
+            : "";
         setSuccessBanner(
-          `Updated ${editingPurchaseNo} and reconciled inventory deltas.`
+          `Updated ${editingPurchaseNo} and reconciled inventory deltas.${warnText}`
         );
       } else {
         const created = await createPurchaseRecord({
@@ -660,15 +666,22 @@ const PurchaseManagement = ({
           locationCode: portalCur.countryCode,
           currency: portalCur.currency,
           currencySymbol: portalCur.symbol,
+          skipStockInward: !inwardToStock,
         });
+        const warnText =
+          created?.failedItems?.length > 0
+            ? ` Warning: ${created.failedItems.length} item(s) could not be inwarded (${created.failedItems.map((f) => f.sku).join(", ")}), all other items recorded.`
+            : "";
         setSuccessBanner(
-          `Recorded ${created.purchaseNo} (+${created.totalQuantity.toLocaleString()} units added to ${portalCur.hubName}${modalNewSkuCount > 0 ? `, including ${modalNewSkuCount} new SKU(s)` : ""}).`
+          inwardToStock
+            ? `Recorded ${created.purchaseNo} (+${created.totalQuantity.toLocaleString()} units added to ${portalCur.hubName}${modalNewSkuCount > 0 ? `, including ${modalNewSkuCount} new SKU(s)` : ""}).${warnText}`
+            : `Recorded ${created.purchaseNo} (${created.totalQuantity.toLocaleString()} units logged as voucher only — stock quantities unchanged).`
         );
       }
 
       setShowModal(false);
       resetModalForm();
-      window.setTimeout(() => setSuccessBanner(""), 5000);
+      window.setTimeout(() => setSuccessBanner(""), 7000);
       if (onPurchasesUpdated) onPurchasesUpdated();
     } catch (err) {
       setErrorMessage(err.message || "Failed to save purchase record.");
@@ -1948,25 +1961,48 @@ const PurchaseManagement = ({
               </div>
 
               {/* Modal Actions */}
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-xs font-semibold transition cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting || lineItems.length === 0}
-                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition shadow-md cursor-pointer"
-                >
-                  {isSubmitting
-                    ? "Saving & Reconciling..."
-                    : editingPurchaseNo
-                    ? "Save Changes & Reconcile Stock"
-                    : "Confirm & Inward Stock"}
-                </button>
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                {!editingPurchaseNo ? (
+                  <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={inwardToStock}
+                      onChange={(e) => setInwardToStock(e.target.checked)}
+                      className="rounded border-slate-300 text-emerald-600 cursor-pointer"
+                    />
+                    <span>
+                      Add inward quantities to Stock Manager{" "}
+                      <span className="text-[10.5px] font-normal text-slate-400">
+                        (uncheck to log PO voucher only)
+                      </span>
+                    </span>
+                  </label>
+                ) : (
+                  <span />
+                )}
+
+                <div className="flex items-center gap-2 ml-auto">
+                  <button
+                    type="button"
+                    onClick={() => setShowModal(false)}
+                    className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-xs font-semibold transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || lineItems.length === 0}
+                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition shadow-md cursor-pointer"
+                  >
+                    {isSubmitting
+                      ? "Saving & Reconciling..."
+                      : editingPurchaseNo
+                      ? "Save Changes & Reconcile Stock"
+                      : inwardToStock
+                      ? "Confirm & Inward Stock"
+                      : "Save Purchase Voucher Only"}
+                  </button>
+                </div>
               </div>
             </form>
           </div>

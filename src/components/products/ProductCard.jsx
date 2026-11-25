@@ -8,7 +8,7 @@ import { useCart } from "../../context/CartContext";
 import { useCountryOptional } from "../../context/CountryContext";
 import { DEFAULT_LOCATIONS, convertAedToLocalPrice } from "../../config/locationsConfig";
 import { AedPrice } from "../common/AedSymbol";
-import { buildVariantSku } from "../../utils/productVariant";
+import { buildVariantSku, getDefaultVariant, getActiveVariant } from "../../utils/productVariant";
 import { estimateCatalogRetailPrice } from "../../context/CatalogContext";
 
 // ⚡ Helper: Sanitize & format verbose raw specifications into compact, elegant micro-pills
@@ -75,10 +75,10 @@ const ProductCard = ({ product }) => {
   const countryPath = countryCtx?.countryPath || ((p) => p);
   const [justAdded, setJustAdded] = useState(false);
 
-  const defaultVariant =
-    product.variants?.find((v) => v.isDefault) ?? product.variants?.[0];
+  const defaultVariant = useMemo(() => getDefaultVariant(product), [product]);
 
-  const [previewVariant, setPreviewVariant] = useState(defaultVariant);
+  const [manualPreviewVariant, setManualPreviewVariant] = useState(null);
+  const previewVariant = manualPreviewVariant || defaultVariant;
 
   const startingStorage =
     product.startingStorage ||
@@ -122,14 +122,18 @@ const ProductCard = ({ product }) => {
   const handleQuickAdd = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    const targetSku = previewVariant
-      ? buildVariantSku(product.sku, previewVariant.colorSlug, startingStorage)
-      : product.sku;
+    const resolved = getActiveVariant(product, previewVariant, startingStorage);
+    const targetSku =
+      resolved?.sku ||
+      product.activeStockSku ||
+      (previewVariant
+        ? buildVariantSku(product.sku, previewVariant.colorSlug, startingStorage)
+        : product.sku);
     addToCart(product, 1, {
       color: previewVariant?.color || "",
       storage: startingStorage || "",
       sku: targetSku,
-      price: sellingPrice,
+      price: Number(resolved?.livePrice) > 0 ? Number(resolved.livePrice) : sellingPrice,
       openDrawer: true,
     });
     setJustAdded(true);
@@ -304,12 +308,12 @@ const ProductCard = ({ product }) => {
                     <button
                       key={variant.colorSlug || variant.color}
                       type="button"
-                      onMouseEnter={() => setPreviewVariant(variant)}
-                      onMouseLeave={() => setPreviewVariant(defaultVariant)}
+                      onMouseEnter={() => setManualPreviewVariant(variant)}
+                      onMouseLeave={() => setManualPreviewVariant(null)}
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        setPreviewVariant(variant);
+                        setManualPreviewVariant(variant);
                       }}
                       title={variant.color}
                       className={`h-3 w-3 sm:h-3.5 sm:w-3.5 rounded-full border transition-all cursor-pointer ${

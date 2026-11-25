@@ -940,7 +940,14 @@ export const extractPurchaseFromGrid = (grid = [], stock = []) => {
       rawCategory || catalogMatch?.category || inferCategoryFromName(finalName);
     const finalSku = catalogMatch
       ? catalogMatch.sku
-      : (rawSku || generateCleanSku(finalName, finalBrand, parsedItems.length + 1)).toUpperCase();
+      : (rawSku || generateCleanSku(finalName, finalBrand, parsedItems.length + 1))
+          .trim()
+          .toUpperCase()
+          .replace(/[\\/]+/g, "-")
+          .replace(/\s+/g, "-")
+          .replace(/[^A-Z0-9._-]+/g, "-")
+          .replace(/-+/g, "-")
+          .replace(/^[-.]+|[-.]+$/g, "");
 
     const resolvedImage =
       catalogMatch?.image ||
