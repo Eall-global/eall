@@ -23,6 +23,7 @@ import { useCatalog } from "../../context/CatalogContext";
 import { useCountry } from "../../context/CountryContext";
 import useScrollPosition from "../../hooks/useScrollPosition";
 import SearchDrawer from "../search/SearchDrawer";
+import { getDefaultVariant } from "../../utils/productVariant";
 import ProductMegaMenu from "../navigation/megaMenu/ProductMegaMenu";
 import QuickRfqModal from "../home/QuickRfqModal";
 import { AedPrice } from "../common/AedSymbol";
@@ -129,25 +130,30 @@ const Header = () => {
     location.pathname.endsWith(`/brands/${b.slug}`)
   );
 
-  // Live Predictive Search Results (from active country's live CatalogContext)
+  // Live Predictive Search Results (strictly in-stock items with valid selling price > 0)
   const predictiveMatches = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (q.length < 2) return [];
     return products
       .filter((p) => {
+        const qty = Number(p.localQuantity ?? p.liveQuantity ?? 0);
+        const price = Number(p.livePrice ?? p.price ?? 0);
+        if (qty <= 0 || price <= 0) return false;
         return (
           (p.name || "").toLowerCase().includes(q) ||
+          (p.activeStockName || "").toLowerCase().includes(q) ||
           (p.brand || "").toLowerCase().includes(q) ||
           (p.sku || "").toLowerCase().includes(q) ||
+          (p.activeStockSku || "").toLowerCase().includes(q) ||
           (p.categoryName || p.category || "").toLowerCase().includes(q) ||
           (p.subCategory || "").toLowerCase().includes(q)
         );
       })
-      .sort((a, b) => {
-        const aIn = a.availability === "In Stock" ? 1 : 0;
-        const bIn = b.availability === "In Stock" ? 1 : 0;
-        return bIn - aIn;
-      })
+      .sort(
+        (a, b) =>
+          Number(b.localQuantity ?? b.liveQuantity ?? 0) -
+          Number(a.localQuantity ?? a.liveQuantity ?? 0)
+      )
       .slice(0, 6);
   }, [products, searchQuery]);
 
@@ -491,6 +497,7 @@ const Header = () => {
                               ? Number(prod.livePrice)
                               : Number(prod.price) || 0;
                           const img =
+                            getDefaultVariant(prod)?.image ||
                             prod.variants?.[0]?.image ||
                             prod.image ||
                             "/logo.png";

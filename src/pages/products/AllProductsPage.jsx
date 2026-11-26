@@ -202,12 +202,21 @@ const AllProductsPage = () => {
         }
       }
 
-      // 5. SEARCH QUERY
+      // 5. SEARCH QUERY (strictly surface in-stock products with valid selling price > 0)
       if (search) {
+        const qty = Number(product.localQuantity ?? product.liveQuantity ?? 0);
+        const effPrice = Number(product.livePrice ?? product.price ?? 0);
+        if (qty <= 0 || effPrice <= 0) {
+          return false;
+        }
         const q = search.toLowerCase();
-        const matchesName = product.name?.toLowerCase().includes(q);
+        const matchesName =
+          product.name?.toLowerCase().includes(q) ||
+          product.activeStockName?.toLowerCase().includes(q);
         const matchesBrand = product.brand?.toLowerCase().includes(q);
-        const matchesSku = product.sku?.toLowerCase().includes(q);
+        const matchesSku =
+          product.sku?.toLowerCase().includes(q) ||
+          product.activeStockSku?.toLowerCase().includes(q);
         const matchesCategory =
           product.categoryName?.toLowerCase().includes(q) ||
           product.category?.toLowerCase().includes(q);

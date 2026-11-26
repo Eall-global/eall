@@ -13,6 +13,7 @@ import {
 import useSearchEngine from "./useSearchEngine";
 import { AedPrice } from "../common/AedSymbol";
 import { useCountry } from "../../context/CountryContext";
+import { getDefaultVariant } from "../../utils/productVariant";
 
 const SearchDrawer = ({ isOpen, onClose }) => {
   const [query, setQuery] = useState("");
@@ -157,54 +158,70 @@ const SearchDrawer = ({ isOpen, onClose }) => {
                     </div>
                   </div>
 
-                  {/* Popular Featured Products */}
-                  <div>
-                    <div className="flex items-center justify-between mb-3.5">
-                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                        <FiShoppingBag className="text-sky-700 text-sm" />
-                        <span>Popular in Catalog</span>
-                      </h3>
-                      <Link
-                        to={countryPath("/products")}
-                        onClick={handleClose}
-                        className="text-xs font-bold text-sky-700 hover:underline flex items-center gap-1"
-                      >
-                        <span>Explore all</span>
-                        <FiArrowRight className="text-[10px]" />
-                      </Link>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                      {results.popularProducts.map((p) => (
+                  {/* Popular In-Stock Products */}
+                  {results.popularProducts.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between mb-3.5">
+                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <FiShoppingBag className="text-sky-700 text-sm" />
+                          <span>Popular in Stock</span>
+                        </h3>
                         <Link
-                          key={p.id}
-                          to={countryPath(`/products/${p.slug}`)}
+                          to={countryPath("/products")}
                           onClick={handleClose}
-                          className="group p-3 sm:p-3.5 rounded-2xl border border-slate-100 hover:border-sky-300 hover:shadow-md bg-white hover:bg-slate-50/50 transition flex items-center gap-3.5"
+                          className="text-xs font-bold text-sky-700 hover:underline flex items-center gap-1"
                         >
-                          <img
-                            src={p.image || "/logo.png"}
-                            alt={p.name}
-                            className="w-14 h-14 object-contain bg-slate-50 rounded-xl p-1 border border-slate-100 shrink-0 group-hover:scale-105 transition-transform"
-                          />
-                          <div className="min-w-0 flex-1">
-                            <span className="text-[10px] font-bold text-sky-700 uppercase tracking-wider block">
-                              {p.brand}
-                            </span>
-                            <h4 className="font-bold text-xs text-slate-900 truncate group-hover:text-sky-700 transition-colors">
-                              {p.name}
-                            </h4>
-                            <div className="mt-1">
-                              <AedPrice
-                                amount={p.price}
-                                className="font-mono font-bold text-xs text-slate-900"
-                              />
-                            </div>
-                          </div>
+                          <span>Explore all</span>
+                          <FiArrowRight className="text-[10px]" />
                         </Link>
-                      ))}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                        {results.popularProducts.map((p) => {
+                          const thumb =
+                            getDefaultVariant(p)?.image || p.image || "/logo.png";
+                          const liveAmount =
+                            Number(p.livePrice) > 0
+                              ? Number(p.livePrice)
+                              : Number(p.price) || 0;
+                          return (
+                            <Link
+                              key={p.id || p.sku}
+                              to={countryPath(`/products/${p.slug}`)}
+                              onClick={handleClose}
+                              className="group p-3 sm:p-3.5 rounded-2xl border border-slate-100 hover:border-sky-300 hover:shadow-md bg-white hover:bg-slate-50/50 transition flex items-center gap-3.5"
+                            >
+                              <img
+                                src={thumb}
+                                alt={p.name}
+                                onError={(e) => {
+                                  e.currentTarget.src = "/logo.png";
+                                }}
+                                className="w-14 h-14 object-contain bg-slate-50 rounded-xl p-1 border border-slate-100 shrink-0 group-hover:scale-105 transition-transform"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <span className="text-[10px] font-bold text-sky-700 uppercase tracking-wider block">
+                                  {p.brand}
+                                </span>
+                                <h4 className="font-bold text-xs text-slate-900 truncate group-hover:text-sky-700 transition-colors">
+                                  {p.name}
+                                </h4>
+                                <div className="mt-1 flex items-center justify-between gap-2">
+                                  <AedPrice
+                                    amount={liveAmount}
+                                    className="font-mono font-bold text-xs text-slate-900"
+                                  />
+                                  <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded shrink-0">
+                                    {p.availabilityBadge || "In Stock"}
+                                  </span>
+                                </div>
+                              </div>
+                            </Link>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                 </div>
               )}
@@ -278,44 +295,55 @@ const SearchDrawer = ({ isOpen, onClose }) => {
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {results.products.map((p) => (
-                        <Link
-                          key={p.id}
-                          to={countryPath(`/products/${p.slug}`)}
-                          onClick={handleClose}
-                          className="group p-3 rounded-2xl border border-slate-200/80 hover:border-sky-300 hover:shadow-md bg-white hover:bg-slate-50/40 transition flex items-center gap-3.5"
-                        >
-                          <img
-                            src={p.image || "/logo.png"}
-                            alt={p.name}
-                            className="w-14 h-14 object-contain bg-slate-50 rounded-xl p-1 border border-slate-100 shrink-0 group-hover:scale-105 transition-transform"
-                          />
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[9.5px] font-bold text-sky-700 uppercase tracking-wider">
-                                {p.brand}
-                              </span>
-                              {p.sku && (
-                                <span className="text-[9px] font-mono text-slate-400">
-                                  • {p.sku}
+                      {results.products.map((p) => {
+                        const thumb =
+                          getDefaultVariant(p)?.image || p.image || "/logo.png";
+                        const liveAmount =
+                          Number(p.livePrice) > 0
+                            ? Number(p.livePrice)
+                            : Number(p.price) || 0;
+                        return (
+                          <Link
+                            key={p.id || p.sku}
+                            to={countryPath(`/products/${p.slug}`)}
+                            onClick={handleClose}
+                            className="group p-3 rounded-2xl border border-slate-200/80 hover:border-sky-300 hover:shadow-md bg-white hover:bg-slate-50/40 transition flex items-center gap-3.5"
+                          >
+                            <img
+                              src={thumb}
+                              alt={p.name}
+                              onError={(e) => {
+                                e.currentTarget.src = "/logo.png";
+                              }}
+                              className="w-14 h-14 object-contain bg-slate-50 rounded-xl p-1 border border-slate-100 shrink-0 group-hover:scale-105 transition-transform"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[9.5px] font-bold text-sky-700 uppercase tracking-wider">
+                                  {p.brand}
                                 </span>
-                              )}
+                                {(p.activeStockSku || p.sku) && (
+                                  <span className="text-[9px] font-mono text-slate-400 truncate">
+                                    • {p.activeStockSku || p.sku}
+                                  </span>
+                                )}
+                              </div>
+                              <h4 className="font-bold text-xs sm:text-sm text-slate-900 truncate group-hover:text-sky-700 transition-colors">
+                                {p.name}
+                              </h4>
+                              <div className="mt-1 flex items-center justify-between gap-2">
+                                <AedPrice
+                                  amount={liveAmount}
+                                  className="font-mono font-bold text-xs text-slate-900"
+                                />
+                                <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-bold shrink-0">
+                                  {p.availabilityBadge || "In Stock"}
+                                </span>
+                              </div>
                             </div>
-                            <h4 className="font-bold text-xs sm:text-sm text-slate-900 truncate group-hover:text-sky-700 transition-colors">
-                              {p.name}
-                            </h4>
-                            <div className="mt-1 flex items-center justify-between">
-                              <AedPrice
-                                amount={p.price}
-                                className="font-mono font-bold text-xs text-slate-900"
-                              />
-                              <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-bold">
-                                In Stock
-                              </span>
-                            </div>
-                          </div>
-                        </Link>
-                      ))}
+                          </Link>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -332,7 +360,9 @@ const SearchDrawer = ({ isOpen, onClose }) => {
                     No results found for "{query}"
                   </h3>
                   <p className="text-xs text-slate-500 leading-relaxed">
-                    Check your spelling or try searching with general terms like <strong>iPhone</strong>, <strong>Nokia</strong>, or <strong>AirPods</strong>.
+                    Check your spelling or try searching available in-stock models like{" "}
+                    <strong>{results.trendingSearches[0] || "HMD 100"}</strong> or{" "}
+                    <strong>{results.trendingSearches[1] || "Nokia 105"}</strong>.
                   </p>
                   <div className="pt-2">
                     <Link

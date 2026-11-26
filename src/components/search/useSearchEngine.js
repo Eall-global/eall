@@ -1,25 +1,62 @@
 import { useMemo } from "react";
-import { products } from "../../data/products/index";
+import { useCatalog } from "../../context/CatalogContext";
 import categories from "../../data/categories";
 import { brands } from "../../data/brandsData";
 
 export const TRENDING_SEARCHES = [
-  "iPhone 16 Pro",
-  "Nokia 150 Music",
-  "AirPods Pro",
   "HMD 100",
-  "iPhone 17 Pro Max",
+  "HMD 102",
+  "Nokia 105",
+  "Nokia 110 Power",
+  "Nokia 150 Music",
   "Feature Phones",
-  "Apple",
-  "Wireless Audio",
 ];
 
+const isSellableInStock = (p) => {
+  if (!p) return false;
+  const qty = Number(p.localQuantity ?? p.liveQuantity ?? 0);
+  const price = Number(p.livePrice ?? p.price ?? 0);
+  return qty > 0 && price > 0;
+};
+
 const useSearchEngine = (query = "") => {
+  const { products: catalogProducts = [] } = useCatalog();
   const q = query.toLowerCase().trim();
 
   return useMemo(() => {
-    // Featured / Popular fallback products when no query is typed
-    const popularProducts = products.slice(0, 4);
+    // Strictly surface ONLY available, in-stock products with a valid selling price (> 0)
+    const availableProducts = catalogProducts
+      .filter(isSellableInStock)
+      .sort(
+        (a, b) =>
+          Number(b.localQuantity ?? b.liveQuantity ?? 0) -
+          Number(a.localQuantity ?? a.liveQuantity ?? 0)
+      );
+
+    // Build dynamic trending searches strictly from what is actually in stock for this country
+    const dynamicTerms = [];
+    const seenTerms = new Set();
+    const pushTerm = (val) => {
+      const clean = String(val || "").trim();
+      const key = clean.toLowerCase();
+      if (!clean || seenTerms.has(key)) return;
+      seenTerms.add(key);
+      dynamicTerms.push(clean);
+    };
+
+    availableProducts.slice(0, 5).forEach((p) => pushTerm(p.shortName || p.name));
+    availableProducts.forEach((p) => {
+      if (dynamicTerms.length < 8) pushTerm(p.brand);
+    });
+    availableProducts.forEach((p) => {
+      if (dynamicTerms.length < 8) pushTerm(p.subCategory || p.categoryName);
+    });
+
+    const trendingSearches =
+      dynamicTerms.length > 0 ? dynamicTerms.slice(0, 8) : TRENDING_SEARCHES;
+
+    // Popular products = top stocked items in the active country
+    const popularProducts = availableProducts.slice(0, 4);
 
     if (!q) {
       return {
@@ -27,29 +64,67 @@ const useSearchEngine = (query = "") => {
         brands: [],
         categories: [],
         popularProducts,
-        trendingSearches: TRENDING_SEARCHES,
+        trendingSearches,
         totalMatches: 0,
       };
     }
 
-    const productResults = products.filter(
-      (p) =>
-        (p.name && p.name.toLowerCase().includes(q)) ||
-        (p.brand && p.brand.toLowerCase().includes(q)) ||
-        (p.category && p.category.toLowerCase().includes(q)) ||
-        (p.sku && p.sku.toLowerCase().includes(q)) ||
-        (p.description && p.description.toLowerCase().includes(q))
+    const productResults = availableProducts.filter((p) => {
+      const haystacks = [
+        p.name,
+        p.shortName,
+        p.activeStockName,
+        p.brand,
+        p.category,
+        p.categoryName,
+        p.subCategory,
+        p.sku,
+        p.activeStockSku,
+        p.description,
+        p.shortDescription,
+      ];
+      return haystacks.some((val) => val && String(val).toLowerCase().includes(q));
+    });
+
+    // Only suggest brands & categories that actually have in-stock products available
+    const stockedBrandKeys = new Set(
+      availableProducts.map((p) => String(p.brand || "").trim().toLowerCase())
+    );
+    const stockedBrandSlugs = new Set(
+      availableProducts.map((p) => String(p.brandSlug || "").trim().toLowerCase())
+    );
+    const stockedCategoryKeys = new Set(
+      availableProducts.flatMap((p) =>
+        [p.category, p.categoryName, p.subCategory]
+          .filter(Boolean)
+          .map((c) => String(c).trim().toLowerCase())
+      )
     );
 
-    const brandResults = brands.filter((b) =>
-      b.name.toLowerCase().includes(q) || (b.slug && b.slug.toLowerCase().includes(q))
-    );
+    const brandResults = brands.filter((b) => {
+      const hasStock =
+        stockedBrandKeys.has(b.name.toLowerCase()) ||
+        (b.slug && stockedBrandSlugs.has(b.slug.toLowerCase()));
+      if (!hasStock) return false;
+      return (
+        b.name.toLowerCase().includes(q) ||
+        (b.slug && b.slug.toLowerCase().includes(q))
+      );
+    });
 
-    const categoryResults = categories.filter((c) =>
-      c.name.toLowerCase().includes(q) || (c.slug && c.slug.toLowerCase().includes(q))
-    );
+    const categoryResults = categories.filter((c) => {
+      const hasStock =
+        stockedCategoryKeys.has(c.name.toLowerCase()) ||
+        (c.slug && stockedCategoryKeys.has(c.slug.toLowerCase()));
+      if (!hasStock) return false;
+      return (
+        c.name.toLowerCase().includes(q) ||
+        (c.slug && c.slug.toLowerCase().includes(q))
+      );
+    });
 
-    const totalMatches = productResults.length + brandResults.length + categoryResults.length;
+    const totalMatches =
+      productResults.length + brandResults.length + categoryResults.length;
 
     return {
       products: productResults.slice(0, 8),
@@ -57,10 +132,10 @@ const useSearchEngine = (query = "") => {
       brands: brandResults.slice(0, 6),
       categories: categoryResults.slice(0, 6),
       popularProducts,
-      trendingSearches: TRENDING_SEARCHES,
+      trendingSearches,
       totalMatches,
     };
-  }, [q]);
+  }, [catalogProducts, q]);
 };
 
 export default useSearchEngine;
