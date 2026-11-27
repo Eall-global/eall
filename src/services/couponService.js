@@ -1,6 +1,6 @@
 /**
- * E-ALL Coupon & Promotions Service
- * Cloud Firestore persistence with First-Order verification
+ * E-ALL Multi-Country Coupon & Promotions Service
+ * Cloud Firestore persistence with First-Order verification, Country Scoping & Live Currency Conversion
  */
 import {
   getFirebaseDb,
@@ -12,6 +12,10 @@ import {
   deleteDoc,
 } from "../lib/firebaseClient";
 import { logAuditEvent } from "./auditService";
+import {
+  DEFAULT_LOCATIONS,
+  convertAedToLocalPrice,
+} from "../config/locationsConfig";
 
 const COUPONS_STORAGE_KEY = "eall_active_coupons";
 
@@ -21,7 +25,10 @@ export const DEFAULT_COUPONS = [
     code: "WELCOME10",
     description: "10% OFF on your very first order",
     discountPercent: 10,
+    discountFlat: 0,
     minOrderAmount: 0,
+    locationCode: "ALL",
+    currency: "AED",
     firstOrderOnly: true,
     isActive: true,
     expiresAt: "2027-12-31",
@@ -31,7 +38,10 @@ export const DEFAULT_COUPONS = [
     code: "EALL2026",
     description: "5% Storewide discount for all customers",
     discountPercent: 5,
+    discountFlat: 0,
     minOrderAmount: 200,
+    locationCode: "ALL",
+    currency: "AED",
     firstOrderOnly: false,
     isActive: true,
     expiresAt: "2027-12-31",
@@ -39,14 +49,160 @@ export const DEFAULT_COUPONS = [
   {
     id: "AFRICA50",
     code: "AFRICA50",
-    description: "Special 50 AED Flat Voucher on orders above 500 AED",
+    description: "Special Flat Voucher on qualifying orders",
+    discountPercent: 0,
     discountFlat: 50,
     minOrderAmount: 500,
+    locationCode: "ALL",
+    currency: "AED",
     firstOrderOnly: false,
     isActive: true,
     expiresAt: "2027-12-31",
   },
 ];
+
+/**
+ * Format a clean coupon currency amount (omits unnecessary .00 decimals for cleaner ticket copy)
+ */
+export const formatCouponAmount = (amount, locationConfig) => {
+  const cfg = locationConfig || DEFAULT_LOCATIONS[0];
+  const sym = cfg.currencySymbol || cfg.currency || "AED";
+  const num = Number(amount) || 0;
+  const isWhole = Math.abs(num - Math.round(num)) < 0.005;
+  const decimals = isWhole ? 0 : Number.isFinite(Number(cfg.decimals)) ? Number(cfg.decimals) : 2;
+  const formatted = num.toLocaleString(cfg.locale || "en-AE", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+  return `${sym} ${formatted}`;
+};
+
+/**
+ * Convert & localize any coupon (global AED base or country-specific) into the active country's currency.
+ * Also cleans legacy descriptions that had hardcoded "AED" text when rendered in non-AED countries.
+ */
+export const resolveCouponForLocation = (coupon, locationConfig = null) => {
+  const cfg = locationConfig || DEFAULT_LOCATIONS[0];
+  const activeCode = String(cfg.code || "AE").toUpperCase();
+  const couponLoc = String(coupon?.locationCode || "ALL").toUpperCase();
+  const couponCurrency = String(coupon?.currency || "AED").toUpperCase();
+  const targetCurrency = String(cfg.currency || "AED").toUpperCase();
+
+  const isGlobal = couponLoc === "ALL";
+  const isNativeCurrency =
+    (!isGlobal && couponLoc === activeCode) || couponCurrency === targetCurrency;
+  const isEligible = isGlobal || couponLoc === activeCode;
+
+  const discountPercent = Math.max(0, Number(coupon?.discountPercent) || 0);
+  const rawFlat = Math.max(0, Number(coupon?.discountFlat) || 0);
+  const rawMin = Math.max(0, Number(coupon?.minOrderAmount) || 0);
+
+  const discountFlatLocal =
+    rawFlat > 0
+      ? isNativeCurrency
+        ? rawFlat
+        : convertAedToLocalPrice(rawFlat, cfg, 0)
+      : 0;
+
+  const minOrderLocal =
+    rawMin > 0
+      ? isNativeCurrency
+        ? rawMin
+        : convertAedToLocalPrice(rawMin, cfg, 0)
+      : 0;
+
+  const flatFormatted =
+    discountFlatLocal > 0 ? formatCouponAmount(discountFlatLocal, cfg) : "";
+  const minFormatted =
+    minOrderLocal > 0 ? formatCouponAmount(minOrderLocal, cfg) : "";
+
+  const shortValue =
+    discountPercent > 0
+      ? `${discountPercent}% OFF`
+      : `${flatFormatted} OFF`;
+
+  const headline =
+    discountPercent > 0
+      ? `EXTRA ${discountPercent}% OFF`
+      : `${flatFormatted} OFF`;
+
+  const subtitle =
+    minOrderLocal > 0
+      ? `On orders above ${minFormatted}`
+      : coupon?.firstOrderOnly
+      ? "On your very first order"
+      : "Valid storewide on all items";
+
+  // Clean legacy hardcoded "AED" text inside saved descriptions when viewing in another currency
+  const rawDesc = String(coupon?.description || "").trim();
+  const hasHardcodedAed = /\bAED\b|د\.إ/i.test(rawDesc);
+  let localizedDescription = rawDesc;
+  if (!rawDesc || (hasHardcodedAed && targetCurrency !== "AED")) {
+    if (discountPercent > 0) {
+      localizedDescription =
+        minOrderLocal > 0
+          ? `${discountPercent}% OFF on orders above ${minFormatted}`
+          : coupon?.firstOrderOnly
+          ? `${discountPercent}% OFF on your very first order`
+          : `${discountPercent}% Storewide discount for all customers`;
+    } else if (discountFlatLocal > 0) {
+      localizedDescription =
+        minOrderLocal > 0
+          ? `Special ${flatFormatted} Flat Voucher on orders above ${minFormatted}`
+          : `Special ${flatFormatted} Instant Storefront Voucher`;
+    }
+  }
+
+  let badgeLabel = "STOREWIDE";
+  if (coupon?.firstOrderOnly) {
+    badgeLabel = "1ST ORDER";
+  } else if (discountPercent >= 10 || rawFlat >= 50) {
+    badgeLabel = "BEST VALUE";
+  } else if (!isGlobal) {
+    badgeLabel = `${cfg.shortName || activeCode} EXCLUSIVE`.toUpperCase();
+  }
+
+  return {
+    ...coupon,
+    locationCode: couponLoc,
+    isGlobal,
+    isEligible,
+    activeCurrency: targetCurrency,
+    activeSymbol: cfg.currencySymbol || targetCurrency,
+    discountPercent,
+    discountFlatLocal,
+    minOrderLocal,
+    flatFormatted,
+    minFormatted,
+    shortValue,
+    headline,
+    subtitle,
+    localizedDescription,
+    badgeLabel,
+  };
+};
+
+/**
+ * Filter and resolve a coupon list for the active country storefront or back-office location
+ */
+export const filterCouponsForLocation = (
+  coupons = [],
+  locationConfig = null,
+  { activeOnly = true } = {}
+) => {
+  const now = new Date();
+  return (coupons || [])
+    .filter((c) => {
+      if (!c) return false;
+      if (activeOnly) {
+        if (c.isActive === false) return false;
+        if (c.expiresAt && new Date(c.expiresAt) < now) return false;
+      }
+      return true;
+    })
+    .map((c) => resolveCouponForLocation(c, locationConfig))
+    .filter((c) => c.isEligible);
+};
 
 /**
  * Fetch all available coupons from Firestore or fallback
@@ -84,13 +240,25 @@ export const saveCoupon = async (couponData) => {
   const code = (couponData.code || "").toUpperCase().trim();
   if (!code) throw new Error("Coupon code is required");
 
+  const locCode = String(couponData.locationCode || "ALL").trim().toUpperCase();
+  const currency = String(couponData.currency || "AED").trim().toUpperCase();
+  const discountPercent = Number(couponData.discountPercent) || 0;
+  const discountFlat = Number(couponData.discountFlat) || 0;
+  const minOrderAmount = Number(couponData.minOrderAmount) || 0;
+
   const coupon = {
     id: code,
     code,
-    description: couponData.description || `${couponData.discountPercent || 10}% OFF`,
-    discountPercent: Number(couponData.discountPercent) || 0,
-    discountFlat: Number(couponData.discountFlat) || 0,
-    minOrderAmount: Number(couponData.minOrderAmount) || 0,
+    description:
+      couponData.description?.trim() ||
+      (discountPercent > 0
+        ? `${discountPercent}% OFF`
+        : `${currency} ${discountFlat} OFF`),
+    discountPercent,
+    discountFlat,
+    minOrderAmount,
+    locationCode: locCode,
+    currency,
     firstOrderOnly: Boolean(couponData.firstOrderOnly),
     isActive: couponData.isActive !== false,
     expiresAt: couponData.expiresAt || "2027-12-31",
@@ -119,7 +287,7 @@ export const saveCoupon = async (couponData) => {
     targetLabel: code,
     summary: existing
       ? `Updated coupon ${code} (${coupon.isActive ? "Active" : "Inactive"})`
-      : `Created coupon ${code} (${coupon.discountPercent > 0 ? `${coupon.discountPercent}% OFF` : `AED ${coupon.discountFlat} OFF`})`,
+      : `Created coupon ${code} (${coupon.discountPercent > 0 ? `${coupon.discountPercent}% OFF` : `${currency} ${coupon.discountFlat} OFF`} • ${locCode === "ALL" ? "Global" : locCode})`,
     changes: existing
       ? [
           {
@@ -132,7 +300,12 @@ export const saveCoupon = async (couponData) => {
           {
             field: "Discount",
             before: "—",
-            after: coupon.discountPercent > 0 ? `${coupon.discountPercent}%` : `AED ${coupon.discountFlat}`,
+            after: coupon.discountPercent > 0 ? `${coupon.discountPercent}%` : `${currency} ${coupon.discountFlat}`,
+          },
+          {
+            field: "Scope",
+            before: "—",
+            after: locCode === "ALL" ? "All Countries (Auto FX)" : `${locCode} (${currency})`,
           },
         ],
   });
@@ -169,11 +342,15 @@ export const deleteCoupon = async (couponId) => {
 };
 
 /**
- * Validate and calculate coupon discount
+ * Validate and calculate coupon discount in the active country's currency
  * @param {string} rawCode
- * @param {Object} context - { user, orders, cartSubtotal }
+ * @param {Object} context - { user, orders, cartSubtotal, locationConfig }
  */
-export const validateCouponCode = async (rawCode, { user, orders = [], cartSubtotal = 0 }) => {
+export const validateCouponCode = async (
+  rawCode,
+  { user, orders = [], cartSubtotal = 0, locationConfig = null } = {}
+) => {
+  const cfg = locationConfig || DEFAULT_LOCATIONS[0];
   const code = (rawCode || "").toUpperCase().trim();
   if (!code) {
     return { valid: false, message: "Please enter a valid coupon code." };
@@ -186,11 +363,24 @@ export const validateCouponCode = async (rawCode, { user, orders = [], cartSubto
     return { valid: false, message: `Coupon code "${code}" is invalid or expired.` };
   }
 
-  // Check minimum order subtotal
-  if (coupon.minOrderAmount > 0 && cartSubtotal < coupon.minOrderAmount) {
+  if (coupon.expiresAt && new Date(coupon.expiresAt) < new Date()) {
+    return { valid: false, message: `Coupon code "${code}" has expired.` };
+  }
+
+  const resolved = resolveCouponForLocation(coupon, cfg);
+
+  if (!resolved.isEligible) {
     return {
       valid: false,
-      message: `Coupon "${code}" requires a minimum order subtotal of ${coupon.minOrderAmount} د.إ.`,
+      message: `Coupon "${code}" is not valid in ${cfg.shortName || cfg.name}.`,
+    };
+  }
+
+  // Check minimum order subtotal in the active country's currency
+  if (resolved.minOrderLocal > 0 && cartSubtotal < resolved.minOrderLocal) {
+    return {
+      valid: false,
+      message: `Coupon "${code}" requires a minimum order subtotal of ${resolved.minFormatted}.`,
     };
   }
 
@@ -214,18 +404,21 @@ export const validateCouponCode = async (rawCode, { user, orders = [], cartSubto
     }
   }
 
-  // Calculate discount amount
+  // Calculate discount amount in the active country's local currency
   let discountAmount = 0;
-  if (coupon.discountPercent > 0) {
-    discountAmount = (cartSubtotal * coupon.discountPercent) / 100;
-  } else if (coupon.discountFlat > 0) {
-    discountAmount = Math.min(cartSubtotal, coupon.discountFlat);
+  if (resolved.discountPercent > 0) {
+    discountAmount = (cartSubtotal * resolved.discountPercent) / 100;
+  } else if (resolved.discountFlatLocal > 0) {
+    discountAmount = Math.min(cartSubtotal, resolved.discountFlatLocal);
   }
+
+  const roundedDiscount = Number(discountAmount.toFixed(2));
+  const savedLabel = formatCouponAmount(roundedDiscount, cfg);
 
   return {
     valid: true,
-    coupon,
-    discountAmount: Number(discountAmount.toFixed(2)),
-    message: `Coupon "${code}" applied! You saved ${discountAmount.toFixed(2)} د.إ`,
+    coupon: resolved,
+    discountAmount: roundedDiscount,
+    message: `Coupon "${code}" applied! You saved ${savedLabel}`,
   };
 };

@@ -32,6 +32,7 @@ import {
   savePosContact,
 } from "../../services/customerService";
 import { useStaffAuth } from "../../context/StaffAuthContext";
+import { resolveCouponForLocation } from "../../services/couponService";
 import PosAddressBookModal from "./PosAddressBookModal";
 
 const HELD_BILLS_KEY = "eall_pos_held_bills";
@@ -502,21 +503,28 @@ const BillingPOS = ({
       setCouponFeedback("This coupon has expired.");
       return;
     }
-    if (Number(match.minOrderAmount || 0) > subtotal) {
+    const resolved = resolveCouponForLocation(match, activeLocationConfig);
+    if (!resolved.isEligible) {
       setCouponFeedback(
-        `Minimum order ${posCurrencySymbol} ${Number(match.minOrderAmount).toLocaleString(posLocale)} required.`
+        `Coupon "${code}" is not eligible for ${activeLocationConfig?.shortName || activeLocationCode}.`
+      );
+      return;
+    }
+    if (resolved.minOrderLocal > subtotal) {
+      setCouponFeedback(
+        `Minimum order ${resolved.minFormatted} required.`
       );
       return;
     }
 
-    if (Number(match.discountPercent) > 0) {
+    if (resolved.discountPercent > 0) {
       setDiscountType("percent");
-      setDiscountValue(Number(match.discountPercent));
-    } else if (Number(match.discountFlat) > 0) {
+      setDiscountValue(resolved.discountPercent);
+    } else if (resolved.discountFlatLocal > 0) {
       setDiscountType("aed");
-      setDiscountValue(Number(match.discountFlat));
+      setDiscountValue(resolved.discountFlatLocal);
     }
-    setAppliedCoupon(match);
+    setAppliedCoupon(resolved);
     setCouponFeedback("");
     setCouponInput("");
   };

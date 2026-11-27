@@ -28,7 +28,11 @@ import { useCustomerAuth } from "../../context/CustomerAuthContext";
 import { useCountry } from "../../context/CountryContext";
 import { adjustStockDelta } from "../../services/stockService";
 import { WAVE_PAYMENT_CONFIG } from "../../constants/paymentConfig";
-import { validateCouponCode, fetchCoupons } from "../../services/couponService";
+import {
+  validateCouponCode,
+  fetchCoupons,
+  filterCouponsForLocation,
+} from "../../services/couponService";
 import OrderSuccessModal from "../../components/checkout/OrderSuccessModal";
 import { AedPrice } from "../../components/common/AedSymbol";
 import CountryFlag from "../../components/common/CountryFlag";
@@ -140,10 +144,14 @@ const CheckoutPage = () => {
     name: "",
   });
 
-  // Load active coupons for drawer
+  // Load active coupons for drawer (scoped & localized to activeCountry currency)
   useEffect(() => {
-    fetchCoupons().then((list) => setAvailableCouponsList(list.filter((c) => c.isActive)));
-  }, []);
+    fetchCoupons().then((list) =>
+      setAvailableCouponsList(
+        filterCouponsForLocation(list, activeCountry, { activeOnly: true })
+      )
+    );
+  }, [activeCountry]);
 
   // Derive saved addresses list (Max 5) for logged-in user or guest session
   const savedAddresses = useMemo(() => {
@@ -325,6 +333,7 @@ const CheckoutPage = () => {
         user,
         orders,
         cartSubtotal,
+        locationConfig: activeCountry,
       });
 
       if (result.valid) {
@@ -1372,10 +1381,17 @@ const CheckoutPage = () => {
                       return (
                         <div key={c.id || c.code} className="p-2.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between gap-2">
                           <div>
-                            <span className="font-mono font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200 text-xs">
-                              {c.code}
-                            </span>
-                            <p className="text-[11px] text-slate-600 mt-1">{c.description}</p>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-mono font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-dashed border-sky-400 text-xs">
+                                {c.code}
+                              </span>
+                              <span className="text-[10.5px] font-extrabold text-emerald-700">
+                                {c.shortValue}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-600 mt-1">
+                              {c.localizedDescription || c.description}
+                            </p>
                             {c.firstOrderOnly && (
                               <span className="inline-block text-[9.5px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded mt-0.5">
                                 1st Order Only (1x per customer)

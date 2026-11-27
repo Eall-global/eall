@@ -1,7 +1,10 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import { Link } from "react-router-dom";
 import { FiArrowRight, FiGlobe, FiPackage } from "react-icons/fi";
 import ProductCard from "../products/ProductCard";
+import CouponTicketStrip, {
+  useLocalizedCoupons,
+} from "../common/CouponTicketStrip";
 import { useCatalog } from "../../context/CatalogContext";
 import { useCountry } from "../../context/CountryContext";
 import { slugify } from "../../utils/slugify";
@@ -26,6 +29,7 @@ const MerchandisingShelf = () => {
     countryStockedCount,
   } = useCatalog();
   const { activeCountry, countryPath, switchCountry } = useCountry();
+  const activeCoupons = useLocalizedCoupons();
   const [activeTab, setActiveTab] = useState("featured");
 
   const visibleProducts = useMemo(() => {
@@ -113,12 +117,93 @@ const MerchandisingShelf = () => {
           </div>
         </div>
 
-        {/* Dense 2-Col Mobile / 5–6 Col Desktop Product Grid */}
+        {/* 2-Col Mobile / 3-Col sm / 4-Col lg / 6-Col xl+ Grid — Coupons Strictly After Every 2nd Row */}
         {visibleProducts.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2.5 sm:gap-4">
-            {visibleProducts.map((product) => (
-              <ProductCard key={product.id || product.slug} product={product} />
-            ))}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2.5 sm:gap-4">
+            {visibleProducts.map((product, idx) => {
+              const hasCoupons = activeCoupons.length > 0;
+              return (
+                <Fragment key={product.id || product.slug}>
+                  <ProductCard product={product} />
+
+                  {/* Mobile (< sm, 2/row): 1 SINGLE crisp ticket after Row 2 (idx 3), Row 4 (idx 7), Row 6 (idx 11) */}
+                  {hasCoupons && idx === 3 && (
+                    <CouponTicketStrip
+                      coupons={activeCoupons.slice(0, 1)}
+                      className="sm:hidden my-1"
+                    />
+                  )}
+                  {hasCoupons && idx === 7 && activeCoupons.length > 1 && (
+                    <CouponTicketStrip
+                      coupons={activeCoupons.slice(1, 2)}
+                      className="sm:hidden my-1"
+                    />
+                  )}
+                  {hasCoupons && idx === 11 && activeCoupons.length > 2 && (
+                    <CouponTicketStrip
+                      coupons={activeCoupons.slice(2, 3)}
+                      className="sm:hidden my-1"
+                    />
+                  )}
+
+                  {/* Tablet sm (3/row): Twin strip after Row 2 (idx 5) & Row 4 (idx 11) */}
+                  {hasCoupons && idx === 5 && (
+                    <CouponTicketStrip
+                      coupons={activeCoupons.slice(0, 2)}
+                      className="hidden sm:block lg:hidden my-1.5"
+                    />
+                  )}
+                  {hasCoupons && idx === 11 && activeCoupons.length > 2 && (
+                    <CouponTicketStrip
+                      coupons={activeCoupons.slice(2, 4)}
+                      className="hidden sm:block lg:hidden my-1.5"
+                    />
+                  )}
+
+                  {/* Laptop lg (4/row): Twin strip after Row 2 (idx 7) */}
+                  {hasCoupons && idx === 7 && (
+                    <CouponTicketStrip
+                      coupons={activeCoupons.slice(0, 2)}
+                      className="hidden lg:block xl:hidden my-1.5"
+                    />
+                  )}
+
+                  {/* Desktop xl+ (6/row): Twin strip after Row 2 (idx 11) */}
+                  {hasCoupons && idx === 11 && (
+                    <CouponTicketStrip
+                      coupons={activeCoupons.slice(0, 2)}
+                      className="hidden xl:block my-2"
+                    />
+                  )}
+                </Fragment>
+              );
+            })}
+
+            {/* Graceful fallback when fewer items exist than 2 full rows at a breakpoint */}
+            {activeCoupons.length > 0 && visibleProducts.length < 4 && (
+              <CouponTicketStrip
+                coupons={activeCoupons.slice(0, 1)}
+                className="sm:hidden my-1"
+              />
+            )}
+            {activeCoupons.length > 0 && visibleProducts.length < 6 && (
+              <CouponTicketStrip
+                coupons={activeCoupons.slice(0, 2)}
+                className="hidden sm:block lg:hidden my-1.5"
+              />
+            )}
+            {activeCoupons.length > 0 && visibleProducts.length < 8 && (
+              <CouponTicketStrip
+                coupons={activeCoupons.slice(0, 2)}
+                className="hidden lg:block xl:hidden my-1.5"
+              />
+            )}
+            {activeCoupons.length > 0 && visibleProducts.length < 12 && (
+              <CouponTicketStrip
+                coupons={activeCoupons.slice(0, 2)}
+                className="hidden xl:block my-2"
+              />
+            )}
           </div>
         ) : isStrictLocalCountry ? (
           <div className="bg-slate-50 rounded-3xl border border-slate-200 p-8 sm:p-10 text-center max-w-3xl mx-auto space-y-3">

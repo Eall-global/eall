@@ -15,7 +15,12 @@ import {
 } from "react-icons/fi";
 import { useCatalog } from "../../context/CatalogContext";
 import { useCountry } from "../../context/CountryContext";
-import { fetchCoupons, DEFAULT_COUPONS } from "../../services/couponService";
+import {
+  fetchCoupons,
+  DEFAULT_COUPONS,
+  filterCouponsForLocation,
+  resolveCouponForLocation,
+} from "../../services/couponService";
 import { slugify } from "../../utils/slugify";
 import { AedPrice } from "../common/AedSymbol";
 
@@ -129,8 +134,6 @@ const COUPON_POSTER_PRESETS = [
     poster: "/assets/home/hero-coupon-1.png",
     eyebrow: "First Order Welcome Offer",
     headline: "10% OFF Your First Order",
-    subtext:
-      "Instant 10% savings at checkout + Free UAE delivery on orders over AED 500.",
     bgCls: "from-indigo-950 via-indigo-900 to-violet-950",
     pillCls: "bg-indigo-500/30 text-indigo-100 border-indigo-400/40",
     badgeCls: "bg-amber-400 text-slate-950",
@@ -139,8 +142,6 @@ const COUPON_POSTER_PRESETS = [
     poster: "/assets/home/hero-coupon-2.png",
     eyebrow: "Storewide Smart Tech Deal",
     headline: "5% OFF Storewide Tech",
-    subtext:
-      "Extra 5% discount across smartphones, tablets, audio & wearables over AED 200.",
     bgCls: "from-emerald-950 via-teal-900 to-emerald-950",
     pillCls: "bg-emerald-500/30 text-emerald-100 border-emerald-400/40",
     badgeCls: "bg-emerald-300 text-slate-950",
@@ -148,9 +149,7 @@ const COUPON_POSTER_PRESETS = [
   {
     poster: "/assets/home/hero-coupon-3.png",
     eyebrow: "Instant Cash Voucher",
-    headline: "AED 50 Flat Cash Off",
-    subtext:
-      "Save AED 50 immediately at checkout on any retail order above AED 500.",
+    headline: "Instant Flat Voucher",
     bgCls: "from-amber-950 via-orange-900 to-amber-950",
     pillCls: "bg-amber-500/30 text-amber-100 border-amber-400/40",
     badgeCls: "bg-amber-300 text-slate-950",
@@ -381,9 +380,15 @@ const EcommerceHero = ({ onOpenRfq }) => {
     };
   }, [showcaseCatalog]);
 
+  const localizedCoupons = useMemo(
+    () => filterCouponsForLocation(coupons, activeCountry, { activeOnly: true }),
+    [coupons, activeCountry]
+  );
   const safeCouponIdx =
-    coupons.length > 0 ? activeCouponIdx % coupons.length : 0;
-  const currentCoupon = coupons[safeCouponIdx] || DEFAULT_COUPONS[0];
+    localizedCoupons.length > 0 ? activeCouponIdx % localizedCoupons.length : 0;
+  const currentCoupon =
+    localizedCoupons[safeCouponIdx] ||
+    resolveCouponForLocation(DEFAULT_COUPONS[0], activeCountry);
   const currentPreset =
     COUPON_POSTER_PRESETS[safeCouponIdx % COUPON_POSTER_PRESETS.length];
 
@@ -395,9 +400,21 @@ const EcommerceHero = ({ onOpenRfq }) => {
   };
 
   const couponBadgeText =
-    Number(currentCoupon?.discountPercent) > 0
-      ? `${currentCoupon.discountPercent}% OFF`
-      : `${formatPrice(convertPrice(Number(currentCoupon?.discountFlat || 50)))} OFF`;
+    currentCoupon?.shortValue ||
+    `${formatPrice(convertPrice(Number(currentCoupon?.discountFlat || 50)))} OFF`;
+
+  const freeShipLabel = formatPrice(
+    Number(activeCountry?.freeShippingThresholdLocal) || convertPrice(500)
+  );
+  const couponSubtext = currentCoupon?.firstOrderOnly
+    ? `Instant ${currentCoupon.shortValue} at checkout + Free ${activeCountry.shortName} delivery over ${freeShipLabel}.`
+    : currentCoupon?.discountFlatLocal > 0
+    ? currentCoupon.minOrderLocal > 0
+      ? `Save ${currentCoupon.flatFormatted} immediately at checkout on orders above ${currentCoupon.minFormatted}.`
+      : `Save ${currentCoupon.flatFormatted} immediately at checkout across genuine ${activeCountry.shortName} stock.`
+    : currentCoupon?.minOrderLocal > 0
+    ? `Extra ${currentCoupon.discountPercent}% discount across smartphones, tablets, audio & wearables over ${currentCoupon.minFormatted}.`
+    : `Extra ${currentCoupon.shortValue} storewide across genuine devices with official 12-month warranty.`;
 
   return (
     <section className="bg-slate-50 border-b border-slate-200/80 pt-[92px] sm:pt-[108px] xl:pt-[144px] pb-6 text-left">
@@ -593,10 +610,10 @@ const EcommerceHero = ({ onOpenRfq }) => {
               </div>
 
               <h2 className="text-xl sm:text-2xl font-black tracking-tight leading-tight">
-                {currentCoupon?.description || currentPreset.headline}
+                {currentCoupon?.localizedDescription || currentPreset.headline}
               </h2>
               <p className="text-xs text-slate-200/90 leading-relaxed line-clamp-2">
-                {currentPreset.subtext}
+                {couponSubtext}
               </p>
             </div>
 

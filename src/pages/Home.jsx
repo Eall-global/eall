@@ -1,7 +1,6 @@
 import { useState } from "react";
 import EcommerceHero from "../components/home/EcommerceHero";
 import MerchandisingShelf from "../components/home/MerchandisingShelf";
-import LiveCouponsBanner from "../components/home/LiveCouponsBanner";
 import DualChannelSection from "../components/home/DualChannelSection";
 import BrandAndImeiSection from "../components/home/BrandAndImeiSection";
 import Testimonials from "../components/home/Testimonials";
@@ -19,19 +18,16 @@ const Home = () => {
       {/* 1. FULL-WIDTH 4-COLUMN COMMERCE MOSAIC + NOON-STYLE VISUAL QUICK-SHOP STRIP */}
       <EcommerceHero onOpenRfq={openRfqModal} />
 
-      {/* 2. DENSE FULL-WIDTH LIVE TABBED MERCHANDISING SHELF */}
+      {/* 2. LIVE TABBED MERCHANDISING SHELF WITH INTERLEAVED COUPON TICKET STRIPS */}
       <MerchandisingShelf />
 
-      {/* 3. LIVE PROMO VOUCHERS STRIP (SYNCED WITH PORTAL COUPONS) */}
-      <LiveCouponsBanner />
-
-      {/* 4. DUAL-CHANNEL RETAIL VS. WHOLESALE B2B SPLIT */}
+      {/* 3. DUAL-CHANNEL RETAIL VS. WHOLESALE B2B SPLIT */}
       <DualChannelSection onOpenRfq={openRfqModal} />
 
-      {/* 5. OFFICIAL BRAND SHOWCASE + IMEI WARRANTY VERIFIER */}
+      {/* 4. OFFICIAL BRAND SHOWCASE + IMEI WARRANTY VERIFIER */}
       <BrandAndImeiSection />
 
-      {/* 6. VERIFIED RETAIL & WHOLESALE REVIEWS */}
+      {/* 5. VERIFIED RETAIL & WHOLESALE REVIEWS */}
       <Testimonials />
 
       {/* INSTANT B2B WHOLESALE RFQ MODAL (WIRED TO PORTAL B2B QUOTES) */}

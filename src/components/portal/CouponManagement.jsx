@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   FiTag,
   FiPlus,
@@ -6,36 +6,40 @@ import {
   FiCheckCircle,
   FiXCircle,
   FiRefreshCw,
-  FiPercent,
-  FiCalendar,
   FiX,
-  FiDollarSign,
-  FiClock,
   FiGrid,
   FiList,
   FiSearch,
+  FiGlobe,
 } from "react-icons/fi";
 import {
   fetchCoupons,
   saveCoupon,
   deleteCoupon,
-  DEFAULT_COUPONS,
+  resolveCouponForLocation,
 } from "../../services/couponService";
+import { usePortalCurrency } from "../../context/PortalCurrencyContext";
 import { AedSymbol, AedPrice } from "../common/AedSymbol";
+import CountryFlag from "../common/CountryFlag";
+import { CouponTicketCard } from "../common/CouponTicketStrip";
 
 const CouponManagement = () => {
+  const portalCur = usePortalCurrency();
   const [coupons, setCoupons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [viewMode, setViewMode] = useState("grid"); // 'grid' | 'table'
   const [search, setSearch] = useState("");
+  const [copiedCode, setCopiedCode] = useState(null);
 
   // New Coupon Form State
   const [code, setCode] = useState("");
   const [description, setDescription] = useState("");
+  const [discountType, setDiscountType] = useState("percent"); // "percent" | "flat"
   const [discountPercent, setDiscountPercent] = useState(10);
   const [discountFlat, setDiscountFlat] = useState(0);
   const [minOrderAmount, setMinOrderAmount] = useState(0);
+  const [scopeMode, setScopeMode] = useState("ALL"); // "ALL" | active country code
   const [firstOrderOnly, setFirstOrderOnly] = useState(false);
   const [expiresAt, setExpiresAt] = useState("2027-12-31");
   const [isSaving, setIsSaving] = useState(false);
@@ -53,32 +57,57 @@ const CouponManagement = () => {
   };
 
   useEffect(() => {
-    loadCoupons();
+    let active = true;
+    fetchCoupons()
+      .then((data) => {
+        if (active) setCoupons(data);
+      })
+      .catch((e) => console.error("Could not load coupons:", e))
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
+
+  const handleOpenAddModal = () => {
+    setCode("");
+    setDescription("");
+    setDiscountType("percent");
+    setDiscountPercent(10);
+    setDiscountFlat(0);
+    setMinOrderAmount(0);
+    setScopeMode(portalCur.isAll ? "ALL" : portalCur.countryCode);
+    setFirstOrderOnly(false);
+    setExpiresAt("2027-12-31");
+    setShowAddModal(true);
+  };
 
   const handleSaveCoupon = async (e) => {
     e.preventDefault();
     if (!code.trim()) return;
+
+    const isGlobalScope = scopeMode === "ALL";
+    const couponCurrency = isGlobalScope ? "AED" : portalCur.currency;
 
     setIsSaving(true);
     try {
       await saveCoupon({
         code: code.trim(),
         description: description.trim(),
-        discountPercent: parseFloat(discountPercent) || 0,
-        discountFlat: parseFloat(discountFlat) || 0,
+        discountPercent:
+          discountType === "percent" ? parseFloat(discountPercent) || 0 : 0,
+        discountFlat:
+          discountType === "flat" ? parseFloat(discountFlat) || 0 : 0,
         minOrderAmount: parseFloat(minOrderAmount) || 0,
+        locationCode: isGlobalScope ? "ALL" : portalCur.countryCode,
+        currency: couponCurrency,
         firstOrderOnly: Boolean(firstOrderOnly),
         expiresAt,
         isActive: true,
       });
       setShowAddModal(false);
-      setCode("");
-      setDescription("");
-      setDiscountPercent(10);
-      setDiscountFlat(0);
-      setMinOrderAmount(0);
-      setFirstOrderOnly(false);
       loadCoupons();
     } catch (err) {
       alert(err.message || "Failed to save coupon");
@@ -102,11 +131,64 @@ const CouponManagement = () => {
     }
   };
 
-  const filteredCoupons = coupons.filter(
-    (c) =>
-      (c.code || "").toLowerCase().includes(search.toLowerCase()) ||
-      (c.description || "").toLowerCase().includes(search.toLowerCase())
-  );
+  const handleCopyPreview = (couponCode) => {
+    navigator.clipboard?.writeText(couponCode);
+    setCopiedCode(couponCode);
+    window.setTimeout(() => {
+      setCopiedCode((prev) => (prev === couponCode ? null : prev));
+    }, 1800);
+  };
+
+  // Resolve every coupon into the active Back Office location's currency & scope
+  const resolvedCoupons = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    return coupons
+      .map((c) => resolveCouponForLocation(c, portalCur.locationConfig))
+      .filter((c) => {
+        if (!portalCur.isAll && !c.isEligible) return false;
+        if (!q) return true;
+        return (
+          (c.code || "").toLowerCase().includes(q) ||
+          (c.localizedDescription || "").toLowerCase().includes(q) ||
+          (c.headline || "").toLowerCase().includes(q)
+        );
+      });
+  }, [coupons, portalCur.locationConfig, portalCur.isAll, search]);
+
+  // Live ticket preview inside Create Modal
+  const draftPreviewCoupon = useMemo(() => {
+    const isGlobalScope = scopeMode === "ALL";
+    return resolveCouponForLocation(
+      {
+        code: (code || "NEWCODE").toUpperCase().trim(),
+        description: description.trim(),
+        discountPercent:
+          discountType === "percent" ? parseFloat(discountPercent) || 0 : 0,
+        discountFlat:
+          discountType === "flat" ? parseFloat(discountFlat) || 0 : 0,
+        minOrderAmount: parseFloat(minOrderAmount) || 0,
+        locationCode: isGlobalScope ? "ALL" : portalCur.countryCode,
+        currency: isGlobalScope ? "AED" : portalCur.currency,
+        firstOrderOnly: Boolean(firstOrderOnly),
+      },
+      portalCur.locationConfig
+    );
+  }, [
+    code,
+    description,
+    discountType,
+    discountPercent,
+    discountFlat,
+    minOrderAmount,
+    scopeMode,
+    firstOrderOnly,
+    portalCur.countryCode,
+    portalCur.currency,
+    portalCur.locationConfig,
+  ]);
+
+  const modalCurrencySymbol =
+    scopeMode === "ALL" ? "AED" : portalCur.symbol;
 
   return (
     <div className="space-y-4 sm:space-y-5 text-left">
@@ -134,9 +216,8 @@ const CouponManagement = () => {
           )}
         </div>
 
-        {/* Actions: Icon-Only Grid/Table Toggle + Refresh + Create Coupon */}
+        {/* Actions: Grid/Table Toggle + Refresh + Create Coupon */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* Icon-Only View Mode Switcher */}
           <div
             role="group"
             aria-label="View mode"
@@ -185,7 +266,7 @@ const CouponManagement = () => {
 
           <button
             type="button"
-            onClick={() => setShowAddModal(true)}
+            onClick={handleOpenAddModal}
             className="ml-auto md:ml-0 inline-flex items-center justify-center gap-1.5 h-10 px-4 bg-sky-700 hover:bg-sky-800 dark:bg-sky-600 dark:hover:bg-sky-500 text-white text-xs font-bold rounded-xl transition shadow-xs cursor-pointer whitespace-nowrap"
           >
             <FiPlus className="text-base" />
@@ -194,29 +275,51 @@ const CouponManagement = () => {
         </div>
       </div>
 
-      {/* 🔲 VIEW MODE 1: GRID / CARDS VIEW (SUPPORTED ON BOTH MOBILE & WEB) */}
+      {/* 🔲 VIEW MODE 1: TICKET CARDS VIEW */}
       {viewMode === "grid" && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredCoupons.length === 0 ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+          {resolvedCoupons.length === 0 ? (
             <div className="col-span-full p-12 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 text-center text-slate-400 dark:text-slate-500 space-y-2">
               <FiTag className="text-4xl mx-auto text-slate-300 dark:text-slate-600" />
               <p className="text-sm font-semibold">No coupons matching your criteria.</p>
             </div>
           ) : (
-            filteredCoupons.map((c) => (
+            resolvedCoupons.map((c) => (
               <div
                 key={c.id || c.code}
-                className={`p-5 bg-white dark:bg-slate-900 rounded-3xl border transition-all duration-300 space-y-3.5 shadow-2xs hover:shadow-md flex flex-col justify-between ${
+                className={`p-4 bg-white dark:bg-slate-900 rounded-3xl border transition-all duration-300 space-y-3.5 shadow-2xs hover:shadow-md flex flex-col justify-between ${
                   c.isActive
                     ? "border-slate-200/80 dark:border-slate-800 hover:border-sky-300 dark:hover:border-sky-500/40"
                     : "border-slate-200/60 dark:border-slate-800/60 opacity-75 bg-slate-50/50 dark:bg-slate-900/60"
                 }`}
               >
                 <div className="space-y-3">
-                  {/* Card Header: Code & Active Pill */}
+                  {/* Live Storefront Ticket Preview */}
+                  <div className="rounded-2xl bg-[#091A32] p-1.5">
+                    <CouponTicketCard
+                      coupon={c}
+                      copied={copiedCode === c.code}
+                      onCopy={handleCopyPreview}
+                      compact={true}
+                    />
+                  </div>
+
+                  {/* Scope + Active Toggle Row */}
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-mono font-black text-sm px-3 py-1 rounded-xl bg-sky-50 dark:bg-sky-500/15 text-sky-900 dark:text-sky-300 border border-sky-200 dark:border-sky-500/25 truncate">
-                      {c.code}
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[10.5px] font-bold">
+                      {c.isGlobal ? (
+                        <>
+                          <FiGlobe className="text-sky-600 dark:text-sky-400 text-xs" />
+                          <span>
+                            Global • {portalCur.currency} Auto FX
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <CountryFlag code={c.locationCode} size="xs" />
+                          <span>{c.locationCode} Exclusive</span>
+                        </>
+                      )}
                     </span>
 
                     <button
@@ -240,14 +343,12 @@ const CouponManagement = () => {
                     </button>
                   </div>
 
-                  {/* Description */}
-                  {c.description && (
-                    <p className="text-xs text-slate-600 dark:text-slate-400 font-medium leading-relaxed line-clamp-2">
-                      {c.description}
-                    </p>
-                  )}
+                  {/* Localized Description */}
+                  <p className="text-xs text-slate-600 dark:text-slate-400 font-medium leading-relaxed line-clamp-2">
+                    {c.localizedDescription}
+                  </p>
 
-                  {/* Metrics 2x2 Grid */}
+                  {/* Metrics 2x2 Grid (Localized to Active Country Currency!) */}
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
                     <div className="p-2.5 bg-slate-50 dark:bg-slate-800/70 rounded-2xl space-y-0.5">
                       <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">
@@ -259,7 +360,7 @@ const CouponManagement = () => {
                         </span>
                       ) : (
                         <span className="font-mono font-black text-emerald-700 dark:text-emerald-400 text-xs">
-                          <AedPrice amount={c.discountFlat} /> OFF
+                          <AedPrice amount={c.discountFlatLocal} decimals={0} /> OFF
                         </span>
                       )}
                     </div>
@@ -268,10 +369,16 @@ const CouponManagement = () => {
                       <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">
                         Min. Spend
                       </span>
-                      {c.minOrderAmount > 0 ? (
-                        <AedPrice amount={c.minOrderAmount} className="font-mono font-bold text-slate-800 dark:text-slate-200 text-xs" />
+                      {c.minOrderLocal > 0 ? (
+                        <AedPrice
+                          amount={c.minOrderLocal}
+                          decimals={0}
+                          className="font-mono font-bold text-slate-800 dark:text-slate-200 text-xs"
+                        />
                       ) : (
-                        <span className="text-slate-500 dark:text-slate-400 font-medium text-xs">No Minimum</span>
+                        <span className="text-slate-500 dark:text-slate-400 font-medium text-xs">
+                          No Minimum
+                        </span>
                       )}
                     </div>
 
@@ -331,6 +438,7 @@ const CouponManagement = () => {
               <thead>
                 <tr className="bg-slate-50/90 dark:bg-slate-800/70 border-b border-slate-200/80 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-[11px] font-bold uppercase tracking-wider">
                   <th className="py-3.5 px-4">Coupon Code</th>
+                  <th className="py-3.5 px-4">Scope</th>
                   <th className="py-3.5 px-4">Discount Value</th>
                   <th className="py-3.5 px-4">Min. Spend (<AedSymbol />)</th>
                   <th className="py-3.5 px-4 text-center">Audience</th>
@@ -340,25 +448,38 @@ const CouponManagement = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 font-medium text-slate-700 dark:text-slate-300">
-                {filteredCoupons.length === 0 ? (
+                {resolvedCoupons.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-slate-400 dark:text-slate-500">
+                    <td colSpan={8} className="py-12 text-center text-slate-400 dark:text-slate-500">
                       <FiTag className="text-3xl mx-auto mb-2 text-slate-300 dark:text-slate-600" />
                       <p className="text-sm font-semibold">No coupons found.</p>
                     </td>
                   </tr>
                 ) : (
-                  filteredCoupons.map((c) => (
+                  resolvedCoupons.map((c) => (
                     <tr key={c.id || c.code} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/60 transition">
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-2">
                           <span className="font-mono font-black text-xs sm:text-sm px-2.5 py-1 rounded-lg bg-sky-50 dark:bg-sky-500/15 text-sky-900 dark:text-sky-300 border border-sky-200 dark:border-sky-500/25">
                             {c.code}
                           </span>
-                          {c.description && (
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-xs">{c.description}</p>
-                          )}
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-xs">
+                            {c.localizedDescription}
+                          </p>
                         </div>
+                      </td>
+
+                      <td className="py-3.5 px-4 whitespace-nowrap text-xs">
+                        {c.isGlobal ? (
+                          <span className="inline-flex items-center gap-1 text-sky-700 dark:text-sky-300 font-bold">
+                            <FiGlobe className="text-xs" /> Global
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 font-bold">
+                            <CountryFlag code={c.locationCode} size="xs" />
+                            <span>{c.locationCode}</span>
+                          </span>
+                        )}
                       </td>
 
                       <td className="py-3.5 px-4">
@@ -368,14 +489,14 @@ const CouponManagement = () => {
                           </span>
                         ) : (
                           <span className="font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-500/15 px-2 py-0.5 rounded-md font-mono text-xs">
-                            <AedPrice amount={c.discountFlat} /> OFF
+                            <AedPrice amount={c.discountFlatLocal} decimals={0} /> OFF
                           </span>
                         )}
                       </td>
 
                       <td className="py-3.5 px-4 font-mono">
-                        {c.minOrderAmount > 0 ? (
-                          <AedPrice amount={c.minOrderAmount} />
+                        {c.minOrderLocal > 0 ? (
+                          <AedPrice amount={c.minOrderLocal} decimals={0} />
                         ) : (
                           <span className="text-slate-400 dark:text-slate-500">No minimum</span>
                         )}
@@ -453,7 +574,52 @@ const CouponManagement = () => {
               </button>
             </div>
 
+            {/* Live Ticket Preview */}
+            <div className="rounded-2xl bg-[#091A32] p-2">
+              <CouponTicketCard
+                coupon={draftPreviewCoupon}
+                copied={false}
+                onCopy={() => {}}
+                compact={true}
+              />
+            </div>
+
             <form onSubmit={handleSaveCoupon} className="space-y-4 text-xs">
+              {/* Scope Selector (Global Auto FX vs Country-Specific) */}
+              <div>
+                <label className="block font-bold text-slate-700 dark:text-slate-300 uppercase text-[10px] mb-1">
+                  Country Availability &amp; Currency
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setScopeMode("ALL")}
+                    className={`p-2 rounded-xl border text-left font-bold transition cursor-pointer flex items-center gap-2 ${
+                      scopeMode === "ALL"
+                        ? "bg-sky-50 dark:bg-sky-500/15 border-sky-500 text-sky-900 dark:text-sky-200"
+                        : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400"
+                    }`}
+                  >
+                    <FiGlobe className="text-sm shrink-0 text-sky-600" />
+                    <span className="truncate">All Countries (AED Auto FX)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setScopeMode(portalCur.countryCode)}
+                    className={`p-2 rounded-xl border text-left font-bold transition cursor-pointer flex items-center gap-2 ${
+                      scopeMode !== "ALL"
+                        ? "bg-sky-50 dark:bg-sky-500/15 border-sky-500 text-sky-900 dark:text-sky-200"
+                        : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400"
+                    }`}
+                  >
+                    <CountryFlag code={portalCur.countryCode} size="xs" />
+                    <span className="truncate">
+                      {portalCur.shortName} Only ({portalCur.currency})
+                    </span>
+                  </button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 dark:text-slate-300 uppercase text-[10px] mb-1">
@@ -462,7 +628,7 @@ const CouponManagement = () => {
                   <input
                     required
                     type="text"
-                    placeholder="e.g. WELCOME10, SUMMER20"
+                    placeholder="e.g. WELCOME10, KE500"
                     value={code}
                     onChange={(e) => setCode(e.target.value.toUpperCase())}
                     className="w-full p-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl font-mono uppercase font-bold text-slate-900 dark:text-white outline-none focus:border-sky-600 dark:focus:border-sky-500"
@@ -470,27 +636,66 @@ const CouponManagement = () => {
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 uppercase text-[10px] mb-1">
-                    Discount Percentage (%)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={discountPercent}
-                    onChange={(e) => setDiscountPercent(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl font-mono font-bold text-emerald-700 dark:text-emerald-400 outline-none focus:border-sky-600 dark:focus:border-sky-500"
-                  />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-bold text-slate-700 dark:text-slate-300 uppercase text-[10px]">
+                      {discountType === "percent"
+                        ? "Discount (%)"
+                        : `Flat Discount (${modalCurrencySymbol})`}
+                    </label>
+                    <div className="inline-flex rounded-lg bg-slate-100 dark:bg-slate-800 p-0.5 text-[10px] font-bold">
+                      <button
+                        type="button"
+                        onClick={() => setDiscountType("percent")}
+                        className={`px-2 py-0.5 rounded-md cursor-pointer ${
+                          discountType === "percent"
+                            ? "bg-sky-700 text-white"
+                            : "text-slate-500"
+                        }`}
+                      >
+                        %
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDiscountType("flat")}
+                        className={`px-2 py-0.5 rounded-md cursor-pointer ${
+                          discountType === "flat"
+                            ? "bg-sky-700 text-white"
+                            : "text-slate-500"
+                        }`}
+                      >
+                        {modalCurrencySymbol}
+                      </button>
+                    </div>
+                  </div>
+                  {discountType === "percent" ? (
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={discountPercent}
+                      onChange={(e) => setDiscountPercent(e.target.value)}
+                      className="w-full p-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl font-mono font-bold text-emerald-700 dark:text-emerald-400 outline-none focus:border-sky-600 dark:focus:border-sky-500"
+                    />
+                  ) : (
+                    <input
+                      type="number"
+                      min="1"
+                      step="any"
+                      value={discountFlat}
+                      onChange={(e) => setDiscountFlat(e.target.value)}
+                      className="w-full p-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl font-mono font-bold text-emerald-700 dark:text-emerald-400 outline-none focus:border-sky-600 dark:focus:border-sky-500"
+                    />
+                  )}
                 </div>
               </div>
 
               <div>
                 <label className="block font-bold text-slate-700 dark:text-slate-300 uppercase text-[10px] mb-1">
-                  Description / Marketing Note
+                  Description / Marketing Note (Optional)
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. 10% discount for first time shoppers"
+                  placeholder="Leave blank to auto-localize currency copy per country"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   className="w-full p-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white outline-none focus:border-sky-600 dark:focus:border-sky-500 font-medium"
@@ -500,7 +705,7 @@ const CouponManagement = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 dark:text-slate-300 uppercase text-[10px] mb-1">
-                    Min Order Subtotal (<AedSymbol />)
+                    Min Order Subtotal ({modalCurrencySymbol})
                   </label>
                   <input
                     type="number"

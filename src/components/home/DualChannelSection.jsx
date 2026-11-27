@@ -6,13 +6,7 @@ import {
   FiArrowRight,
 } from "react-icons/fi";
 import { BsWhatsapp } from "react-icons/bs";
-
-const RETAIL_PERKS = [
-  "Instant online checkout for 1 to 9 units — no account required",
-  "Pay via Apple Pay, Card, Tabby, Tamara, Wave Transfer or COD",
-  "Free Express UAE delivery on orders above AED 500",
-  "100% genuine factory-sealed devices with official 12-month warranty",
-];
+import { useCountry } from "../../context/CountryContext";
 
 const WHOLESALE_PERKS = [
   "Master-carton & tiered dealer pricing from 10 to 5,000+ units",
@@ -22,6 +16,21 @@ const WHOLESALE_PERKS = [
 ];
 
 const DualChannelSection = ({ onOpenRfq }) => {
+  const { activeCountry, countryPath, formatPrice, convertPrice } = useCountry();
+  const freeShipLabel = formatPrice(
+    Number(activeCountry?.freeShippingThresholdLocal) || convertPrice(500)
+  );
+  const retailPerks = [
+    "Instant online checkout for 1 to 9 units — no account required",
+    activeCountry.code === "KE"
+      ? "Pay via M-Pesa, Card, Apple Pay, Bank Transfer or COD"
+      : activeCountry.code === "SN" || activeCountry.code === "CI"
+      ? "Pay via Wave, Orange Money, Card, Bank Transfer or COD"
+      : "Pay via Apple Pay, Card, Tabby, Tamara, Wave Transfer or COD",
+    `Free Express ${activeCountry.shortName} delivery on orders above ${freeShipLabel}`,
+    "100% genuine factory-sealed devices with official 12-month warranty",
+  ];
+
   return (
     <section className="py-10 sm:py-12 bg-white text-left">
       <div className="w-full px-4 sm:px-6 lg:px-8 space-y-6">
@@ -52,12 +61,12 @@ const DualChannelSection = ({ onOpenRfq }) => {
                   Personal &amp; Retail Checkout
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-500 mt-1 leading-relaxed">
-                  Order genuine smartphones, earbuds, and everyday tech directly from our Dubai warehouse with fast doorstep delivery.
+                  Order genuine smartphones, earbuds, and everyday tech directly from our {activeCountry.hubName} with fast doorstep delivery.
                 </p>
               </div>
 
               <ul className="space-y-2.5 pt-1">
-                {RETAIL_PERKS.map((perk) => (
+                {retailPerks.map((perk) => (
                   <li
                     key={perk}
                     className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-700"
@@ -73,14 +82,14 @@ const DualChannelSection = ({ onOpenRfq }) => {
 
             <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-slate-100">
               <Link
-                to="/products"
+                to={countryPath("/products")}
                 className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-slate-900 hover:bg-sky-700 text-white text-xs sm:text-sm font-bold shadow-xs transition"
               >
                 <span>Start Retail Shopping</span>
                 <FiArrowRight />
               </Link>
               <Link
-                to="/brands"
+                to={countryPath("/brands")}
                 className="inline-flex items-center gap-1.5 px-4 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs sm:text-sm font-bold transition"
               >
                 Explore Official Brands

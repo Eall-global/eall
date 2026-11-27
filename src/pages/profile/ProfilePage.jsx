@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -31,7 +31,6 @@ import {
   FiHelpCircle,
   FiInfo,
   FiTag,
-  FiCopy,
   FiShoppingCart,
 } from "react-icons/fi";
 import { FaFacebookSquare, FaLinkedin, FaTiktok } from "react-icons/fa";
@@ -41,7 +40,10 @@ import { useWishlist } from "../../context/WishlistContext";
 import { useCart } from "../../context/CartContext";
 import { useCountry } from "../../context/CountryContext";
 import { downloadInvoicePDF } from "../../services/pdfInvoiceGenerator";
-import { fetchCoupons, DEFAULT_COUPONS } from "../../services/couponService";
+import {
+  CouponTicketCard,
+  useLocalizedCoupons,
+} from "../../components/common/CouponTicketStrip";
 import InvoiceDocument from "../../components/portal/InvoiceDocument";
 import QuickRfqModal from "../../components/home/QuickRfqModal";
 import CountryFlag from "../../components/common/CountryFlag";
@@ -118,21 +120,8 @@ const ProfilePage = () => {
   const [addressSuccessMsg, setAddressSuccessMsg] = useState("");
   const [copiedCoupon, setCopiedCoupon] = useState("");
 
-  // Active Coupons
-  const [coupons, setCoupons] = useState(DEFAULT_COUPONS);
-  useEffect(() => {
-    let active = true;
-    fetchCoupons()
-      .then((list) => {
-        if (!active || !Array.isArray(list)) return;
-        const valid = list.filter((c) => c.isActive !== false);
-        if (valid.length > 0) setCoupons(valid);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, []);
+  // Active Coupons (automatically localized to activeCountry currency & scope)
+  const coupons = useLocalizedCoupons();
 
   // Personal Info Form
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -1450,43 +1439,23 @@ const ProfilePage = () => {
             {/* ---------------- SUB-VIEW: COUPONS & OFFERS ---------------- */}
             {effectiveView === "coupons" && (
               <div className="space-y-3">
-                {coupons.map((c) => {
-                  const isCopied = copiedCoupon === c.code;
-                  return (
-                    <div
+                <div
+                  className="rounded-2xl bg-[#091A32] p-2.5 sm:p-3 space-y-2.5 shadow-sm"
+                  style={{
+                    backgroundImage:
+                      "repeating-linear-gradient(135deg, rgba(14,165,233,0.09) 0px, rgba(14,165,233,0.09) 2px, transparent 2px, transparent 14px)",
+                  }}
+                >
+                  {coupons.map((c, idx) => (
+                    <CouponTicketCard
                       key={c.id || c.code}
-                      className="bg-white rounded-2xl p-4 border border-slate-200/80 flex items-center justify-between gap-3"
-                    >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono font-black text-xs px-2.5 py-1 rounded-lg bg-sky-50 text-sky-800 border border-dashed border-sky-300">
-                            {c.code}
-                          </span>
-                          <span className="text-[11px] font-extrabold text-emerald-700">
-                            {Number(c.discountPercent) > 0
-                              ? `${c.discountPercent}% OFF`
-                              : `Flat ${c.discountFlat} OFF`}
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-600 mt-1.5">
-                          {c.description}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleCopyCoupon(c.code)}
-                        className={`px-3 py-2 rounded-xl text-xs font-bold shrink-0 inline-flex items-center gap-1 transition cursor-pointer ${
-                          isCopied
-                            ? "bg-emerald-600 text-white"
-                            : "bg-slate-900 hover:bg-sky-700 text-white"
-                        }`}
-                      >
-                        {isCopied ? <FiCheck /> : <FiCopy />}
-                        <span>{isCopied ? "Copied" : "Copy"}</span>
-                      </button>
-                    </div>
-                  );
-                })}
+                      coupon={c}
+                      copied={copiedCoupon === c.code}
+                      onCopy={handleCopyCoupon}
+                      accentVariant={idx % 2 === 1 ? "highlight" : "primary"}
+                    />
+                  ))}
+                </div>
               </div>
             )}
 
